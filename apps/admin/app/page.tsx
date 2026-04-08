@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 const slots = [
   { id: '12', status: 'Reserved', driver: 'Maria D.' },
   { id: '13', status: 'Available', driver: '-' },
@@ -16,6 +18,24 @@ export default function Page() {
         <p style={{ maxWidth: 760, color: '#a9bdd6', fontSize: 18, lineHeight: 1.6, margin: 0 }}>
           Monitor reservations, resolve conflicts, and keep slot state accurate across the property.
         </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <Link
+            href="/qr"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: '#3dd6a5',
+              color: '#071018',
+              fontWeight: 800,
+              textDecoration: 'none',
+            }}
+          >
+            Print Slot QR Codes
+          </Link>
+        </div>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>

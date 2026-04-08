@@ -1,12 +1,16 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import type { ParkingSessionResult, ReservationResult } from '../lib/reservations';
+
 type Props = {
+  reservation: ReservationResult | null;
+  parkingSession: ParkingSessionResult | null;
   onFinish: () => void;
   onBack: () => void;
 };
 
-export function SessionScreen({ onFinish, onBack }: Props) {
+export function SessionScreen({ reservation, parkingSession, onFinish, onBack }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Step 3 of 3</Text>
@@ -17,15 +21,25 @@ export function SessionScreen({ onFinish, onBack }: Props) {
         <Text style={styles.cardTitle}>Live Session</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Timer</Text>
-          <Text style={styles.rowValue}>01:24:18</Text>
+          <Text style={styles.rowValue}>Running</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Estimated Total</Text>
-          <Text style={styles.rowValue}>PHP 110.00</Text>
+          <Text style={styles.rowLabel}>Reservation</Text>
+          <Text style={styles.rowValue}>{reservation?.slot_label ?? 'Unknown slot'}</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Status</Text>
-          <Text style={styles.rowValue}>Active</Text>
+          <Text style={styles.rowLabel}>Session Status</Text>
+          <Text style={styles.rowValue}>{parkingSession?.session_status ?? 'Active'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Started</Text>
+          <Text style={styles.rowValue}>
+            {parkingSession?.started_at ? new Date(parkingSession.started_at).toLocaleTimeString() : 'Just now'}
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Plate</Text>
+          <Text style={styles.rowValue}>{parkingSession?.plate_number ?? 'N/A'}</Text>
         </View>
       </View>
 

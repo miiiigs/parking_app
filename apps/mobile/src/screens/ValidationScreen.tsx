@@ -1,12 +1,29 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+import type { ReservationResult } from '../lib/reservations';
 
 type Props = {
+  reservation: ReservationResult | null;
+  assignedSlotLabel: string;
+  slotQrToken: string;
+  onSlotQrTokenChange: (value: string) => void;
+  isSubmitting: boolean;
+  errorMessage: string | null;
   onValidate: () => void;
   onBack: () => void;
 };
 
-export function ValidationScreen({ onValidate, onBack }: Props) {
+export function ValidationScreen({
+  reservation,
+  assignedSlotLabel,
+  slotQrToken,
+  onSlotQrTokenChange,
+  isSubmitting,
+  errorMessage,
+  onValidate,
+  onBack,
+}: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Step 2 of 3</Text>
@@ -14,17 +31,48 @@ export function ValidationScreen({ onValidate, onBack }: Props) {
       <Text style={styles.subtitle}>Scan the QR on the slot or confirm manually to start the session.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Assigned Slot</Text>
-        <Text style={styles.bigValue}>Slot #12</Text>
-        <Text style={styles.helper}>QR must match the reserved slot before the timer starts.</Text>
+        <Text style={styles.cardTitle}>Reservation Details</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Slot</Text>
+          <Text style={styles.rowValue}>{reservation?.slot_label ?? assignedSlotLabel}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Status</Text>
+          <Text style={styles.rowValue}>{reservation?.reservation_status ?? 'Pending'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Expires</Text>
+          <Text style={styles.rowValue}>{reservation?.expires_at ? new Date(reservation.expires_at).toLocaleTimeString() : 'N/A'}</Text>
+        </View>
+        <Text style={styles.helper}>Validate the created reservation to start the parking session.</Text>
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Slot QR Token</Text>
+        <TextInput
+          value={slotQrToken}
+          onChangeText={onSlotQrTokenChange}
+          placeholder="Paste or scan the slot QR token"
+          placeholderTextColor="#5e7490"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <Text style={styles.helper}>For now, paste the token from the assigned slot. QR camera scanning can come next.</Text>
+      </View>
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={onValidate}>
-          <Text style={styles.primaryButtonText}>I’m Parked</Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSubmitting ? styles.primaryButtonDisabled : null]}
+          onPress={onValidate}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Starting...' : 'I’m Parked'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -68,13 +116,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  bigValue: {
-    color: '#3dd6a5',
-    fontSize: 30,
-    fontWeight: '800',
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  rowLabel: {
+    color: '#b8c7da',
+    fontSize: 14,
+  },
+  rowValue: {
+    color: '#f4f7fb',
+    fontSize: 14,
+    fontWeight: '700',
   },
   helper: {
     color: '#b8c7da',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  input: {
+    backgroundColor: '#08111d',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#18283f',
+    color: '#f4f7fb',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  errorText: {
+    color: '#ff8a80',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -89,6 +161,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: '#071018',
