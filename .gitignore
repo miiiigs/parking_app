@@ -1,1 +1,22 @@
-node_modules
+node_modules/
+**/node_modules/
+
+# Environment files
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.template
+
+# Expo / Next / build output
+**/.expo/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/coverage/
+**/*.tsbuildinfo
+
+# Logs and OS clutter
+*.log
+.DS_Store
+Thumbs.db
