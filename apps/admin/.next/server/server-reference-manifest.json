@@ -1,0 +1,19 @@
+{
+  "node": {
+    "40bf3cc959732af9a7f707a7588834c1e3d1b6315b": {
+      "workers": {
+        "app/page": {
+          "moduleId": "(rsc)/../../node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5CDesktop%202%5C%5CDocuments%5C%5CMigs%20Documents%5C%5Cparking_app%5C%5Capps%5C%5Cadmin%5C%5Capp%5C%5Cactions.ts%22%2C%5B%7B%22id%22%3A%2240bf3cc959732af9a7f707a7588834c1e3d1b6315b%22%2C%22exportedName%22%3A%22updateSlotStatus%22%2C%22filename%22%3A%22..%2FC%3A%5C%5CUsers%5C%5CDesktop%202%5C%5CDocuments%5C%5CMigs%20Documents%5C%5Cparking_app%5C%5Capps%5C%5Cadmin%5C%5Capp%5C%5Cactions.ts%22%7D%5D%5D%5D&__client_imported__=!",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "rsc"
+      },
+      "filename": "../C:\\Users\\Desktop 2\\Documents\\Migs Documents\\parking_app\\apps\\admin\\app\\actions.ts",
+      "exportedName": "updateSlotStatus"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "tZJ/8SHBuIo/IdF57Ma7bmXlbXdJo//7XMFvOhd3pQ8="
+}

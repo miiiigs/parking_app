@@ -130,7 +130,7 @@ export default function App() {
     }
   }
 
-  async function handleStartSession() {
+  async function handleStartSession(slotQrTokenOverride?: string) {
     if (!createdReservation) {
       setReservationError('Create a reservation before starting a parking session.');
       setStage('reserve');
@@ -140,10 +140,12 @@ export default function App() {
     setIsStartingSession(true);
     setReservationError(null);
 
+    const tokenToUse = (slotQrTokenOverride ?? validationQrToken).trim();
+
     try {
       const sessionRecords = await startParkingSession({
         reservationId: createdReservation.reservation_id,
-        slotQrToken: validationQrToken.trim() || null,
+        slotQrToken: tokenToUse || null,
       });
 
       const session = Array.isArray(sessionRecords) ? sessionRecords[0] ?? null : sessionRecords;
@@ -189,6 +191,7 @@ export default function App() {
         <ValidationScreen
           reservation={createdReservation}
           assignedSlotLabel={createdReservationSlotLabel}
+          expectedQrToken={createdReservation ? parkingData.slots.find((slot) => slot.id === createdReservation.slot_id)?.qrToken ?? validationQrToken : validationQrToken}
           slotQrToken={validationQrToken}
           onSlotQrTokenChange={setValidationQrToken}
           onValidate={handleStartSession}
