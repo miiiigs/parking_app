@@ -10,6 +10,7 @@ node_modules/
 # Expo / Next / build output
 **/.expo/
 **/.next/
+**/.next/trace
 **/out/
 **/dist/
 **/build/
