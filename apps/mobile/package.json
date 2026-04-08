@@ -1,0 +1,19 @@
+{
+  "name": "@parking/mobile",
+  "private": true,
+  "main": "expo/AppEntry",
+  "dependencies": {
+    "expo": "^52.0.0",
+    "react": "^18.3.0",
+    "react-native": "^0.76.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  },
+  "scripts": {
+    "start": "expo start --tunnel",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "smart-parking-reservation-system",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "npm --workspace apps/mobile run start",
+    "dev:admin": "npm --workspace apps/admin run dev",
+    "build:admin": "npm --workspace apps/admin run build"
+  }
+}
