@@ -12,8 +12,12 @@ returns table (
   session_status text,
   started_at timestamptz,
   validated_at timestamptz,
+  ended_at timestamptz,
   plate_number text,
-  reservation_fee numeric
+  reservation_fee numeric,
+  billed_minutes integer,
+  billed_amount numeric,
+  payment_status text
 )
 language plpgsql
 security definer
@@ -72,8 +76,12 @@ begin
         v_existing_session.status,
         v_existing_session.started_at,
         v_reservation.validated_at,
+        v_existing_session.ended_at,
         v_reservation.plate_number,
-        v_reservation.reservation_fee;
+        v_reservation.reservation_fee,
+        v_existing_session.billed_minutes,
+        v_existing_session.billed_amount,
+        null::text;
 
     return;
   end if;
@@ -134,8 +142,12 @@ begin
       'active',
       v_started_at,
       v_started_at,
+      null::timestamptz,
       v_reservation.plate_number,
-      v_reservation.reservation_fee;
+      v_reservation.reservation_fee,
+      null::integer,
+      null::numeric,
+      null::text;
 end;
 $$;
 

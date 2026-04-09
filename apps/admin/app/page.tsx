@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
-import { updateSlotStatus } from './actions';
+import { resetDemoData, resetParkingSlots, updateSlotStatus } from './actions';
+import { DashboardLiveRefresh } from './DashboardLiveRefresh';
 import { getFallbackAdminDashboardData, loadAdminDashboardData } from '../lib/dashboard';
 
 const statusTheme = {
@@ -21,11 +22,6 @@ const stateDescriptions = [
     status: 'occupied' as const,
     title: 'Occupied',
     description: 'The vehicle is physically parked and the live session is active.',
-  },
-  {
-    status: 'blocked' as const,
-    title: 'Blocked',
-    description: 'Temporarily unavailable because of maintenance, cleaning, staff hold, or physical issues.',
   },
   {
     status: 'blocked' as const,
@@ -102,6 +98,47 @@ export default async function Page() {
           >
             Print Slot QR Codes
           </Link>
+          <DashboardLiveRefresh />
+          <form action={resetParkingSlots}>
+            <input type="hidden" name="redirectTo" value="/" />
+            <button
+              type="submit"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: '#ff8a80',
+                color: '#1b0c0d',
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Reset Slot Statuses
+            </button>
+          </form>
+          <form action={resetDemoData}>
+            <input type="hidden" name="redirectTo" value="/" />
+            <button
+              type="submit"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: '#ff5d5d',
+                color: '#1b0c0d',
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Full Demo Reset
+            </button>
+          </form>
         </div>
       </section>
 
@@ -109,6 +146,7 @@ export default async function Page() {
         {[
           ['Active Reservations', String(dashboardData.metrics.activeReservations)],
           ['Occupied Slots', String(dashboardData.metrics.occupiedSlots)],
+          ['Completed Sessions', String(dashboardData.metrics.completedSessions)],
           ['No-Shows Today', String(dashboardData.metrics.noShowsToday)],
           ['Revenue', `PHP ${dashboardData.metrics.revenue.toFixed(2)}`],
         ].map(([label, value]) => (

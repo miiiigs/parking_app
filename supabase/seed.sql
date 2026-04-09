@@ -24,7 +24,7 @@ begin
       '11111111-1111-1111-1111-111111111111',
       'Slot #' || slot_index,
       slot_index,
-      case when slot_index = 12 then 'reserved' else 'available' end,
+      'available',
       'bgc-pilot-slot-' || slot_index
     )
     on conflict do nothing;

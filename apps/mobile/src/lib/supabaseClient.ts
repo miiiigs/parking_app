@@ -4,9 +4,9 @@ function getEnv() {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 }
 
-let cachedClient: ReturnType<typeof createClient> | null = null;
+let cachedClient: any = null;
 
-export function getSupabaseClient() {
+export function getSupabaseClient(): any {
   if (cachedClient) {
     return cachedClient;
   }

@@ -7,7 +7,7 @@ export default async function QRPage() {
 
   return (
     <main style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 24px' }}>
-      <style jsx global>{`
+      <style>{`
         @media print {
           @page {
             size: A4;

@@ -19,6 +19,7 @@ export type AdminSlot = {
 export type AdminMetrics = {
   activeReservations: number;
   occupiedSlots: number;
+  completedSessions: number;
   noShowsToday: number;
   revenue: number;
 };
@@ -28,7 +29,7 @@ export type AdminReservation = {
   slotId: string;
   slotLabel: string;
   plateNumber: string;
-  status: 'pending' | 'confirmed' | 'expired' | 'cancelled' | 'no_show';
+  status: 'pending' | 'confirmed' | 'completed' | 'expired' | 'cancelled' | 'no_show';
   arrivalWindowMinutes: number;
   reservationFee: number;
   reservedAt: string;
@@ -118,6 +119,7 @@ export function getFallbackAdminDashboardData(): AdminDashboardData {
     metrics: {
       activeReservations: 1,
       occupiedSlots: 0,
+        completedSessions: 0,
       noShowsToday: 0,
       revenue: 0,
     },
@@ -185,7 +187,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
   }>;
 
   const sessionResponse = await fetch(
-    `${config.url}/rest/v1/parking_sessions?select=status,billed_amount,slot_id&status=in.(active)&order=started_at.desc`,
+    `${config.url}/rest/v1/parking_sessions?select=status,billed_amount,slot_id&status=in.(active,completed)&order=started_at.desc`,
     {
       headers,
       cache: 'no-store',
@@ -198,7 +200,23 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     slot_id: string;
   }>;
 
-  const activeSessionSlotIds = new Set(sessionRows.map((session) => session.slot_id));
+  const activeSessionRows = sessionRows.filter((session) => session.status === 'active');
+  const completedSessionCount = sessionRows.filter((session) => session.status === 'completed').length;
+
+  const paymentResponse = await fetch(
+    `${config.url}/rest/v1/payments?select=amount,status&status=eq.paid&order=paid_at.desc`,
+    {
+      headers,
+      cache: 'no-store',
+    },
+  );
+
+  const paymentRows = (await paymentResponse.json()) as SupabaseListResponse<{
+    amount: number;
+    status: 'paid';
+  }>;
+
+  const activeSessionSlotIds = new Set(activeSessionRows.map((session) => session.slot_id));
   const confirmedReservationSlotIds = new Set(reservationRows.map((reservation) => reservation.slot_id));
 
   const slots =
@@ -232,7 +250,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
   const activeReservations = reservations.filter((reservation) => reservation.status === 'confirmed').length;
   const occupiedSlots = activeSessionSlotIds.size;
   const noShowsToday = reservations.filter((reservation) => reservation.status === 'no_show').length;
-  const revenue = sessionRows.reduce((total, session) => total + Number(session.billed_amount ?? 0), 0);
+  const revenue = paymentRows.reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
 
   return {
     location,
@@ -241,6 +259,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     metrics: {
       activeReservations,
       occupiedSlots,
+        completedSessions: completedSessionCount,
       noShowsToday,
       revenue,
     },

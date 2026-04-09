@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  AppState,
+  type AppStateStatus,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -19,10 +21,14 @@ import {
 } from './src/lib/parkingData';
 import {
   createParkingReservation,
+  endParkingSession,
+  getParkingReservationById,
+  getParkingSessionByReservationId,
   startParkingSession,
   type ParkingSessionResult,
   type ReservationResult,
 } from './src/lib/reservations';
+import { getSupabaseClient } from './src/lib/supabaseClient';
 import {
   DEFAULT_ARRIVAL_WINDOW_MINUTES,
   ARRIVAL_WINDOW_OPTIONS,
@@ -40,9 +46,68 @@ export default function App() {
   const [validationQrToken, setValidationQrToken] = useState('');
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   const [reservationError, setReservationError] = useState<string | null>(null);
   const [createdReservation, setCreatedReservation] = useState<ReservationResult | null>(null);
   const [activeParkingSession, setActiveParkingSession] = useState<ParkingSessionResult | null>(null);
+  const syncInProgressRef = useRef(false);
+
+  async function refreshFromBackend() {
+    if (syncInProgressRef.current) {
+      return;
+    }
+
+    syncInProgressRef.current = true;
+
+    try {
+      const refreshedParkingData = await loadParkingDashboardData();
+      setParkingData(refreshedParkingData);
+
+      setSelectedSlotId((currentSelectedSlotId) => {
+        if (currentSelectedSlotId && refreshedParkingData.slots.some((slot) => slot.id === currentSelectedSlotId)) {
+          return currentSelectedSlotId;
+        }
+
+        const nextAvailableSlot = refreshedParkingData.slots.find((slot) => slot.status === 'available') ?? refreshedParkingData.slots[0] ?? null;
+
+        return nextAvailableSlot?.id ?? null;
+      });
+
+      if (createdReservation) {
+        const latestReservation = await getParkingReservationById(createdReservation.reservation_id);
+
+        if (!latestReservation) {
+          setCreatedReservation(null);
+          setActiveParkingSession(null);
+          setValidationQrToken('');
+          setReservationError('Reservation was removed from the database.');
+          setStage('home');
+          return;
+        }
+
+        setCreatedReservation(latestReservation);
+
+        const latestSession = await getParkingSessionByReservationId(createdReservation.reservation_id);
+
+        if (latestSession) {
+          setActiveParkingSession(latestSession);
+          if (stage === 'validate') {
+            setStage('session');
+          }
+        } else {
+          setActiveParkingSession(null);
+          if (stage === 'session') {
+            setStage('validate');
+          }
+        }
+      }
+    } catch {
+      setParkingData(getFallbackParkingData());
+    } finally {
+      syncInProgressRef.current = false;
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     const currentSelectionExists = selectedSlotId && parkingData.slots.some((slot) => slot.id === selectedSlotId);
@@ -54,32 +119,50 @@ export default function App() {
   }, [parkingData.slots, selectedSlotId]);
 
   useEffect(() => {
-    let isMounted = true;
+    void refreshFromBackend();
 
-    loadParkingDashboardData()
-      .then((data) => {
-        if (isMounted) {
-          setParkingData(data);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setParkingData(getFallbackParkingData());
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      });
+    const supabaseClient = getSupabaseClient();
+    const liveRefresh = () => {
+      void refreshFromBackend();
+    };
+
+    let channel: ReturnType<NonNullable<typeof supabaseClient>['channel']> | null = null;
+
+    if (supabaseClient) {
+      channel = supabaseClient
+        .channel('mobile-dashboard-live-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_slots' }, liveRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, liveRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_sessions' }, liveRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, liveRefresh)
+        .subscribe();
+    }
+
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        void refreshFromBackend();
+      }
+    });
+
+    const intervalId = setInterval(() => {
+      void refreshFromBackend();
+    }, 15000);
 
     return () => {
-      isMounted = false;
+      if (supabaseClient && channel) {
+        void supabaseClient.removeChannel(channel);
+      }
+
+      subscription.remove();
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [createdReservation, stage]);
 
   const activeLocation = parkingData.location;
-  const activeSlot = parkingData.slots.find((slot) => slot.status === 'reserved') ?? parkingData.slots[0];
+  const currentSessionSlotId = activeParkingSession?.slot_id ?? createdReservation?.slot_id ?? null;
+  const activeSlot = currentSessionSlotId
+    ? parkingData.slots.find((slot) => slot.id === currentSessionSlotId) ?? parkingData.slots[0]
+    : parkingData.slots[0];
   const slotCountLabel = isLoading ? 'Syncing live slot board...' : `${parkingData.slots.length} controlled slots`;
   const selectedArrivalWindow = ARRIVAL_WINDOW_OPTIONS.find((option) => option.minutes === selectedArrivalWindowMinutes) ?? ARRIVAL_WINDOW_OPTIONS[1];
   const createdReservationSlotLabel = createdReservation
@@ -167,6 +250,53 @@ export default function App() {
     }
   }
 
+  async function handleEndSession() {
+    if (!createdReservation) {
+      setStage('home');
+      return;
+    }
+
+    if (activeParkingSession?.session_status === 'completed') {
+      setStage('home');
+      setCreatedReservation(null);
+      setActiveParkingSession(null);
+      setValidationQrToken('');
+      return;
+    }
+
+    setIsEndingSession(true);
+    setReservationError(null);
+
+    try {
+      const sessionRecords = await endParkingSession({
+        reservationId: createdReservation.reservation_id,
+        billedAmount: activeParkingSession?.reservation_fee ?? null,
+      });
+
+      const session = Array.isArray(sessionRecords) ? sessionRecords[0] ?? null : sessionRecords;
+
+      if (!session) {
+        throw new Error('Session completion succeeded but no session record was returned.');
+      }
+
+      setActiveParkingSession(session);
+
+      const refreshed = await loadParkingDashboardData();
+      setParkingData(refreshed);
+
+      setStage('home');
+      setCreatedReservation(null);
+      setActiveParkingSession(null);
+      setValidationQrToken('');
+      setReservationError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to complete parking session.';
+      setReservationError(message);
+    } finally {
+      setIsEndingSession(false);
+    }
+  }
+
   const renderStage = () => {
     if (stage === 'reserve') {
       return (
@@ -207,11 +337,9 @@ export default function App() {
         <SessionScreen
           parkingSession={activeParkingSession}
           reservation={createdReservation}
-          onFinish={() => {
-            setStage('home');
-            setCreatedReservation(null);
-            setActiveParkingSession(null);
-          }}
+          isSubmitting={isEndingSession}
+          errorMessage={reservationError}
+          onFinish={handleEndSession}
           onBack={() => setStage('validate')}
         />
       );

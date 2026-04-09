@@ -6,16 +6,38 @@ import type { ParkingSessionResult, ReservationResult } from '../lib/reservation
 type Props = {
   reservation: ReservationResult | null;
   parkingSession: ParkingSessionResult | null;
+  isSubmitting: boolean;
+  errorMessage: string | null;
   onFinish: () => void;
   onBack: () => void;
 };
 
-export function SessionScreen({ reservation, parkingSession, onFinish, onBack }: Props) {
+export function SessionScreen({ reservation, parkingSession, isSubmitting, errorMessage, onFinish, onBack }: Props) {
+  const isCompleted = parkingSession?.session_status === 'completed';
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Step 3 of 3</Text>
-      <Text style={styles.title}>Parking session active.</Text>
-      <Text style={styles.subtitle}>The timer starts after validation and billing updates in real time.</Text>
+      <Text style={styles.title}>{isCompleted ? 'Parking session completed.' : 'Parking session active.'}</Text>
+      <Text style={styles.subtitle}>
+        {isCompleted
+          ? 'The session has been closed, payment was recorded, and the slot is available again.'
+          : 'The timer starts after validation and billing updates in real time.'}
+      </Text>
+
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>Session update failed</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+
+      {isCompleted ? (
+        <View style={styles.successBox}>
+          <Text style={styles.successTitle}>Payment recorded</Text>
+          <Text style={styles.successText}>The session is now complete and the slot has been released.</Text>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Live Session</Text>
@@ -32,9 +54,23 @@ export function SessionScreen({ reservation, parkingSession, onFinish, onBack }:
           <Text style={styles.rowValue}>{parkingSession?.session_status ?? 'Active'}</Text>
         </View>
         <View style={styles.row}>
+          <Text style={styles.rowLabel}>Payment</Text>
+          <Text style={styles.rowValue}>{parkingSession?.payment_status ?? (isCompleted ? 'paid' : 'unpaid')}</Text>
+        </View>
+        <View style={styles.row}>
           <Text style={styles.rowLabel}>Started</Text>
           <Text style={styles.rowValue}>
             {parkingSession?.started_at ? new Date(parkingSession.started_at).toLocaleTimeString() : 'Just now'}
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Ended</Text>
+          <Text style={styles.rowValue}>{parkingSession?.ended_at ? new Date(parkingSession.ended_at).toLocaleTimeString() : 'Not yet'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Billed</Text>
+          <Text style={styles.rowValue}>
+            PHP {(parkingSession?.billed_amount ?? parkingSession?.reservation_fee ?? 0).toFixed(2)}
           </Text>
         </View>
         <View style={styles.row}>
@@ -47,8 +83,8 @@ export function SessionScreen({ reservation, parkingSession, onFinish, onBack }:
         <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={onFinish}>
-          <Text style={styles.primaryButtonText}>Mark as Paid</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={onFinish} disabled={isSubmitting}>
+          <Text style={styles.primaryButtonText}>{isCompleted ? 'Return Home' : isSubmitting ? 'Ending...' : 'Mark as Paid & End Session'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -78,6 +114,42 @@ const styles = StyleSheet.create({
     color: '#b8c7da',
     fontSize: 15,
     lineHeight: 22,
+  },
+  errorBox: {
+    backgroundColor: '#2a1114',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#8f3c46',
+    gap: 6,
+  },
+  errorTitle: {
+    color: '#ff8a80',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  errorText: {
+    color: '#f2c9cd',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  successBox: {
+    backgroundColor: '#0e231a',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#2d7f63',
+    gap: 6,
+  },
+  successTitle: {
+    color: '#3dd6a5',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  successText: {
+    color: '#c6f2e4',
+    fontSize: 13,
+    lineHeight: 18,
   },
   card: {
     backgroundColor: '#08111d',

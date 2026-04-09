@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from './supabaseClient';
 
 export type ParkingLocation = {
   id: string;
@@ -38,22 +38,6 @@ const fallbackSlots: ParkingSlot[] = Array.from({ length: 20 }, (_, index) => {
     qrToken: `bgc-pilot-slot-${slotNumber}`,
   };
 });
-
-function getEnv() {
-  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
-}
-
-function getSupabaseClient() {
-  const env = getEnv();
-  const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return null;
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey);
-}
 
 export function getFallbackParkingData(): ParkingDashboardData {
   return {
