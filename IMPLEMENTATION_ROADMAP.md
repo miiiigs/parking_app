@@ -7,6 +7,8 @@
 - Supabase schema and seed data
 - Booking state model: reserved, validated, active, paid, expired
 - Manual GCash and Maya payment confirmation
+- Native Android testing with `expo run:android`
+- EAS build profiles for Android and iOS release preparation
 
 ## Phase 2 - Core Booking Flows
 
@@ -33,6 +35,12 @@
 - Push notifications for reminders and expirations
 - Payment webhooks
 - Optional ANPR and gate integrations
+
+## Release Path
+
+- Use Expo Go only for basic UI testing
+- Use `expo run:android` for native Android testing during development
+- Use EAS Build for Play Store and App Store release artifacts
 
 ## Phase 5 - Scale
 

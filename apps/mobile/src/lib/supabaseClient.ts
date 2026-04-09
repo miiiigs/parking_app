@@ -1,10 +1,42 @@
 import { createClient } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
 
 function getEnv() {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 }
 
 let cachedClient: any = null;
+
+const authStorageCache = new Map<string, string>();
+
+const supabaseAuthStorage = {
+  async getItem(key: string) {
+    try {
+      const storedValue = await SecureStore.getItemAsync(key);
+      return storedValue ?? authStorageCache.get(key) ?? null;
+    } catch {
+      return authStorageCache.get(key) ?? null;
+    }
+  },
+  async setItem(key: string, value: string) {
+    authStorageCache.set(key, value);
+
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch {
+      // Keep the in-memory copy so the session still works during this runtime.
+    }
+  },
+  async removeItem(key: string) {
+    authStorageCache.delete(key);
+
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      // Ignore storage cleanup failures and fall back to the in-memory cache.
+    }
+  },
+};
 
 export function getSupabaseClient(): any {
   if (cachedClient) {
@@ -23,7 +55,8 @@ export function getSupabaseClient(): any {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: false,
-      persistSession: false,
+      persistSession: true,
+      storage: supabaseAuthStorage,
     },
   });
 

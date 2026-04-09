@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useReducer, useRef, useState } from 'react';
 import {
   AppState,
   type AppStateStatus,
@@ -14,6 +14,8 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { ReservationScreen } from './src/screens/ReservationScreen';
 import { SessionScreen } from './src/screens/SessionScreen';
 import { ValidationScreen } from './src/screens/ValidationScreen';
+// @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
+import { buildStoredWorkflowSnapshot, getNextSelectedSlotId } from './src/lib/workflowLogic';
 import {
   getFallbackParkingData,
   loadParkingDashboardData,
@@ -22,6 +24,7 @@ import {
 import {
   createParkingReservation,
   endParkingSession,
+  getCurrentMobileWorkflowState,
   getParkingReservationById,
   getParkingSessionByReservationId,
   startParkingSession,
@@ -33,24 +36,119 @@ import {
   DEFAULT_ARRIVAL_WINDOW_MINUTES,
   ARRIVAL_WINDOW_OPTIONS,
 } from './src/lib/reservationOptions';
+import {
+  clearStoredWorkflowSnapshot,
+  loadStoredWorkflowSnapshot,
+  saveStoredWorkflowSnapshot,
+} from './src/lib/workflowStorage';
+import {
+  cancelScheduledNotifications,
+  ensureParkingNotificationsEnabled,
+  scheduleReservationReminderNotifications,
+  sendSessionCompletedNotification,
+} from './src/lib/notifications';
 
 type Stage = 'home' | 'reserve' | 'validate' | 'session';
+type Operation = 'idle' | 'refreshing' | 'creatingReservation' | 'startingSession' | 'endingSession';
+type ConnectionState = 'booting' | 'live' | 'degraded' | 'offline';
+
+type WorkflowState = {
+  stage: Stage;
+  selectedSlotId: string | null;
+  selectedArrivalWindowMinutes: number;
+  plateNumber: string;
+  validationQrToken: string;
+  scheduledNotificationIds: string[];
+  reservationError: string | null;
+  createdReservation: ReservationResult | null;
+  activeParkingSession: ParkingSessionResult | null;
+  operation: Operation;
+  connectionState: ConnectionState;
+  connectionMessage: string | null;
+};
+
+type WorkflowAction = {
+  type: 'patch';
+  patch: Partial<WorkflowState>;
+};
+
+const initialWorkflowState: WorkflowState = {
+  stage: 'home',
+  selectedSlotId: null,
+  selectedArrivalWindowMinutes: DEFAULT_ARRIVAL_WINDOW_MINUTES,
+  plateNumber: 'ABC-1234',
+  validationQrToken: '',
+  scheduledNotificationIds: [],
+  reservationError: null,
+  createdReservation: null,
+  activeParkingSession: null,
+  operation: 'idle',
+  connectionState: 'booting',
+  connectionMessage: 'Syncing live parking data...',
+};
+
+function workflowReducer(state: WorkflowState, action: WorkflowAction): WorkflowState {
+  switch (action.type) {
+    case 'patch':
+      return {
+        ...state,
+        ...action.patch,
+      };
+    default:
+      return state;
+  }
+}
 
 export default function App() {
-  const [stage, setStage] = useState<Stage>('home');
+  const [workflow, dispatchWorkflow] = useReducer(workflowReducer, initialWorkflowState);
   const [parkingData, setParkingData] = useState<ParkingDashboardData>(getFallbackParkingData());
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [selectedArrivalWindowMinutes, setSelectedArrivalWindowMinutes] = useState<number>(DEFAULT_ARRIVAL_WINDOW_MINUTES);
-  const [plateNumber, setPlateNumber] = useState('ABC-1234');
-  const [validationQrToken, setValidationQrToken] = useState('');
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [isEndingSession, setIsEndingSession] = useState(false);
-  const [reservationError, setReservationError] = useState<string | null>(null);
-  const [createdReservation, setCreatedReservation] = useState<ReservationResult | null>(null);
-  const [activeParkingSession, setActiveParkingSession] = useState<ParkingSessionResult | null>(null);
   const syncInProgressRef = useRef(false);
+  const hasBootstrappedRef = useRef(false);
+  const workflowRef = useRef(workflow);
+
+  useEffect(() => {
+    workflowRef.current = workflow;
+  }, [workflow]);
+
+  useEffect(() => {
+    void ensureParkingNotificationsEnabled();
+  }, []);
+
+  async function cancelReminderNotifications() {
+    const reminderIds = workflowRef.current.scheduledNotificationIds;
+
+    if (reminderIds.length > 0) {
+      await cancelScheduledNotifications(reminderIds);
+    }
+
+    dispatchWorkflow({
+      type: 'patch',
+      patch: {
+        scheduledNotificationIds: [],
+      },
+    });
+  }
+
+  async function scheduleReservationReminders(reservation: ReservationResult) {
+    const slotLabel = parkingData.slots.find((slot) => slot.id === reservation.slot_id)?.label ?? 'Assigned slot';
+    const reminderIds = await scheduleReservationReminderNotifications({
+      reservationId: reservation.reservation_id,
+      slotLabel,
+      expiresAt: reservation.expires_at,
+    });
+
+    dispatchWorkflow({
+      type: 'patch',
+      patch: {
+        scheduledNotificationIds: reminderIds,
+      },
+    });
+
+    return reminderIds;
+  }
 
   async function refreshFromBackend() {
     if (syncInProgressRef.current) {
@@ -65,60 +163,155 @@ export default function App() {
       const refreshedParkingData = await loadParkingDashboardData();
       setParkingData(refreshedParkingData);
 
-      setSelectedSlotId((currentSelectedSlotId) => {
-        if (currentSelectedSlotId && refreshedParkingData.slots.some((slot) => slot.id === currentSelectedSlotId)) {
-          return currentSelectedSlotId;
-        }
-
-        const nextAvailableSlot = refreshedParkingData.slots.find((slot) => slot.status === 'available') ?? refreshedParkingData.slots[0] ?? null;
-
-        return nextAvailableSlot?.id ?? null;
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          connectionState: refreshedParkingData.isLiveData ? 'live' : 'degraded',
+          connectionMessage: refreshedParkingData.isLiveData
+            ? null
+            : 'Using fallback parking data until Supabase becomes available again.',
+        },
       });
 
-      if (createdReservation) {
-        const latestReservation = await getParkingReservationById(createdReservation.reservation_id);
+      const currentWorkflow = workflowRef.current;
+      const currentSelectedSlotId = currentWorkflow.selectedSlotId;
+      const resolvedSelectedSlotId = getNextSelectedSlotId(refreshedParkingData.slots, currentSelectedSlotId);
+
+      if (resolvedSelectedSlotId !== currentSelectedSlotId) {
+        dispatchWorkflow({
+          type: 'patch',
+          patch: {
+            selectedSlotId: resolvedSelectedSlotId,
+          },
+        });
+      }
+
+      const currentWorkflowReservationId =
+        currentWorkflow.createdReservation?.reservation_id ?? currentWorkflow.activeParkingSession?.reservation_id ?? null;
+
+      if (currentWorkflowReservationId) {
+        const latestReservation = await getParkingReservationById(currentWorkflowReservationId);
 
         if (!latestReservation) {
-          setCreatedReservation(null);
-          setActiveParkingSession(null);
-          setValidationQrToken('');
-          setReservationError('Reservation was removed from the database.');
-          setStage('home');
+          await cancelReminderNotifications();
+          await clearStoredWorkflowSnapshot();
+          dispatchWorkflow({
+            type: 'patch',
+            patch: {
+              stage: 'home',
+              createdReservation: null,
+              activeParkingSession: null,
+              validationQrToken: '',
+              reservationError: 'Reservation was removed from the database.',
+              operation: 'idle',
+            },
+          });
           return;
         }
 
-        setCreatedReservation(latestReservation);
+        dispatchWorkflow({
+          type: 'patch',
+          patch: {
+            createdReservation: latestReservation,
+            reservationError: null,
+          },
+        });
 
-        const latestSession = await getParkingSessionByReservationId(createdReservation.reservation_id);
+        const latestSession = await getParkingSessionByReservationId(currentWorkflowReservationId);
 
         if (latestSession) {
-          setActiveParkingSession(latestSession);
-          if (stage === 'validate') {
-            setStage('session');
+          await cancelReminderNotifications();
+          dispatchWorkflow({
+            type: 'patch',
+            patch: {
+              activeParkingSession: latestSession,
+              stage: 'session',
+              scheduledNotificationIds: [],
+            },
+          });
+        } else {
+          if (currentWorkflow.scheduledNotificationIds.length === 0) {
+            await scheduleReservationReminders(latestReservation);
+          }
+
+          dispatchWorkflow({
+            type: 'patch',
+            patch: {
+              activeParkingSession: null,
+              stage: 'validate',
+            },
+          });
+        }
+      } else if (!hasBootstrappedRef.current) {
+        const restoredWorkflow = await getCurrentMobileWorkflowState();
+
+        if (restoredWorkflow) {
+          const storedWorkflow = await loadStoredWorkflowSnapshot();
+
+          dispatchWorkflow({
+            type: 'patch',
+            patch: {
+              createdReservation: restoredWorkflow.reservation,
+              activeParkingSession: restoredWorkflow.session,
+              validationQrToken:
+                refreshedParkingData.slots.find((slot) => slot.id === restoredWorkflow.reservation.slot_id)?.qrToken ?? '',
+              reservationError: null,
+              stage: restoredWorkflow.session ? 'session' : 'validate',
+              scheduledNotificationIds: storedWorkflow?.scheduledNotificationIds ?? [],
+            },
+          });
+
+          if (restoredWorkflow.session) {
+            await cancelReminderNotifications();
+          } else if ((storedWorkflow?.scheduledNotificationIds ?? []).length === 0) {
+            await scheduleReservationReminders(restoredWorkflow.reservation);
           }
         } else {
-          setActiveParkingSession(null);
-          if (stage === 'session') {
-            setStage('validate');
+          const storedWorkflow = await loadStoredWorkflowSnapshot();
+
+          if (storedWorkflow && storedWorkflow.stage !== 'home') {
+            dispatchWorkflow({
+              type: 'patch',
+              patch: {
+                stage: storedWorkflow.stage,
+                selectedSlotId: getNextSelectedSlotId(refreshedParkingData.slots, storedWorkflow.selectedSlotId),
+                selectedArrivalWindowMinutes: storedWorkflow.selectedArrivalWindowMinutes,
+                plateNumber: storedWorkflow.plateNumber,
+                scheduledNotificationIds: storedWorkflow.scheduledNotificationIds,
+                reservationError: null,
+              },
+            });
           }
         }
       }
     } catch {
       setParkingData(getFallbackParkingData());
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          connectionState: 'offline',
+          connectionMessage: 'Live backend data is unavailable. Showing fallback data.',
+        },
+      });
     } finally {
       syncInProgressRef.current = false;
-      setIsLoading(false);
+      hasBootstrappedRef.current = true;
     }
   }
 
   useEffect(() => {
-    const currentSelectionExists = selectedSlotId && parkingData.slots.some((slot) => slot.id === selectedSlotId);
+    const currentSelectionExists = workflow.selectedSlotId && parkingData.slots.some((slot) => slot.id === workflow.selectedSlotId);
 
     if (!currentSelectionExists) {
       const nextSlot = parkingData.slots.find((slot) => slot.status === 'available') ?? parkingData.slots[0] ?? null;
-      setSelectedSlotId(nextSlot?.id ?? null);
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          selectedSlotId: nextSlot?.id ?? null,
+        },
+      });
     }
-  }, [parkingData.slots, selectedSlotId]);
+  }, [parkingData.slots, workflow.selectedSlotId]);
 
   useEffect(() => {
     void refreshFromBackend();
@@ -158,44 +351,90 @@ export default function App() {
       subscription.remove();
       clearInterval(intervalId);
     };
-  }, [createdReservation, stage]);
+  }, []);
+
+  useEffect(() => {
+    if (!hasBootstrappedRef.current) {
+      return;
+    }
+
+    const currentReservationId = workflow.createdReservation?.reservation_id ?? workflow.activeParkingSession?.reservation_id ?? null;
+
+    if (workflow.stage === 'home' && !currentReservationId) {
+      void clearStoredWorkflowSnapshot();
+      return;
+    }
+
+    void saveStoredWorkflowSnapshot(buildStoredWorkflowSnapshot(workflow, currentReservationId));
+  }, [
+    workflow.activeParkingSession?.reservation_id,
+    workflow.createdReservation?.reservation_id,
+    workflow.plateNumber,
+    workflow.selectedArrivalWindowMinutes,
+    workflow.selectedSlotId,
+    workflow.stage,
+  ]);
 
   const activeLocation = parkingData.location;
-  const currentSessionSlotId = activeParkingSession?.slot_id ?? createdReservation?.slot_id ?? null;
+  const currentReservation = workflow.createdReservation;
+  const currentSession = workflow.activeParkingSession;
+  const currentSessionSlotId = currentSession?.slot_id ?? currentReservation?.slot_id ?? null;
   const activeSlot = currentSessionSlotId
     ? parkingData.slots.find((slot) => slot.id === currentSessionSlotId) ?? parkingData.slots[0]
     : parkingData.slots[0];
-  const slotCountLabel = isLoading ? 'Syncing live slot board...' : `${parkingData.slots.length} controlled slots`;
+  const slotCountLabel = workflow.connectionState === 'booting' ? 'Syncing live slot board...' : `${parkingData.slots.length} controlled slots`;
   const isLiveData = parkingData.isLiveData;
-  const selectedArrivalWindow = ARRIVAL_WINDOW_OPTIONS.find((option) => option.minutes === selectedArrivalWindowMinutes) ?? ARRIVAL_WINDOW_OPTIONS[1];
-  const createdReservationSlotLabel = createdReservation
-    ? parkingData.slots.find((slot) => slot.id === createdReservation.slot_id)?.label ?? 'Assigned slot'
+  const selectedArrivalWindow =
+    ARRIVAL_WINDOW_OPTIONS.find((option) => option.minutes === workflow.selectedArrivalWindowMinutes) ?? ARRIVAL_WINDOW_OPTIONS[1];
+  const createdReservationSlotLabel = currentReservation
+    ? parkingData.slots.find((slot) => slot.id === currentReservation.slot_id)?.label ?? 'Assigned slot'
     : 'Assigned slot';
 
   async function handleCreateReservation() {
     if (!isLiveData) {
-      setReservationError('Live backend data is unavailable. Connect Supabase before creating reservations.');
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: 'Live backend data is unavailable. Connect Supabase before creating reservations.',
+        },
+      });
       return;
     }
 
-    if (!selectedSlotId) {
-      setReservationError('Select a slot before confirming the reservation.');
+    if (!workflow.selectedSlotId) {
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: 'Select a slot before confirming the reservation.',
+        },
+      });
       return;
     }
 
-    if (!plateNumber.trim()) {
-      setReservationError('Enter a plate number before confirming the reservation.');
+    if (!workflow.plateNumber.trim()) {
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: 'Enter a plate number before confirming the reservation.',
+        },
+      });
       return;
     }
 
     setIsSubmittingReservation(true);
-    setReservationError(null);
+    dispatchWorkflow({
+      type: 'patch',
+      patch: {
+        operation: 'creatingReservation',
+        reservationError: null,
+      },
+    });
 
     try {
       const reservationRecords = await createParkingReservation({
-        slotId: selectedSlotId,
+        slotId: workflow.selectedSlotId,
         arrivalWindowMinutes: selectedArrivalWindow.minutes,
-        plateNumber: plateNumber.trim().toUpperCase(),
+        plateNumber: workflow.plateNumber.trim().toUpperCase(),
       });
 
       const reservation = reservationRecords[0] ?? null;
@@ -204,38 +443,71 @@ export default function App() {
         throw new Error('Reservation was created but no record was returned.');
       }
 
-      setCreatedReservation(reservation);
-      setActiveParkingSession(null);
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          createdReservation: reservation,
+          activeParkingSession: null,
+          validationQrToken: parkingData.slots.find((slot) => slot.id === reservation.slot_id)?.qrToken ?? '',
+          stage: 'validate',
+          reservationError: null,
+          operation: 'idle',
+        },
+      });
 
-      const reservedSlot = parkingData.slots.find((slot) => slot.id === reservation.slot_id);
-      setValidationQrToken(reservedSlot?.qrToken ?? '');
+      await scheduleReservationReminders(reservation);
 
       const refreshed = await loadParkingDashboardData();
       setParkingData(refreshed);
-      setStage('validate');
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          connectionState: refreshed.isLiveData ? 'live' : 'degraded',
+          connectionMessage: refreshed.isLiveData
+            ? null
+            : 'Using fallback parking data until Supabase becomes available again.',
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create reservation.';
-      setReservationError(message);
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: message,
+          operation: 'idle',
+        },
+      });
     } finally {
       setIsSubmittingReservation(false);
     }
   }
 
   async function handleStartSession(slotQrTokenOverride?: string) {
-    if (!createdReservation) {
-      setReservationError('Create a reservation before starting a parking session.');
-      setStage('reserve');
+    if (!currentReservation) {
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: 'Create a reservation before starting a parking session.',
+          stage: 'reserve',
+        },
+      });
       return;
     }
 
     setIsStartingSession(true);
-    setReservationError(null);
+    dispatchWorkflow({
+      type: 'patch',
+      patch: {
+        operation: 'startingSession',
+        reservationError: null,
+      },
+    });
 
-    const tokenToUse = (slotQrTokenOverride ?? validationQrToken).trim();
+    const tokenToUse = (slotQrTokenOverride ?? workflow.validationQrToken).trim();
 
     try {
       const sessionRecords = await startParkingSession({
-        reservationId: createdReservation.reservation_id,
+        reservationId: currentReservation.reservation_id,
         slotQrToken: tokenToUse || null,
       });
 
@@ -245,40 +517,88 @@ export default function App() {
         throw new Error('Session validation succeeded but no session record was returned.');
       }
 
-      setActiveParkingSession(session);
+      await cancelReminderNotifications();
+
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          activeParkingSession: session,
+          stage: 'session',
+          validationQrToken: tokenToUse,
+          reservationError: null,
+          operation: 'idle',
+          scheduledNotificationIds: [],
+        },
+      });
 
       const refreshed = await loadParkingDashboardData();
       setParkingData(refreshed);
-      setStage('session');
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          connectionState: refreshed.isLiveData ? 'live' : 'degraded',
+          connectionMessage: refreshed.isLiveData
+            ? null
+            : 'Using fallback parking data until Supabase becomes available again.',
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start parking session.';
-      setReservationError(message);
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: message,
+          operation: 'idle',
+        },
+      });
     } finally {
       setIsStartingSession(false);
     }
   }
 
   async function handleEndSession() {
-    if (!createdReservation) {
-      setStage('home');
+    if (!currentReservation) {
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          stage: 'home',
+          reservationError: null,
+        },
+      });
       return;
     }
 
-    if (activeParkingSession?.session_status === 'completed') {
-      setStage('home');
-      setCreatedReservation(null);
-      setActiveParkingSession(null);
-      setValidationQrToken('');
+    if (currentSession?.session_status === 'completed') {
+      await clearStoredWorkflowSnapshot();
+      await cancelReminderNotifications();
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          stage: 'home',
+          createdReservation: null,
+          activeParkingSession: null,
+          validationQrToken: '',
+          reservationError: null,
+          operation: 'idle',
+          scheduledNotificationIds: [],
+        },
+      });
       return;
     }
 
     setIsEndingSession(true);
-    setReservationError(null);
+    dispatchWorkflow({
+      type: 'patch',
+      patch: {
+        operation: 'endingSession',
+        reservationError: null,
+      },
+    });
 
     try {
       const sessionRecords = await endParkingSession({
-        reservationId: createdReservation.reservation_id,
-        billedAmount: activeParkingSession?.reservation_fee ?? null,
+        reservationId: currentReservation.reservation_id,
+        billedAmount: currentSession?.reservation_fee ?? null,
       });
 
       const session = Array.isArray(sessionRecords) ? sessionRecords[0] ?? null : sessionRecords;
@@ -287,69 +607,145 @@ export default function App() {
         throw new Error('Session completion succeeded but no session record was returned.');
       }
 
-      setActiveParkingSession(session);
+      await cancelReminderNotifications();
+      await sendSessionCompletedNotification({
+        slotLabel: currentReservation?.slot_label ?? activeSlot?.label ?? 'Assigned slot',
+        billedAmount: Number(session.billed_amount ?? session.reservation_fee ?? 0),
+      });
+
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          activeParkingSession: session,
+          reservationError: null,
+        },
+      });
 
       const refreshed = await loadParkingDashboardData();
       setParkingData(refreshed);
 
-      setStage('home');
-      setCreatedReservation(null);
-      setActiveParkingSession(null);
-      setValidationQrToken('');
-      setReservationError(null);
+      await clearStoredWorkflowSnapshot();
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          stage: 'home',
+          createdReservation: null,
+          activeParkingSession: null,
+          validationQrToken: '',
+          reservationError: null,
+          operation: 'idle',
+          scheduledNotificationIds: [],
+          connectionState: refreshed.isLiveData ? 'live' : 'degraded',
+          connectionMessage: refreshed.isLiveData
+            ? null
+            : 'Using fallback parking data until Supabase becomes available again.',
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to complete parking session.';
-      setReservationError(message);
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          reservationError: message,
+          operation: 'idle',
+        },
+      });
     } finally {
       setIsEndingSession(false);
     }
   }
 
+  const connectionBannerMessage =
+    workflow.connectionState === 'booting'
+      ? workflow.connectionMessage ?? 'Syncing live parking data...'
+      : workflow.connectionState === 'offline'
+        ? workflow.connectionMessage ?? 'Live backend is unavailable. Using fallback data.'
+        : workflow.connectionState === 'degraded'
+          ? workflow.connectionMessage ?? 'Operating with fallback parking data.'
+          : null;
+
   const renderStage = () => {
-    if (stage === 'reserve') {
+    if (workflow.stage === 'reserve') {
       return (
         <ReservationScreen
           slots={parkingData.slots}
-          selectedSlotId={selectedSlotId}
-          selectedArrivalWindowMinutes={selectedArrivalWindowMinutes}
-          plateNumber={plateNumber}
-          isSubmitting={isSubmittingReservation}
+          selectedSlotId={workflow.selectedSlotId}
+          selectedArrivalWindowMinutes={workflow.selectedArrivalWindowMinutes}
+          plateNumber={workflow.plateNumber}
+          isSubmitting={workflow.operation === 'creatingReservation' || isSubmittingReservation}
           isLiveData={isLiveData}
-          errorMessage={reservationError}
-          onSelectSlot={setSelectedSlotId}
-          onSelectArrivalWindow={setSelectedArrivalWindowMinutes}
-          onPlateNumberChange={setPlateNumber}
+          errorMessage={workflow.reservationError}
+          onSelectSlot={(slotId) =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: { selectedSlotId: slotId },
+            })
+          }
+          onSelectArrivalWindow={(minutes) =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: { selectedArrivalWindowMinutes: minutes },
+            })
+          }
+          onPlateNumberChange={(plateNumber) =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: { plateNumber },
+            })
+          }
           onSubmit={handleCreateReservation}
-          onBack={() => setStage('home')}
+          onBack={() =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: {
+                stage: 'home',
+              },
+            })
+          }
         />
       );
     }
 
-    if (stage === 'validate') {
+    if (workflow.stage === 'validate') {
       return (
         <ValidationScreen
-          reservation={createdReservation}
+          reservation={currentReservation}
           assignedSlotLabel={createdReservationSlotLabel}
-          expectedQrToken={createdReservation ? parkingData.slots.find((slot) => slot.id === createdReservation.slot_id)?.qrToken ?? validationQrToken : validationQrToken}
-          slotQrToken={validationQrToken}
-          onSlotQrTokenChange={setValidationQrToken}
+          expectedQrToken={currentReservation ? parkingData.slots.find((slot) => slot.id === currentReservation.slot_id)?.qrToken ?? workflow.validationQrToken : workflow.validationQrToken}
+          slotQrToken={workflow.validationQrToken}
+          onSlotQrTokenChange={(value) =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: { validationQrToken: value },
+            })
+          }
           onValidate={handleStartSession}
-          onBack={() => setStage('reserve')}
-          isSubmitting={isStartingSession}
-          errorMessage={reservationError}
+          onBack={() =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: { stage: 'reserve' },
+            })
+          }
+          isSubmitting={workflow.operation === 'startingSession' || isStartingSession}
+          errorMessage={workflow.reservationError}
         />
       );
     }
 
-    if (stage === 'session') {
+    if (workflow.stage === 'session') {
       return (
         <SessionScreen
-          parkingSession={activeParkingSession}
-          reservation={createdReservation}
-          isSubmitting={isEndingSession}
-          errorMessage={reservationError}
+          parkingSession={currentSession}
+          reservation={currentReservation}
+          isSubmitting={workflow.operation === 'endingSession' || isEndingSession}
+          errorMessage={workflow.reservationError}
           onFinish={handleEndSession}
-          onBack={() => setStage('validate')}
+          onBack={() =>
+            dispatchWorkflow({
+              type: 'patch',
+              patch: { stage: 'validate' },
+            })
+          }
         />
       );
     }
@@ -359,9 +755,25 @@ export default function App() {
         locationName={activeLocation?.name ?? 'BGC Pilot Site'}
         locationAddress={activeLocation?.address ?? 'Bonifacio Global City, Taguig'}
         slotCountLabel={slotCountLabel}
-        isLoading={isLoading}
-        onStartReservation={() => setStage('reserve')}
-        onViewSession={() => setStage('session')}
+        isLoading={workflow.connectionState === 'booting'}
+        onStartReservation={() =>
+          dispatchWorkflow({
+            type: 'patch',
+            patch: {
+              stage: 'reserve',
+              reservationError: null,
+            },
+          })
+        }
+        onViewSession={() =>
+          dispatchWorkflow({
+            type: 'patch',
+            patch: {
+              stage: currentSession ? 'session' : currentReservation ? 'validate' : 'reserve',
+              reservationError: currentSession || currentReservation ? null : 'No active parking session is available right now.',
+            },
+          })
+        }
       />
     );
   };
@@ -370,6 +782,24 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.content}>
+        {connectionBannerMessage ? (
+          <View
+            style={[
+              styles.banner,
+              workflow.connectionState === 'offline' ? styles.bannerOffline : styles.bannerDegraded,
+            ]}
+          >
+            <Text style={styles.bannerTitle}>
+              {workflow.connectionState === 'offline'
+                ? 'Offline mode'
+                : workflow.connectionState === 'degraded'
+                  ? 'Fallback data in use'
+                  : 'Booting'}
+            </Text>
+            <Text style={styles.bannerText}>{connectionBannerMessage}</Text>
+          </View>
+        ) : null}
+
         {renderStage()}
 
         <View style={styles.card}>
@@ -400,6 +830,32 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     gap: 16,
+  },
+  banner: {
+    borderRadius: 18,
+    padding: 16,
+    gap: 6,
+    borderWidth: 1,
+  },
+  bannerOffline: {
+    backgroundColor: '#2a1114',
+    borderColor: '#8f3c46',
+  },
+  bannerDegraded: {
+    backgroundColor: '#2a220f',
+    borderColor: '#8a6b2f',
+  },
+  bannerTitle: {
+    color: '#f4f7fb',
+    fontSize: 14,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+  },
+  bannerText: {
+    color: '#f5e6bf',
+    fontSize: 13,
+    lineHeight: 18,
   },
   card: {
     backgroundColor: '#0f1b2c',

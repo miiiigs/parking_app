@@ -11,7 +11,9 @@ Monorepo scaffold for the Smart Parking Reservation System startup idea.
 
 ## Next build step
 
-1. Add Expo and Next.js dependencies.
+1. Keep the mobile app on Expo, but use `expo run:android` for local native testing and EAS builds for release instead of Expo Go for native features.
 2. Define the Supabase schema.
-3. Implement reservation, validation, and session state flows.
+3. Implement reservation, validation, session state flows.
 4. Wire payment and notification events.
+5. Add store-build configuration for Android and iOS.
+6. Follow the Android build checklist in [ANDROID_BUILD_CHECKLIST.md](ANDROID_BUILD_CHECKLIST.md).

@@ -1,4 +1,4 @@
-import { getSupabaseClient } from './supabaseClient';
+import { ensureMobileAuthSession, getSupabaseClient } from './supabaseClient';
 import { getArrivalWindowOption } from './reservationOptions';
 
 export type ReservationResult = {
@@ -27,6 +27,11 @@ export type ParkingSessionResult = {
   billed_minutes: number | null;
   billed_amount: number | null;
   payment_status: string | null;
+};
+
+export type MobileWorkflowState = {
+  reservation: ReservationResult;
+  session: ParkingSessionResult | null;
 };
 
 export type ReservationRequest = {
@@ -177,6 +182,54 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     billed_amount: data.billed_amount !== null && data.billed_amount !== undefined ? Number(data.billed_amount) : null,
     payment_status: payment?.status ?? (data.status === 'completed' ? 'paid' : null),
   } as ParkingSessionResult;
+}
+
+export async function getCurrentMobileWorkflowState(): Promise<MobileWorkflowState | null> {
+  const supabase = getSupabaseClient() as any;
+
+  if (!supabase) {
+    return null;
+  }
+
+  await ensureMobileAuthSession();
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const currentUser = userData?.user ?? null;
+
+  if (userError || !currentUser) {
+    return null;
+  }
+
+  const { data: reservations, error } = await supabase
+    .from('reservations')
+    .select(`
+      id
+    `)
+    .eq('user_id', currentUser.id)
+    .eq('status', 'confirmed')
+    .order('reserved_at', { ascending: false })
+    .limit(1);
+
+  if (error || !reservations || reservations.length === 0) {
+    return null;
+  }
+
+  const latestReservation = await getParkingReservationById(reservations[0].id);
+
+  if (!latestReservation) {
+    return null;
+  }
+
+  const latestSession = await getParkingSessionByReservationId(latestReservation.reservation_id);
+
+  if (latestSession?.session_status === 'completed') {
+    return null;
+  }
+
+  return {
+    reservation: latestReservation,
+    session: latestSession,
+  };
 }
 
 export async function endParkingSession(request: {

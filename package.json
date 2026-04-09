@@ -8,9 +8,12 @@
   "scripts": {
     "dev:mobile": "npm --workspace apps/mobile run start",
     "dev:admin": "npm --workspace apps/admin run dev",
-    "build:admin": "npm --workspace apps/admin run build"
+    "build:admin": "npm --workspace apps/admin run build",
+    "test:mobile": "node --test apps/mobile/tests/workflowLogic.test.js"
   },
   "dependencies": {
-    "expo-camera": "~16.0.18"
+    "expo-camera": "~16.0.18",
+    "expo-notifications": "~0.29.14",
+    "expo-secure-store": "~14.0.1"
   }
 }
