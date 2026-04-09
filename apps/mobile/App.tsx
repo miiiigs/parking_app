@@ -28,7 +28,7 @@ import {
   type ParkingSessionResult,
   type ReservationResult,
 } from './src/lib/reservations';
-import { getSupabaseClient } from './src/lib/supabaseClient';
+import { ensureMobileAuthSession, getSupabaseClient } from './src/lib/supabaseClient';
 import {
   DEFAULT_ARRIVAL_WINDOW_MINUTES,
   ARRIVAL_WINDOW_OPTIONS,
@@ -60,6 +60,8 @@ export default function App() {
     syncInProgressRef.current = true;
 
     try {
+      await ensureMobileAuthSession();
+
       const refreshedParkingData = await loadParkingDashboardData();
       setParkingData(refreshedParkingData);
 
@@ -164,12 +166,18 @@ export default function App() {
     ? parkingData.slots.find((slot) => slot.id === currentSessionSlotId) ?? parkingData.slots[0]
     : parkingData.slots[0];
   const slotCountLabel = isLoading ? 'Syncing live slot board...' : `${parkingData.slots.length} controlled slots`;
+  const isLiveData = parkingData.isLiveData;
   const selectedArrivalWindow = ARRIVAL_WINDOW_OPTIONS.find((option) => option.minutes === selectedArrivalWindowMinutes) ?? ARRIVAL_WINDOW_OPTIONS[1];
   const createdReservationSlotLabel = createdReservation
     ? parkingData.slots.find((slot) => slot.id === createdReservation.slot_id)?.label ?? 'Assigned slot'
     : 'Assigned slot';
 
   async function handleCreateReservation() {
+    if (!isLiveData) {
+      setReservationError('Live backend data is unavailable. Connect Supabase before creating reservations.');
+      return;
+    }
+
     if (!selectedSlotId) {
       setReservationError('Select a slot before confirming the reservation.');
       return;
@@ -306,6 +314,7 @@ export default function App() {
           selectedArrivalWindowMinutes={selectedArrivalWindowMinutes}
           plateNumber={plateNumber}
           isSubmitting={isSubmittingReservation}
+          isLiveData={isLiveData}
           errorMessage={reservationError}
           onSelectSlot={setSelectedSlotId}
           onSelectArrivalWindow={setSelectedArrivalWindowMinutes}

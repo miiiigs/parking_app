@@ -21,7 +21,7 @@ as $$
 declare
   v_slot parking_slots%rowtype;
   v_reservation_id uuid := gen_random_uuid();
-  v_user_id uuid := coalesce(p_user_id, gen_random_uuid());
+  v_user_id uuid := coalesce(auth.uid(), p_user_id, gen_random_uuid());
   v_reserved_at timestamptz := now();
   v_expires_at timestamptz := now() + make_interval(mins => p_arrival_window_minutes);
 begin

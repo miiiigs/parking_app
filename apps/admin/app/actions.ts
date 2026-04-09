@@ -1,9 +1,117 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { createServerClient } from '@supabase/ssr';
 
 import { getAdminServiceConfig } from '../lib/adminService';
+import { ADMIN_ROLES } from '../lib/adminAuth';
+import { getAdminSupabaseConfig } from '../lib/supabase';
+
+async function createAdminAuthClient() {
+  const config = getAdminSupabaseConfig();
+
+  if (!config?.url || !config.anonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in admin environment variables.');
+  }
+
+  const cookieStore = await cookies();
+
+  return createServerClient(config.url, config.anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
+      },
+    },
+  });
+}
+
+export async function signInAdmin(formData: FormData) {
+  const email = String(formData.get('email') ?? '').trim();
+  const password = String(formData.get('password') ?? '').trim();
+
+  if (!email || !password) {
+    redirect('/login?error=Enter%20your%20email%20and%20password.');
+  }
+
+  const supabase = await createAdminAuthClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+
+  if (!userId) {
+    await supabase.auth.signOut();
+    redirect('/login?error=Unable%20to%20confirm%20your%20session.');
+  }
+
+  const { data: roleData, error: roleError } = await supabase
+    .from('admin_user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (roleError) {
+    await supabase.auth.signOut();
+    redirect(`/login?error=${encodeURIComponent(roleError.message)}`);
+  }
+
+  const role = roleData?.role;
+
+  if (!role || !ADMIN_ROLES.includes(role)) {
+    await supabase.auth.signOut();
+    redirect('/login?error=Access%20denied.%20This%20account%20is%20not%20allowed%20to%20use%20the%20admin%20dashboard.');
+  }
+
+  redirect('/');
+}
+
+export async function signOutAdmin() {
+  const supabase = await createAdminAuthClient();
+  await supabase.auth.signOut();
+  redirect('/login');
+}
+
+export async function runParkingReconciliation(formData: FormData) {
+  const redirectTo = String(formData.get('redirectTo') ?? '/').trim() || '/';
+  const config = getAdminServiceConfig();
+
+  if (!config?.serviceRoleKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE URL in admin environment variables.');
+  }
+
+  const response = await fetch(`${config.url}/rest/v1/rpc/reconcile_parking_state`, {
+    method: 'POST',
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  revalidatePath('/');
+  revalidatePath('/qr');
+  redirect(redirectTo);
+}
 
 export async function updateSlotStatus(formData: FormData) {
   const slotId = String(formData.get('slotId') ?? '').trim();

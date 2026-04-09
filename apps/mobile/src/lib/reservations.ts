@@ -41,11 +41,19 @@ function generateGuestUserId() {
   return `${randomSegment()}${randomSegment()}-${randomSegment()}-${randomSegment()}-${randomSegment()}-${randomSegment()}${randomSegment()}${randomSegment()}`;
 }
 
+function isUuidLike(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 export async function createParkingReservation(request: ReservationRequest) {
   const supabase = getSupabaseClient() as any;
 
   if (!supabase) {
     throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  }
+
+  if (!isUuidLike(request.slotId)) {
+    throw new Error('Please reconnect to live backend data before reserving. The current slot list is only fallback data.');
   }
 
   const selectedWindow = getArrivalWindowOption(request.arrivalWindowMinutes);

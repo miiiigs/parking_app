@@ -18,6 +18,7 @@ export type ParkingSlot = {
 export type ParkingDashboardData = {
   location: ParkingLocation | null;
   slots: ParkingSlot[];
+  isLiveData: boolean;
 };
 
 const fallbackLocation: ParkingLocation = {
@@ -43,6 +44,7 @@ export function getFallbackParkingData(): ParkingDashboardData {
   return {
     location: fallbackLocation,
     slots: fallbackSlots,
+    isLiveData: false,
   };
 }
 
@@ -76,6 +78,7 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
     return {
       location: activeLocation,
       slots: fallbackSlots,
+      isLiveData: false,
     };
   }
 
@@ -88,5 +91,6 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
       displayOrder: slot.display_order,
       qrToken: slot.qr_token,
     })),
+    isLiveData: true,
   };
 }

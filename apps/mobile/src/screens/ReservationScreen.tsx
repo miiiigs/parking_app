@@ -18,6 +18,7 @@ type Props = {
   selectedArrivalWindowMinutes: number;
   plateNumber: string;
   isSubmitting: boolean;
+  isLiveData: boolean;
   errorMessage: string | null;
   onSelectSlot: (slotId: string) => void;
   onSelectArrivalWindow: (minutes: number) => void;
@@ -94,6 +95,7 @@ export function ReservationScreen({
   selectedArrivalWindowMinutes,
   plateNumber,
   isSubmitting,
+  isLiveData,
   errorMessage,
   onSelectSlot,
   onSelectArrivalWindow,
@@ -111,6 +113,15 @@ export function ReservationScreen({
       <Text style={styles.sectionLabel}>Step 1 of 3</Text>
       <Text style={styles.title}>Reserve a real slot.</Text>
       <Text style={styles.subtitle}>Choose a controlled slot and an arrival window.</Text>
+
+      {!isLiveData ? (
+        <View style={styles.warningBox}>
+          <Text style={styles.warningTitle}>Backend data is offline</Text>
+          <Text style={styles.warningText}>
+            You are viewing fallback demo slots. Connect to Supabase before creating a real reservation.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
@@ -201,11 +212,13 @@ export function ReservationScreen({
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.primaryButton, isSubmitting ? styles.primaryButtonDisabled : null]}
+          style={[styles.primaryButton, isSubmitting || !isLiveData ? styles.primaryButtonDisabled : null]}
           onPress={onSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !isLiveData}
         >
-          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Creating...' : 'Confirm Reservation'}</Text>
+          <Text style={styles.primaryButtonText}>
+            {isSubmitting ? 'Creating...' : !isLiveData ? 'Connect Backend First' : 'Confirm Reservation'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -235,6 +248,24 @@ const styles = StyleSheet.create({
     color: '#b8c7da',
     fontSize: 15,
     lineHeight: 22,
+  },
+  warningBox: {
+    backgroundColor: '#2a220f',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#8a6b2f',
+    gap: 6,
+  },
+  warningTitle: {
+    color: '#ffcf66',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  warningText: {
+    color: '#f5e6bf',
+    fontSize: 13,
+    lineHeight: 18,
   },
   card: {
     backgroundColor: '#08111d',

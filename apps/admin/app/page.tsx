@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { resetDemoData, resetParkingSlots, updateSlotStatus } from './actions';
+import { resetDemoData, resetParkingSlots, runParkingReconciliation, signOutAdmin, updateSlotStatus } from './actions';
 import { DashboardLiveRefresh } from './DashboardLiveRefresh';
 import { getFallbackAdminDashboardData, loadAdminDashboardData } from '../lib/dashboard';
 
@@ -99,6 +99,25 @@ export default async function Page() {
             Print Slot QR Codes
           </Link>
           <DashboardLiveRefresh />
+          <form action={signOutAdmin}>
+            <button
+              type="submit"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: '#1a2e49',
+                color: '#f4f7fb',
+                fontWeight: 800,
+                border: '1px solid #26405f',
+                cursor: 'pointer',
+              }}
+            >
+              Sign Out
+            </button>
+          </form>
           <form action={resetParkingSlots}>
             <input type="hidden" name="redirectTo" value="/" />
             <button
@@ -139,6 +158,26 @@ export default async function Page() {
               Full Demo Reset
             </button>
           </form>
+          <form action={runParkingReconciliation}>
+            <input type="hidden" name="redirectTo" value="/" />
+            <button
+              type="submit"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: '#7bd3ff',
+                color: '#071018',
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Run Reconciliation
+            </button>
+          </form>
         </div>
       </section>
 
@@ -148,6 +187,7 @@ export default async function Page() {
           ['Occupied Slots', String(dashboardData.metrics.occupiedSlots)],
           ['Completed Sessions', String(dashboardData.metrics.completedSessions)],
           ['No-Shows Today', String(dashboardData.metrics.noShowsToday)],
+          ['Data Mismatches', String(dashboardData.metrics.dataIntegrityMismatches)],
           ['Revenue', `PHP ${dashboardData.metrics.revenue.toFixed(2)}`],
         ].map(([label, value]) => (
           <div key={label} style={{ background: '#0f1b2c', borderRadius: 20, padding: 20, border: '1px solid #18283f' }}>
@@ -249,6 +289,63 @@ export default async function Page() {
                     </form>
                   ))}
                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f', marginBottom: 24 }}>
+        <h2 style={{ marginTop: 0 }}>Production Health</h2>
+        <p style={{ color: '#a9bdd6', marginTop: -6, marginBottom: 18 }}>
+          Audit trail, reconciliation activity, and integrity signals for operators.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 18 }}>
+          {[
+            ['Latest Audit Events', String(dashboardData.auditEvents.length)],
+            ['Recent Reconciliations', String(dashboardData.reconciliationRuns.length)],
+            ['Open Mismatches', String(dashboardData.metrics.dataIntegrityMismatches)],
+          ].map(([label, value]) => (
+            <div key={label} style={{ background: '#08111d', borderRadius: 18, padding: 18, border: '1px solid #18283f' }}>
+              <div style={{ color: '#7f94ad', fontSize: 14 }}>{label}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {dashboardData.reconciliationRuns.length === 0 ? (
+            <div style={{ color: '#a9bdd6', fontSize: 14 }}>No reconciliation runs yet.</div>
+          ) : null}
+          {dashboardData.reconciliationRuns.map((run) => (
+            <div key={run.id} style={{ background: '#08111d', borderRadius: 16, padding: 16, border: '1px solid #18283f' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <strong>{run.runStatus.toUpperCase()}</strong>
+                <span style={{ color: '#7f94ad' }}>{new Date(run.startedAt).toLocaleString()}</span>
+              </div>
+              <div style={{ color: '#a9bdd6', fontSize: 13, marginTop: 8 }}>
+                Fixed {run.fixedCount} of {run.mismatchCount} mismatches
+              </div>
+              {run.message ? <div style={{ color: '#f4f7fb', fontSize: 13, marginTop: 6 }}>{run.message}</div> : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f', marginBottom: 24 }}>
+        <h2 style={{ marginTop: 0 }}>Recent Audit Trail</h2>
+        <p style={{ color: '#a9bdd6', marginTop: -6, marginBottom: 18 }}>Latest database changes captured by the audit triggers.</p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {dashboardData.auditEvents.length === 0 ? (
+            <div style={{ color: '#a9bdd6', fontSize: 14 }}>No audit events yet.</div>
+          ) : null}
+          {dashboardData.auditEvents.map((event) => (
+            <div key={event.id} style={{ background: '#08111d', borderRadius: 16, padding: 16, border: '1px solid #18283f' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <strong>{event.tableName}</strong>
+                <span style={{ color: '#7f94ad' }}>{new Date(event.createdAt).toLocaleString()}</span>
+              </div>
+              <div style={{ color: '#a9bdd6', fontSize: 13, marginTop: 8 }}>
+                Action: {event.action} · Record: {event.recordId ?? 'n/a'}
               </div>
             </div>
           ))}

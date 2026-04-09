@@ -22,6 +22,26 @@ export type AdminMetrics = {
   completedSessions: number;
   noShowsToday: number;
   revenue: number;
+  dataIntegrityMismatches: number;
+};
+
+export type AdminAuditEvent = {
+  id: string;
+  tableName: string;
+  recordId: string | null;
+  action: 'insert' | 'update' | 'delete' | 'reconcile_fix' | 'manual_override';
+  actorUserId: string | null;
+  createdAt: string;
+};
+
+export type ReconciliationRun = {
+  id: string;
+  runStatus: 'running' | 'completed' | 'failed';
+  mismatchCount: number;
+  fixedCount: number;
+  message: string | null;
+  startedAt: string;
+  completedAt: string | null;
 };
 
 export type AdminReservation = {
@@ -41,10 +61,26 @@ export type AdminDashboardData = {
   slots: AdminSlot[];
   reservations: AdminReservation[];
   metrics: AdminMetrics;
+  auditEvents: AdminAuditEvent[];
+  reconciliationRuns: ReconciliationRun[];
 };
 
 type SupabaseListResponse<T> = T[];
 type SlotSourceStatus = 'available' | 'reserved' | 'occupied' | 'blocked' | 'disputed';
+
+async function readRestList<T>(response: Response): Promise<SupabaseListResponse<T>> {
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload as SupabaseListResponse<T>;
+}
 
 const fallbackLocation: AdminLocation = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -84,6 +120,14 @@ function createFallbackReservations(): AdminReservation[] {
   ];
 }
 
+function createFallbackAuditEvents(): AdminAuditEvent[] {
+  return [];
+}
+
+function createFallbackReconciliationRuns(): ReconciliationRun[] {
+  return [];
+}
+
 function normalizeSlotStatus({
   rawStatus,
   hasActiveSession,
@@ -119,10 +163,13 @@ export function getFallbackAdminDashboardData(): AdminDashboardData {
     metrics: {
       activeReservations: 1,
       occupiedSlots: 0,
-        completedSessions: 0,
+      completedSessions: 0,
       noShowsToday: 0,
       revenue: 0,
+      dataIntegrityMismatches: 0,
     },
+    auditEvents: createFallbackAuditEvents(),
+    reconciliationRuns: createFallbackReconciliationRuns(),
   };
 }
 
@@ -148,7 +195,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     },
   );
 
-  const locationRows = (await locationResponse.json()) as SupabaseListResponse<AdminLocation>;
+  const locationRows = await readRestList<AdminLocation>(locationResponse);
   const location = locationRows[0] ?? fallbackLocation;
 
   const slotResponse = await fetch(
@@ -159,13 +206,13 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     },
   );
 
-  const slotRows = (await slotResponse.json()) as SupabaseListResponse<{
+  const slotRows = await readRestList<{
     id: string;
     slot_label: string;
     status: SlotSourceStatus;
     display_order: number;
     qr_token: string;
-  }>;
+  }>(slotResponse);
 
   const reservationResponse = await fetch(
     `${config.url}/rest/v1/reservations?select=id,slot_id,plate_number,status,arrival_window_minutes,reservation_fee,reserved_at,expires_at&status=in.(confirmed)&order=reserved_at.desc&limit=20`,
@@ -175,7 +222,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     },
   );
 
-  const reservationRows = (await reservationResponse.json()) as SupabaseListResponse<{
+  const reservationRows = await readRestList<{
     id: string;
     slot_id: string;
     plate_number: string;
@@ -184,7 +231,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     reservation_fee: number;
     reserved_at: string;
     expires_at: string;
-  }>;
+  }>(reservationResponse);
 
   const sessionResponse = await fetch(
     `${config.url}/rest/v1/parking_sessions?select=status,billed_amount,slot_id&status=in.(active,completed)&order=started_at.desc`,
@@ -194,11 +241,11 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     },
   );
 
-  const sessionRows = (await sessionResponse.json()) as SupabaseListResponse<{
+  const sessionRows = await readRestList<{
     status: string;
     billed_amount: number | null;
     slot_id: string;
-  }>;
+  }>(sessionResponse);
 
   const activeSessionRows = sessionRows.filter((session) => session.status === 'active');
   const completedSessionCount = sessionRows.filter((session) => session.status === 'completed').length;
@@ -211,10 +258,45 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     },
   );
 
-  const paymentRows = (await paymentResponse.json()) as SupabaseListResponse<{
+  const paymentRows = await readRestList<{
     amount: number;
     status: 'paid';
-  }>;
+  }>(paymentResponse);
+
+  const auditResponse = await fetch(
+    `${config.url}/rest/v1/admin_audit_log?select=id,table_name,record_id,action,actor_user_id,created_at&order=created_at.desc&limit=10`,
+    {
+      headers,
+      cache: 'no-store',
+    },
+  );
+
+  const auditRows = await readRestList<{
+    id: string;
+    table_name: string;
+    record_id: string | null;
+    action: AdminAuditEvent['action'];
+    actor_user_id: string | null;
+    created_at: string;
+  }>(auditResponse);
+
+  const reconciliationResponse = await fetch(
+    `${config.url}/rest/v1/reconciliation_runs?select=id,run_status,mismatch_count,fixed_count,message,started_at,completed_at&order=started_at.desc&limit=5`,
+    {
+      headers,
+      cache: 'no-store',
+    },
+  );
+
+  const reconciliationRows = await readRestList<{
+    id: string;
+    run_status: ReconciliationRun['runStatus'];
+    mismatch_count: number;
+    fixed_count: number;
+    message: string | null;
+    started_at: string;
+    completed_at: string | null;
+  }>(reconciliationResponse);
 
   const activeSessionSlotIds = new Set(activeSessionRows.map((session) => session.slot_id));
   const confirmedReservationSlotIds = new Set(reservationRows.map((reservation) => reservation.slot_id));
@@ -251,6 +333,15 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
   const occupiedSlots = activeSessionSlotIds.size;
   const noShowsToday = reservations.filter((reservation) => reservation.status === 'no_show').length;
   const revenue = paymentRows.reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+  const dataIntegrityMismatches = slotRows.filter((slot) => {
+    const normalizedStatus = normalizeSlotStatus({
+      rawStatus: slot.status,
+      hasActiveSession: activeSessionSlotIds.has(slot.id),
+      hasConfirmedReservation: confirmedReservationSlotIds.has(slot.id),
+    });
+
+    return normalizedStatus !== slot.status;
+  }).length;
 
   return {
     location,
@@ -262,6 +353,24 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
         completedSessions: completedSessionCount,
       noShowsToday,
       revenue,
+      dataIntegrityMismatches,
     },
+    auditEvents: auditRows.map((event) => ({
+      id: event.id,
+      tableName: event.table_name,
+      recordId: event.record_id,
+      action: event.action,
+      actorUserId: event.actor_user_id,
+      createdAt: event.created_at,
+    })),
+    reconciliationRuns: reconciliationRows.map((run) => ({
+      id: run.id,
+      runStatus: run.run_status,
+      mismatchCount: run.mismatch_count,
+      fixedCount: run.fixed_count,
+      message: run.message,
+      startedAt: run.started_at,
+      completedAt: run.completed_at,
+    })),
   };
 }

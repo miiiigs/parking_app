@@ -19,7 +19,35 @@ export function getSupabaseClient(): any {
     return null;
   }
 
-  cachedClient = createClient(supabaseUrl, supabaseAnonKey);
+  cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+  });
 
   return cachedClient;
+}
+
+export async function ensureMobileAuthSession() {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+
+  if (sessionData.session?.user) {
+    return sessionData.session.user;
+  }
+
+  const { data, error } = await supabase.auth.signInAnonymously();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.user ?? null;
 }
