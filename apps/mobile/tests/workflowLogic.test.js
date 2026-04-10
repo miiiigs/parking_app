@@ -5,6 +5,7 @@ const {
   buildStoredWorkflowSnapshot,
   getNextSelectedSlotId,
 } = require('../src/lib/workflowLogic.js');
+const { workflowReducer } = require('../src/lib/workflowReducer.js');
 
 test('keeps the current slot when it still exists', () => {
   const slots = [
@@ -57,4 +58,58 @@ test('builds a stored workflow snapshot with notification ids', () => {
   assert.equal(snapshot.reservationId, 'reservation-123');
   assert.deepEqual(snapshot.scheduledNotificationIds, ['notif-1', 'notif-2']);
   assert.equal(typeof snapshot.savedAt, 'string');
+});
+
+test('workflow reducer applies patch updates immutably', () => {
+  const previousState = {
+    stage: 'reserve',
+    selectedSlotId: 'slot-1',
+    selectedArrivalWindowMinutes: 60,
+    plateNumber: 'ABC-1234',
+    validationQrToken: 'token-1',
+    scheduledNotificationIds: ['notif-1'],
+    reservationError: null,
+    createdReservation: null,
+    activeParkingSession: null,
+    operation: 'idle',
+    connectionState: 'live',
+    connectionMessage: null,
+  };
+
+  const nextState = workflowReducer(previousState, {
+    type: 'patch',
+    patch: {
+      stage: 'validate',
+      selectedSlotId: 'slot-2',
+      scheduledNotificationIds: ['notif-2', 'notif-3'],
+    },
+  });
+
+  assert.notStrictEqual(nextState, previousState);
+  assert.equal(nextState.stage, 'validate');
+  assert.equal(nextState.selectedSlotId, 'slot-2');
+  assert.deepEqual(nextState.scheduledNotificationIds, ['notif-2', 'notif-3']);
+  assert.equal(previousState.stage, 'reserve');
+  assert.deepEqual(previousState.scheduledNotificationIds, ['notif-1']);
+});
+
+test('workflow reducer ignores unknown actions', () => {
+  const previousState = {
+    stage: 'home',
+    selectedSlotId: null,
+    selectedArrivalWindowMinutes: 60,
+    plateNumber: 'ABC-1234',
+    validationQrToken: '',
+    scheduledNotificationIds: [],
+    reservationError: null,
+    createdReservation: null,
+    activeParkingSession: null,
+    operation: 'idle',
+    connectionState: 'booting',
+    connectionMessage: 'Syncing live parking data...',
+  };
+
+  const nextState = workflowReducer(previousState, { type: 'noop' });
+
+  assert.equal(nextState, previousState);
 });

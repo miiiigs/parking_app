@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import type { ReservationResult } from '../lib/reservations';
@@ -28,19 +28,15 @@ export function ValidationScreen({
   onBack,
 }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
-  const [scanMessage, setScanMessage] = useState('Align the slot QR inside the frame.');
+  const [scanMessage, setScanMessage] = useState('Press Scan QR to open the camera.');
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
   const hasTriggeredValidation = useRef(false);
 
   useEffect(() => {
     hasTriggeredValidation.current = false;
-    setScanMessage('Align the slot QR inside the frame.');
+    setIsScannerVisible(false);
+    setScanMessage('Press Scan QR to open the camera.');
   }, [expectedQrToken, reservation?.reservation_id]);
-
-  useEffect(() => {
-    if (!permission) {
-      void requestPermission();
-    }
-  }, [permission, requestPermission]);
 
   function handleBarcodeScanned(value: string) {
     if (isSubmitting || hasTriggeredValidation.current) {
@@ -55,8 +51,25 @@ export function ValidationScreen({
     }
 
     hasTriggeredValidation.current = true;
+    setIsScannerVisible(false);
     setScanMessage('QR matched. Starting the parking session.');
     onValidate(value);
+  }
+
+  async function openScanner() {
+    if (isSubmitting || hasTriggeredValidation.current) {
+      return;
+    }
+
+    const currentPermission = permission?.granted ? permission : await requestPermission();
+
+    if (!currentPermission?.granted) {
+      setScanMessage('Camera permission is required to scan QR codes.');
+      return;
+    }
+
+    setScanMessage('Align the slot QR inside the frame.');
+    setIsScannerVisible(true);
   }
 
   return (
@@ -84,24 +97,14 @@ export function ValidationScreen({
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Slot QR Token</Text>
-        {permission?.granted ? (
-          <View style={styles.cameraWrapper}>
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              onBarcodeScanned={(event: { data: string }) => handleBarcodeScanned(event.data)}
-            />
-            <Text style={styles.cameraHint}>Scan the QR sticker on the assigned slot.</Text>
-          </View>
-        ) : (
-          <View style={styles.permissionCard}>
-            <Text style={styles.helper}>Camera permission is required to scan QR codes.</Text>
-            <TouchableOpacity style={styles.permissionButton} onPress={() => void requestPermission()}>
-              <Text style={styles.permissionButtonText}>Allow Camera</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <TouchableOpacity
+          style={[styles.scanButton, isSubmitting ? styles.scanButtonDisabled : null]}
+          onPress={() => void openScanner()}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.scanButtonText}>Scan QR</Text>
+        </TouchableOpacity>
+        <Text style={styles.helper}>Tap Scan QR to open the camera only when you need it.</Text>
 
         <TextInput
           value={slotQrToken}
@@ -116,6 +119,44 @@ export function ValidationScreen({
       </View>
 
       <Text style={styles.scanMessage}>{scanMessage}</Text>
+
+      <Modal
+        visible={isScannerVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setIsScannerVisible(false)}
+      >
+        <View style={styles.scannerModal}>
+          <View style={styles.scannerHeader}>
+            <Text style={styles.scannerTitle}>Scan the slot QR</Text>
+            <TouchableOpacity
+              style={styles.closeScannerButton}
+              onPress={() => setIsScannerVisible(false)}
+            >
+              <Text style={styles.closeScannerText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          {permission?.granted ? (
+            <View style={styles.cameraWrapper}>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={(event: { data: string }) => handleBarcodeScanned(event.data)}
+              />
+              <Text style={styles.cameraHint}>Point the camera at the QR sticker on the assigned slot.</Text>
+            </View>
+          ) : (
+            <View style={styles.permissionCard}>
+              <Text style={styles.helper}>Camera permission is required to scan QR codes.</Text>
+              <TouchableOpacity style={styles.permissionButton} onPress={() => void openScanner()}>
+                <Text style={styles.permissionButtonText}>Allow Camera</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
 
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
@@ -191,6 +232,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  scanButton: {
+    backgroundColor: '#1a2e49',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#26405f',
+  },
+  scanButtonDisabled: {
+    opacity: 0.7,
+  },
+  scanButtonText: {
+    color: '#f4f7fb',
+    fontWeight: '800',
+    fontSize: 16,
+  },
   input: {
     backgroundColor: '#08111d',
     borderRadius: 14,
@@ -205,7 +262,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   camera: {
-    height: 240,
+    height: 420,
     borderRadius: 18,
     overflow: 'hidden',
   },
@@ -213,6 +270,36 @@ const styles = StyleSheet.create({
     color: '#b8c7da',
     fontSize: 12,
     lineHeight: 18,
+  },
+  scannerModal: {
+    flex: 1,
+    backgroundColor: '#08111f',
+    padding: 20,
+    gap: 16,
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  scannerTitle: {
+    color: '#f4f7fb',
+    fontSize: 20,
+    fontWeight: '800',
+    flex: 1,
+  },
+  closeScannerButton: {
+    backgroundColor: '#1a2e49',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#26405f',
+  },
+  closeScannerText: {
+    color: '#f4f7fb',
+    fontWeight: '700',
   },
   permissionCard: {
     gap: 10,

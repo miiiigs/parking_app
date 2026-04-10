@@ -9,7 +9,7 @@
     "dev:mobile": "npm --workspace apps/mobile run start",
     "dev:admin": "npm --workspace apps/admin run dev",
     "build:admin": "npm --workspace apps/admin run build",
-    "test:mobile": "node --test apps/mobile/tests/workflowLogic.test.js"
+    "test:mobile": "npm --workspace apps/mobile run test"
   },
   "dependencies": {
     "expo-camera": "~16.0.18",

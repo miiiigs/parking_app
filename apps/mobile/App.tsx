@@ -15,6 +15,8 @@ import { ReservationScreen } from './src/screens/ReservationScreen';
 import { SessionScreen } from './src/screens/SessionScreen';
 import { ValidationScreen } from './src/screens/ValidationScreen';
 // @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
+import { workflowReducer as applyWorkflowAction } from './src/lib/workflowReducer';
+// @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
 import { buildStoredWorkflowSnapshot, getNextSelectedSlotId } from './src/lib/workflowLogic';
 import {
   getFallbackParkingData,
@@ -42,9 +44,12 @@ import {
   saveStoredWorkflowSnapshot,
 } from './src/lib/workflowStorage';
 import {
+  cancelReservationNotifications,
   cancelScheduledNotifications,
   ensureParkingNotificationsEnabled,
-  scheduleReservationReminderNotifications,
+  hasScheduledReservationNotifications,
+  scheduleReservationConfirmationNotification,
+  scheduleReservationFollowUpNotifications,
   sendSessionCompletedNotification,
 } from './src/lib/notifications';
 
@@ -88,15 +93,7 @@ const initialWorkflowState: WorkflowState = {
 };
 
 function workflowReducer(state: WorkflowState, action: WorkflowAction): WorkflowState {
-  switch (action.type) {
-    case 'patch':
-      return {
-        ...state,
-        ...action.patch,
-      };
-    default:
-      return state;
-  }
+  return applyWorkflowAction(state, action);
 }
 
 export default function App() {
@@ -118,10 +115,13 @@ export default function App() {
   }, []);
 
   async function cancelReminderNotifications() {
-    const reminderIds = workflowRef.current.scheduledNotificationIds;
+    const currentWorkflow = workflowRef.current;
+    const reservationId = currentWorkflow.createdReservation?.reservation_id ?? currentWorkflow.activeParkingSession?.reservation_id ?? '';
 
-    if (reminderIds.length > 0) {
-      await cancelScheduledNotifications(reminderIds);
+    if (reservationId) {
+      await cancelReservationNotifications(reservationId, currentWorkflow.scheduledNotificationIds);
+    } else if (currentWorkflow.scheduledNotificationIds.length > 0) {
+      await cancelScheduledNotifications(currentWorkflow.scheduledNotificationIds);
     }
 
     dispatchWorkflow({
@@ -132,22 +132,36 @@ export default function App() {
     });
   }
 
-  async function scheduleReservationReminders(reservation: ReservationResult) {
-    const slotLabel = parkingData.slots.find((slot) => slot.id === reservation.slot_id)?.label ?? 'Assigned slot';
-    const reminderIds = await scheduleReservationReminderNotifications({
-      reservationId: reservation.reservation_id,
-      slotLabel,
-      expiresAt: reservation.expires_at,
+  async function scheduleFollowUpNotificationsOnBackground() {
+    const currentWorkflow = workflowRef.current;
+
+    if (currentWorkflow.stage !== 'validate' || !currentWorkflow.createdReservation || currentWorkflow.activeParkingSession) {
+      return;
+    }
+
+    if (currentWorkflow.scheduledNotificationIds.length > 1) {
+      return;
+    }
+
+    if (await hasScheduledReservationNotifications(currentWorkflow.createdReservation.reservation_id, ['reservation-expiry-reminder', 'reservation-expired'])) {
+      return;
+    }
+
+    const reminderIds = await scheduleReservationFollowUpNotifications({
+      reservationId: currentWorkflow.createdReservation.reservation_id,
+      slotLabel:
+        parkingData.slots.find((slot) => slot.id === currentWorkflow.createdReservation?.slot_id)?.label ?? 'Assigned slot',
+      expiresAt: currentWorkflow.createdReservation.expires_at,
     });
 
-    dispatchWorkflow({
-      type: 'patch',
-      patch: {
-        scheduledNotificationIds: reminderIds,
-      },
-    });
-
-    return reminderIds;
+    if (reminderIds.length > 0) {
+      dispatchWorkflow({
+        type: 'patch',
+        patch: {
+          scheduledNotificationIds: [...currentWorkflow.scheduledNotificationIds, ...reminderIds],
+        },
+      });
+    }
   }
 
   async function refreshFromBackend() {
@@ -220,7 +234,7 @@ export default function App() {
         const latestSession = await getParkingSessionByReservationId(currentWorkflowReservationId);
 
         if (latestSession) {
-          await cancelReminderNotifications();
+          await cancelReservationNotifications(currentWorkflowReservationId, currentWorkflow.scheduledNotificationIds);
           dispatchWorkflow({
             type: 'patch',
             patch: {
@@ -230,10 +244,6 @@ export default function App() {
             },
           });
         } else {
-          if (currentWorkflow.scheduledNotificationIds.length === 0) {
-            await scheduleReservationReminders(latestReservation);
-          }
-
           dispatchWorkflow({
             type: 'patch',
             patch: {
@@ -262,9 +272,7 @@ export default function App() {
           });
 
           if (restoredWorkflow.session) {
-            await cancelReminderNotifications();
-          } else if ((storedWorkflow?.scheduledNotificationIds ?? []).length === 0) {
-            await scheduleReservationReminders(restoredWorkflow.reservation);
+            await cancelReservationNotifications(restoredWorkflow.reservation.reservation_id, storedWorkflow?.scheduledNotificationIds ?? []);
           }
         } else {
           const storedWorkflow = await loadStoredWorkflowSnapshot();
@@ -336,6 +344,8 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         void refreshFromBackend();
+      } else if (nextAppState === 'background') {
+        void scheduleFollowUpNotificationsOnBackground();
       }
     });
 
@@ -443,6 +453,12 @@ export default function App() {
         throw new Error('Reservation was created but no record was returned.');
       }
 
+      const confirmationNotificationIds = await scheduleReservationConfirmationNotification({
+        reservationId: reservation.reservation_id,
+        slotLabel: parkingData.slots.find((slot) => slot.id === reservation.slot_id)?.label ?? 'Assigned slot',
+        expiresAt: reservation.expires_at,
+      });
+
       dispatchWorkflow({
         type: 'patch',
         patch: {
@@ -452,10 +468,9 @@ export default function App() {
           stage: 'validate',
           reservationError: null,
           operation: 'idle',
+          scheduledNotificationIds: confirmationNotificationIds,
         },
       });
-
-      await scheduleReservationReminders(reservation);
 
       const refreshed = await loadParkingDashboardData();
       setParkingData(refreshed);

@@ -2,8 +2,10 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+// @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
+import { buildReservationFollowUpNotificationPlan } from './notificationScheduling';
+
 const PARKING_NOTIFICATION_CHANNEL_ID = 'parking-reminders';
-const EXPIRY_REMINDER_OFFSET_MINUTES = 5;
 
 function isRunningInExpoGo() {
   return Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
@@ -58,12 +60,104 @@ function buildBaseContent(title: string, body: string) {
   };
 }
 
-function asTriggerDate(dateValue: string | Date) {
-  const triggerDate = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
-  return triggerDate.getTime() > Date.now() + 5000 ? triggerDate : null;
+function asTriggerDate(dateValue: string | Date | number) {
+  const triggerDate = typeof dateValue === 'number' ? new Date(dateValue) : typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+  return triggerDate.getTime() > Date.now() + 5000
+    ? { type: 'date' as const, timestamp: triggerDate.getTime() }
+    : null;
 }
 
-export async function scheduleReservationReminderNotifications(params: {
+function getScheduledNotificationData(notification: any) {
+  return notification?.content?.data ?? null;
+}
+
+function notificationMatchesReservation(notification: any, reservationId: string, notificationTypes?: string[]) {
+  const data = getScheduledNotificationData(notification);
+
+  if (!data || data.reservationId !== reservationId) {
+    return false;
+  }
+
+  if (!notificationTypes || notificationTypes.length === 0) {
+    return true;
+  }
+
+  return notificationTypes.includes(data.type);
+}
+
+export async function getScheduledReservationNotificationIds(
+  reservationId: string,
+  notificationTypes?: string[],
+) {
+  if (!reservationId) {
+    return [] as string[];
+  }
+
+  const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+
+  return scheduledNotifications
+    .filter((notification) => notificationMatchesReservation(notification, reservationId, notificationTypes))
+    .map((notification) => notification.identifier)
+    .filter(Boolean);
+}
+
+export async function hasScheduledReservationNotifications(
+  reservationId: string,
+  notificationTypes?: string[],
+) {
+  const scheduledNotificationIds = await getScheduledReservationNotificationIds(reservationId, notificationTypes);
+  return scheduledNotificationIds.length > 0;
+}
+
+export async function cancelReservationNotifications(
+  reservationId: string,
+  notificationIds: string[] = [],
+  notificationTypes?: string[],
+) {
+  const scheduledNotificationIds = await getScheduledReservationNotificationIds(reservationId, notificationTypes);
+  const uniqueNotificationIds = [...new Set([...notificationIds, ...scheduledNotificationIds])].filter(Boolean);
+
+  await Promise.all(
+    uniqueNotificationIds.map(async (notificationId) => {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(notificationId);
+      } catch {
+        // Ignore cleanup errors. The backend workflow remains authoritative.
+      }
+    }),
+  );
+}
+
+export async function scheduleReservationConfirmationNotification(params: {
+  reservationId: string;
+  slotLabel: string;
+  expiresAt: string;
+}) {
+  if (isRunningInExpoGo()) {
+    return [] as string[];
+  }
+
+  const notificationsEnabled = await ensureParkingNotificationsEnabled();
+
+  if (!notificationsEnabled) {
+    return [] as string[];
+  }
+
+  const confirmationId = await Notifications.scheduleNotificationAsync({
+    content: {
+      ...buildBaseContent('Parking slot reserved', `${params.slotLabel} is confirmed. The booking is active now.`),
+      data: {
+        reservationId: params.reservationId,
+        type: 'reservation-confirmed',
+      },
+    },
+    trigger: null,
+  });
+
+  return [confirmationId];
+}
+
+export async function scheduleReservationFollowUpNotifications(params: {
   reservationId: string;
   slotLabel: string;
   expiresAt: string;
@@ -79,53 +173,32 @@ export async function scheduleReservationReminderNotifications(params: {
   }
 
   const scheduledNotificationIds: string[] = [];
-  const reservationExpiresAt = new Date(params.expiresAt);
+  const notificationPlan = buildReservationFollowUpNotificationPlan(params);
 
-  const confirmationId = await Notifications.scheduleNotificationAsync({
-    content: {
-      ...buildBaseContent('Parking slot reserved', `${params.slotLabel} is confirmed. The booking is active now.`),
-      data: {
-        reservationId: params.reservationId,
-        type: 'reservation-confirmed',
-      },
-    },
-    trigger: null,
-  });
-  scheduledNotificationIds.push(confirmationId);
-
-  const reminderTrigger = new Date(reservationExpiresAt.getTime() - EXPIRY_REMINDER_OFFSET_MINUTES * 60 * 1000);
-
-  if (reminderTrigger.getTime() > Date.now() + 5000) {
-    const reminderId = await Notifications.scheduleNotificationAsync({
+  for (const notification of notificationPlan) {
+    const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        ...buildBaseContent('Reservation expiring soon', `${params.slotLabel} expires in ${EXPIRY_REMINDER_OFFSET_MINUTES} minutes.`),
+        ...buildBaseContent(notification.title, notification.body),
         data: {
           reservationId: params.reservationId,
-          type: 'reservation-expiry-reminder',
+          type: notification.type,
         },
       },
-      trigger: asTriggerDate(reminderTrigger),
+      trigger: asTriggerDate(notification.triggerAt),
     });
 
-    scheduledNotificationIds.push(reminderId);
-  }
-
-  if (reservationExpiresAt.getTime() > Date.now() + 5000) {
-    const expiryId = await Notifications.scheduleNotificationAsync({
-      content: {
-        ...buildBaseContent('Reservation expired', `${params.slotLabel} is now past the arrival window.`),
-        data: {
-          reservationId: params.reservationId,
-          type: 'reservation-expired',
-        },
-      },
-      trigger: asTriggerDate(reservationExpiresAt),
-    });
-
-    scheduledNotificationIds.push(expiryId);
+    scheduledNotificationIds.push(notificationId);
   }
 
   return scheduledNotificationIds;
+}
+
+export async function scheduleReservationReminderNotifications(params: {
+  reservationId: string;
+  slotLabel: string;
+  expiresAt: string;
+}) {
+  return scheduleReservationFollowUpNotifications(params);
 }
 
 export async function sendSessionCompletedNotification(params: {
