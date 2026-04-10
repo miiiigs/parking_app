@@ -6,8 +6,12 @@ type Props = {
   locationAddress: string;
   slotCountLabel: string;
   isLoading: boolean;
+  notificationLabel: string;
+  notificationMessage: string;
+  isRefreshingNotifications: boolean;
   onStartReservation: () => void;
   onViewSession: () => void;
+  onEnableNotifications: () => void;
 };
 
 export function HomeScreen({
@@ -15,8 +19,12 @@ export function HomeScreen({
   locationAddress,
   slotCountLabel,
   isLoading,
+  notificationLabel,
+  notificationMessage,
+  isRefreshingNotifications,
   onStartReservation,
   onViewSession,
+  onEnableNotifications,
 }: Props) {
   return (
     <View style={styles.container}>
@@ -30,6 +38,17 @@ export function HomeScreen({
         <Text style={styles.liveValue}>{locationName}</Text>
         <Text style={styles.liveHelper}>{locationAddress}</Text>
         <Text style={styles.liveStatus}>{isLoading ? 'Loading live data...' : slotCountLabel}</Text>
+      </View>
+      <View style={styles.noticeCard}>
+        <Text style={styles.noticeLabel}>{notificationLabel}</Text>
+        <Text style={styles.noticeMessage}>{notificationMessage}</Text>
+        <TouchableOpacity
+          style={[styles.noticeButton, isRefreshingNotifications ? styles.noticeButtonDisabled : null]}
+          onPress={onEnableNotifications}
+          disabled={isRefreshingNotifications}
+        >
+          <Text style={styles.noticeButtonText}>{isRefreshingNotifications ? 'Checking...' : 'Enable reminders'}</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.primaryButton} onPress={onStartReservation}>
@@ -96,6 +115,41 @@ const styles = StyleSheet.create({
     color: '#3dd6a5',
     fontSize: 13,
     fontWeight: '700',
+  },
+  noticeCard: {
+    backgroundColor: '#0d1726',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#273e57',
+    gap: 10,
+  },
+  noticeLabel: {
+    color: '#f4f7fb',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  noticeMessage: {
+    color: '#b8c7da',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  noticeButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1a2e49',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#26405f',
+  },
+  noticeButtonDisabled: {
+    opacity: 0.7,
+  },
+  noticeButtonText: {
+    color: '#f4f7fb',
+    fontWeight: '700',
+    fontSize: 14,
   },
   buttonRow: {
     flexDirection: 'row',

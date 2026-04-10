@@ -51,6 +51,40 @@ export async function ensureParkingNotificationsEnabled() {
   return true;
 }
 
+export async function getParkingNotificationReadiness() {
+  if (isRunningInExpoGo()) {
+    return {
+      status: 'expo-go' as const,
+      label: 'Expo Go',
+      message: 'Notifications are unavailable in Expo Go. Use a development build to receive reminders.',
+    };
+  }
+
+  const currentPermissions = await Notifications.getPermissionsAsync();
+
+  if (currentPermissions.status === 'granted') {
+    return {
+      status: 'ready' as const,
+      label: 'Reminders enabled',
+      message: 'Parking reminders are enabled on this device.',
+    };
+  }
+
+  if (currentPermissions.status === 'denied') {
+    return {
+      status: 'blocked' as const,
+      label: 'Notifications blocked',
+      message: 'Notification access is blocked. Open device settings to allow parking reminders.',
+    };
+  }
+
+  return {
+    status: 'needs-permission' as const,
+    label: 'Reminders not enabled',
+    message: 'Tap Enable reminders to request notification access for reservation updates.',
+  };
+}
+
 function buildBaseContent(title: string, body: string) {
   return {
     title,

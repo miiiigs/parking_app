@@ -7,6 +7,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -47,6 +48,7 @@ import {
   cancelReservationNotifications,
   cancelScheduledNotifications,
   ensureParkingNotificationsEnabled,
+  getParkingNotificationReadiness,
   hasScheduledReservationNotifications,
   scheduleReservationConfirmationNotification,
   scheduleReservationFollowUpNotifications,
@@ -56,6 +58,10 @@ import {
 type Stage = 'home' | 'reserve' | 'validate' | 'session';
 type Operation = 'idle' | 'refreshing' | 'creatingReservation' | 'startingSession' | 'endingSession';
 type ConnectionState = 'booting' | 'live' | 'degraded' | 'offline';
+type NotificationReadinessState = {
+  label: string;
+  message: string;
+};
 
 type WorkflowState = {
   stage: Stage;
@@ -92,6 +98,11 @@ const initialWorkflowState: WorkflowState = {
   connectionMessage: 'Syncing live parking data...',
 };
 
+const initialNotificationReadinessState: NotificationReadinessState = {
+  label: 'Checking reminders',
+  message: 'Checking whether parking reminders are available on this device...',
+};
+
 function workflowReducer(state: WorkflowState, action: WorkflowAction): WorkflowState {
   return applyWorkflowAction(state, action);
 }
@@ -99,20 +110,65 @@ function workflowReducer(state: WorkflowState, action: WorkflowAction): Workflow
 export default function App() {
   const [workflow, dispatchWorkflow] = useReducer(workflowReducer, initialWorkflowState);
   const [parkingData, setParkingData] = useState<ParkingDashboardData>(getFallbackParkingData());
+  const [notificationReadiness, setNotificationReadiness] = useState<NotificationReadinessState>(initialNotificationReadinessState);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  const [isCheckingNotifications, setIsCheckingNotifications] = useState(false);
   const syncInProgressRef = useRef(false);
   const hasBootstrappedRef = useRef(false);
   const workflowRef = useRef(workflow);
+  const [isRefreshingBackend, setIsRefreshingBackend] = useState(false);
 
   useEffect(() => {
     workflowRef.current = workflow;
   }, [workflow]);
 
-  useEffect(() => {
-    void ensureParkingNotificationsEnabled();
-  }, []);
+  async function refreshNotificationReadiness() {
+    if (isCheckingNotifications) {
+      return;
+    }
+
+    setIsCheckingNotifications(true);
+
+    try {
+      const readiness = await getParkingNotificationReadiness();
+      setNotificationReadiness({
+        label: readiness.label,
+        message: readiness.message,
+      });
+    } finally {
+      setIsCheckingNotifications(false);
+    }
+  }
+
+  async function enableNotifications() {
+    if (isCheckingNotifications) {
+      return;
+    }
+
+    setIsCheckingNotifications(true);
+
+    try {
+      const notificationsEnabled = await ensureParkingNotificationsEnabled();
+
+      if (notificationsEnabled) {
+        setNotificationReadiness({
+          label: 'Reminders enabled',
+          message: 'Parking reminders are enabled on this device.',
+        });
+        return;
+      }
+
+      const readiness = await getParkingNotificationReadiness();
+      setNotificationReadiness({
+        label: readiness.label,
+        message: readiness.message,
+      });
+    } finally {
+      setIsCheckingNotifications(false);
+    }
+  }
 
   async function cancelReminderNotifications() {
     const currentWorkflow = workflowRef.current;
@@ -170,6 +226,7 @@ export default function App() {
     }
 
     syncInProgressRef.current = true;
+    setIsRefreshingBackend(true);
 
     try {
       await ensureMobileAuthSession();
@@ -183,7 +240,7 @@ export default function App() {
           connectionState: refreshedParkingData.isLiveData ? 'live' : 'degraded',
           connectionMessage: refreshedParkingData.isLiveData
             ? null
-            : 'Using fallback parking data until Supabase becomes available again.',
+            : 'Using fallback parking data until Supabase becomes available again. Tap Retry to check for live data.',
         },
       });
 
@@ -298,13 +355,19 @@ export default function App() {
         type: 'patch',
         patch: {
           connectionState: 'offline',
-          connectionMessage: 'Live backend data is unavailable. Showing fallback data.',
+          connectionMessage: 'Live backend data is unavailable. Showing fallback data. Tap Retry to check again.',
         },
       });
     } finally {
       syncInProgressRef.current = false;
+      setIsRefreshingBackend(false);
       hasBootstrappedRef.current = true;
     }
+  }
+
+  async function retryBackendSync() {
+    await refreshFromBackend();
+    await refreshNotificationReadiness();
   }
 
   useEffect(() => {
@@ -323,6 +386,7 @@ export default function App() {
 
   useEffect(() => {
     void refreshFromBackend();
+    void refreshNotificationReadiness();
 
     const supabaseClient = getSupabaseClient();
     const liveRefresh = () => {
@@ -344,6 +408,7 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         void refreshFromBackend();
+        void refreshNotificationReadiness();
       } else if (nextAppState === 'background') {
         void scheduleFollowUpNotificationsOnBackground();
       }
@@ -771,6 +836,9 @@ export default function App() {
         locationAddress={activeLocation?.address ?? 'Bonifacio Global City, Taguig'}
         slotCountLabel={slotCountLabel}
         isLoading={workflow.connectionState === 'booting'}
+        notificationLabel={notificationReadiness.label}
+        notificationMessage={notificationReadiness.message}
+        isRefreshingNotifications={isCheckingNotifications}
         onStartReservation={() =>
           dispatchWorkflow({
             type: 'patch',
@@ -789,6 +857,9 @@ export default function App() {
             },
           })
         }
+        onEnableNotifications={() => {
+          void enableNotifications();
+        }}
       />
     );
   };
@@ -804,14 +875,29 @@ export default function App() {
               workflow.connectionState === 'offline' ? styles.bannerOffline : styles.bannerDegraded,
             ]}
           >
-            <Text style={styles.bannerTitle}>
-              {workflow.connectionState === 'offline'
-                ? 'Offline mode'
-                : workflow.connectionState === 'degraded'
-                  ? 'Fallback data in use'
-                  : 'Booting'}
-            </Text>
-            <Text style={styles.bannerText}>{connectionBannerMessage}</Text>
+            <View style={styles.bannerTextRow}>
+              <View style={styles.bannerCopy}>
+                <Text style={styles.bannerTitle}>
+                  {workflow.connectionState === 'offline'
+                    ? 'Offline mode'
+                    : workflow.connectionState === 'degraded'
+                      ? 'Fallback data in use'
+                      : 'Booting'}
+                </Text>
+                <Text style={styles.bannerText}>{connectionBannerMessage}</Text>
+              </View>
+              {workflow.connectionState !== 'live' ? (
+                <TouchableOpacity
+                  style={[styles.bannerButton, isRefreshingBackend ? styles.bannerButtonDisabled : null]}
+                  onPress={() => {
+                    void retryBackendSync();
+                  }}
+                  disabled={isRefreshingBackend}
+                >
+                  <Text style={styles.bannerButtonText}>{isRefreshingBackend ? 'Retrying...' : 'Retry'}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         ) : null}
 
@@ -852,6 +938,15 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1,
   },
+  bannerTextRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  bannerCopy: {
+    flex: 1,
+    gap: 6,
+  },
   bannerOffline: {
     backgroundColor: '#2a1114',
     borderColor: '#8f3c46',
@@ -881,6 +976,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: '#f4f7fb',
     fontSize: 18,
+    fontWeight: '700',
+  },
+  bannerButton: {
+    backgroundColor: '#1a2e49',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#26405f',
+  },
+  bannerButtonDisabled: {
+    opacity: 0.7,
+  },
+  bannerButtonText: {
+    color: '#f4f7fb',
+    fontSize: 13,
     fontWeight: '700',
   },
   row: {
