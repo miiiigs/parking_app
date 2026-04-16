@@ -1163,34 +1163,6 @@ export default function App() {
             <View style={styles.headerCopy}>
               <Text style={styles.headerKicker}>Smart Parking</Text>
               <Text style={styles.headerTitle}>{headerTitle}</Text>
-              <Text style={styles.headerSubtitle}>{activeLocation?.city ?? 'Bonifacio Global City'}</Text>
-                <View
-                  style={[
-                    styles.headerStatusChip,
-                    workflow.connectionState === 'offline'
-                      ? styles.headerStatusChipOffline
-                      : workflow.connectionState === 'degraded'
-                        ? styles.headerStatusChipDegraded
-                        : workflow.connectionState === 'booting'
-                          ? styles.headerStatusChipBooting
-                          : styles.headerStatusChipLive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.headerStatusChipText,
-                      workflow.connectionState === 'offline'
-                        ? styles.headerStatusChipTextOffline
-                        : workflow.connectionState === 'degraded'
-                          ? styles.headerStatusChipTextDegraded
-                          : workflow.connectionState === 'booting'
-                            ? styles.headerStatusChipTextBooting
-                            : styles.headerStatusChipTextLive,
-                    ]}
-                  >
-                    {headerStatusLabel}
-                  </Text>
-                </View>
             </View>
           </View>
           <TouchableOpacity style={styles.menuButton} onPress={() => setIsMenuVisible(true)}>
@@ -1256,6 +1228,8 @@ export default function App() {
               notificationLabel={notificationReadiness.label}
               notificationMessage={notificationReadiness.message}
               isRefreshingNotifications={isCheckingNotifications}
+              currentReservation={currentReservation}
+              currentSession={currentSession}
               onStartReservation={() => openBookingTab('reserve')}
               onViewSession={() =>
                 openBookingTab(currentSession ? 'session' : currentReservation ? 'validate' : 'reserve')
@@ -1265,51 +1239,17 @@ export default function App() {
               }}
             />
           )}
-
-          {activeTab !== 'profile' ? (
-            <View style={styles.statusCard}>
-              <View style={styles.statusHeaderRow}>
-                <Text style={styles.statusTitle}>Current Session</Text>
-                <Text style={styles.statusChip}>{currentSession?.session_status ? 'Tracked' : currentReservation ? 'Tracked' : 'Ready'}</Text>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Location</Text>
-                <Text style={styles.statusValue}>{activeLocation?.name ?? 'BGC Pilot Site'}</Text>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Assigned Slot</Text>
-                <Text style={styles.statusValue}>{activeSlot?.label ?? 'Slot #12'}</Text>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Stage</Text>
-                <Text style={styles.statusValue}>{bookingStage.toUpperCase()}</Text>
-              </View>
-              <View style={styles.statusRow}>
-                <Text style={styles.statusLabel}>Timer</Text>
-                <Text style={styles.statusValue}>{currentSession?.started_at ? new Date(currentSession.started_at).toLocaleTimeString() : 'Waiting to start'}</Text>
-              </View>
-            </View>
-          ) : null}
         </ScrollView>
 
         <View style={styles.bottomNav}>
           <TouchableOpacity style={[styles.navItem, activeTab === 'home' ? styles.navItemActive : null]} onPress={openHomeTab}>
-            <View style={styles.navItemContent}>
-              <Text style={[styles.navItemLabel, activeTab === 'home' ? styles.navItemLabelActive : null]}>Home</Text>
-              <Text style={[styles.navItemHint, activeTab === 'home' ? styles.navItemHintActive : null]}>Overview</Text>
-            </View>
+            <Text style={[styles.navItemLabel, activeTab === 'home' ? styles.navItemLabelActive : null]}>Home</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.navItem, activeTab === 'book' ? styles.navItemActive : null]} onPress={() => openBookingTab()}>
-            <View style={styles.navItemContent}>
-              <Text style={[styles.navItemLabel, activeTab === 'book' ? styles.navItemLabelActive : null]}>Book</Text>
-              <Text style={[styles.navItemHint, activeTab === 'book' ? styles.navItemHintActive : null]}>Reserve</Text>
-            </View>
+            <Text style={[styles.navItemLabel, activeTab === 'book' ? styles.navItemLabelActive : null]}>Book</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.navItem, activeTab === 'profile' ? styles.navItemActive : null]} onPress={openProfileTab}>
-            <View style={styles.navItemContent}>
-              <Text style={[styles.navItemLabel, activeTab === 'profile' ? styles.navItemLabelActive : null]}>Profile</Text>
-              <Text style={[styles.navItemHint, activeTab === 'profile' ? styles.navItemHintActive : null]}>History</Text>
-            </View>
+            <Text style={[styles.navItemLabel, activeTab === 'profile' ? styles.navItemLabelActive : null]}>Profile</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1324,7 +1264,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    gap: 14,
+    gap: 12,
   },
   shell: {
     flex: 1,
@@ -1373,52 +1313,6 @@ const styles = StyleSheet.create({
     color: '#f4f7fb',
     fontSize: 17,
     fontWeight: '800',
-  },
-  headerSubtitle: {
-    color: '#b8c7da',
-    fontSize: 12,
-  },
-  headerStatusChip: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    marginTop: 6,
-  },
-  headerStatusChipLive: {
-    backgroundColor: '#0d1a2a',
-    borderColor: '#3dd6a5',
-  },
-  headerStatusChipOffline: {
-    backgroundColor: '#2a1114',
-    borderColor: '#8f3c46',
-  },
-  headerStatusChipDegraded: {
-    backgroundColor: '#2a220f',
-    borderColor: '#8a6b2f',
-  },
-  headerStatusChipBooting: {
-    backgroundColor: '#0f1b2c',
-    borderColor: '#26405f',
-  },
-  headerStatusChipText: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  headerStatusChipTextLive: {
-    color: '#3dd6a5',
-  },
-  headerStatusChipTextOffline: {
-    color: '#ffb3be',
-  },
-  headerStatusChipTextDegraded: {
-    color: '#ffcf66',
-  },
-  headerStatusChipTextBooting: {
-    color: '#7bd3ff',
   },
   menuButton: {
     backgroundColor: '#0f1b2c',
@@ -1550,15 +1444,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f1b2c',
     borderRadius: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#18283f',
-    gap: 2,
-  },
-  navItemContent: {
-    alignItems: 'center',
-    gap: 2,
   },
   navItemActive: {
     backgroundColor: '#12233a',
@@ -1573,16 +1462,6 @@ const styles = StyleSheet.create({
   },
   navItemLabelActive: {
     color: '#f4f7fb',
-  },
-  navItemHint: {
-    color: '#7f94ad',
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  navItemHintActive: {
-    color: '#3dd6a5',
   },
   splashScreen: {
     flex: 1,

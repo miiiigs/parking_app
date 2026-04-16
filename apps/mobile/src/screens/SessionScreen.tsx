@@ -18,96 +18,82 @@ export function SessionScreen({ reservation, parkingSession, isSubmitting, error
 
   return (
     <View style={styles.container}>
+      {/* Hero Card */}
       <View style={styles.heroCard}>
-        <View style={styles.heroHeaderRow}>
-          <Text style={styles.sectionLabel}>Step 3 of 3</Text>
-        </View>
-        <Text style={styles.title}>{isCompleted ? 'Parking session completed.' : 'Parking session active.'}</Text>
-        <Text style={styles.subtitle}>
-          {isCompleted
-            ? 'The session has been closed, payment was recorded, and the slot is available again.'
-            : 'The timer starts after validation and billing updates in real time.'}
+        <Text style={styles.kickerText}>Step 3 of 3</Text>
+        <Text style={styles.heroTitle}>{isCompleted ? 'Session Complete' : 'Parking Active'}</Text>
+        <Text style={styles.heroSubtitle}>
+          {isCompleted ? 'Your parking session has ended and payment has been processed.' : 'Your timer is running. Payment updates in real time.'}
         </Text>
       </View>
 
+      {/* Status Messages */}
       {errorMessage ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorTitle}>Session update failed</Text>
-          <Text style={styles.errorText}>{errorMessage}</Text>
+        <View style={styles.alertBox}>
+          <Text style={styles.alertTitle}>⚠ Error</Text>
+          <Text style={styles.alertText}>{errorMessage}</Text>
         </View>
-      ) : null}
-
-      {isCompleted ? (
+      ) : isCompleted ? (
         <View style={styles.successBox}>
-          <Text style={styles.successTitle}>Payment recorded</Text>
-          <Text style={styles.successText}>The session is now complete and the slot has been released.</Text>
+          <Text style={styles.successTitle}>✓ Payment Recorded</Text>
+          <Text style={styles.successText}>Slot released and available for others</Text>
         </View>
       ) : null}
 
+      {/* Spotlight Card - Timer & Amount */}
       <View style={styles.spotlightCard}>
-        <View style={styles.spotlightRow}>
+        <View style={styles.spotlightContent}>
           <View>
-            <Text style={styles.spotlightLabel}>Live timer</Text>
-            <Text style={styles.spotlightValue}>{isCompleted ? 'Closed' : 'Running'}</Text>
+            <Text style={styles.spotlightLabel}>Session Status</Text>
+            <Text style={styles.spotlightTimer}>{isCompleted ? 'Closed' : 'Running'}</Text>
           </View>
-          <Text style={styles.spotlightAmount}>PHP {billedAmount.toFixed(2)}</Text>
-        </View>
-        <View style={styles.spotlightMetaRow}>
-          <Text style={styles.spotlightMetaText}>{reservation?.slot_label ?? 'Unknown slot'}</Text>
-          <Text style={styles.spotlightMetaDot}>•</Text>
-          <Text style={styles.spotlightMetaText}>{parkingSession?.payment_status ?? (isCompleted ? 'paid' : 'unpaid')}</Text>
+          <View style={styles.spotlightDivider} />
+          <View style={styles.spotlightAmountSection}>
+            <Text style={styles.spotlightLabel}>Total Amount</Text>
+            <Text style={styles.spotlightAmount}>PHP {billedAmount.toFixed(2)}</Text>
+          </View>
         </View>
       </View>
 
+      {/* Session Details Card */}
       <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Live Session</Text>
-          <Text style={styles.cardBadge}>{parkingSession?.session_status ?? 'Active'}</Text>
+        <Text style={styles.cardLabel}>Parking Details</Text>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Slot</Text>
+          <Text style={styles.detailValue}>{reservation?.slot_label ?? 'Unknown'}</Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Timer</Text>
-          <Text style={styles.rowValue}>{isCompleted ? 'Closed' : 'Running'}</Text>
+        <View style={styles.detailDivider} />
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Status</Text>
+          <Text style={styles.detailValue}>{parkingSession?.session_status ?? 'Active'}</Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Reservation</Text>
-          <Text style={styles.rowValue}>{reservation?.slot_label ?? 'Unknown slot'}</Text>
+        <View style={styles.detailDivider} />
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Vehicle</Text>
+          <Text style={styles.detailValue}>{parkingSession?.plate_number ?? 'N/A'}</Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Session Status</Text>
-          <Text style={styles.rowValue}>{parkingSession?.session_status ?? 'Active'}</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Payment</Text>
-          <Text style={styles.rowValue}>{parkingSession?.payment_status ?? (isCompleted ? 'paid' : 'unpaid')}</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Started</Text>
-          <Text style={styles.rowValue}>
-            {parkingSession?.started_at ? new Date(parkingSession.started_at).toLocaleTimeString() : 'Just now'}
-          </Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Ended</Text>
-          <Text style={styles.rowValue}>{parkingSession?.ended_at ? new Date(parkingSession.ended_at).toLocaleTimeString() : 'Not yet'}</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Billed</Text>
-          <Text style={styles.rowValue}>
-            PHP {billedAmount.toFixed(2)}
-          </Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Plate</Text>
-          <Text style={styles.rowValue}>{parkingSession?.plate_number ?? 'N/A'}</Text>
-        </View>
+        {parkingSession?.started_at && (
+          <>
+            <View style={styles.detailDivider} />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Started</Text>
+              <Text style={styles.detailValue}>{new Date(parkingSession.started_at).toLocaleTimeString()}</Text>
+            </View>
+          </>
+        )}
       </View>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
+      {/* Action Buttons */}
+      <View style={styles.buttonGroup}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={onBack} disabled={isSubmitting}>
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={onFinish} disabled={isSubmitting}>
-          <Text style={styles.primaryButtonText}>{isCompleted ? 'Return Home' : isSubmitting ? 'Ending...' : 'Mark as Paid & End Session'}</Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+          onPress={onFinish}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.primaryButtonText}>{isCompleted ? 'Return Home' : isSubmitting ? 'Processing...' : '✓ Complete Session'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -116,168 +102,146 @@ export function SessionScreen({ reservation, parkingSession, isSubmitting, error
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0b1320',
-    borderRadius: 28,
-    padding: 20,
-    gap: 14,
-    borderWidth: 1,
-    borderColor: '#152234',
+    gap: 16,
   },
   heroCard: {
     backgroundColor: '#111c2d',
-    borderRadius: 24,
-    padding: 18,
-    gap: 10,
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
     borderWidth: 1,
     borderColor: '#1b2b43',
   },
-  heroHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
-  },
-  sectionLabel: {
+  kickerText: {
     color: '#7bd3ff',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
     fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  title: {
+  heroTitle: {
     color: '#f4f7fb',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
   },
-  subtitle: {
+  heroSubtitle: {
     color: '#b8c7da',
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
   },
-  errorBox: {
+  alertBox: {
     backgroundColor: '#2a1114',
     borderRadius: 16,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#8f3c46',
-    gap: 6,
+    gap: 4,
   },
-  errorTitle: {
+  alertTitle: {
     color: '#ff8a80',
     fontWeight: '800',
-    fontSize: 14,
-  },
-  errorText: {
-    color: '#f2c9cd',
     fontSize: 13,
-    lineHeight: 18,
+  },
+  alertText: {
+    color: '#f2c9cd',
+    fontSize: 12,
+    lineHeight: 16,
   },
   successBox: {
     backgroundColor: '#0e231a',
     borderRadius: 16,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#2d7f63',
-    gap: 6,
+    gap: 4,
   },
   successTitle: {
     color: '#3dd6a5',
     fontWeight: '800',
-    fontSize: 14,
+    fontSize: 13,
   },
   successText: {
     color: '#c6f2e4',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   spotlightCard: {
-    backgroundColor: '#08111d',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: '#0f1b2c',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
     borderWidth: 1,
-    borderColor: '#18283f',
-    gap: 14,
+    borderColor: '#1a2e49',
   },
-  spotlightRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
+  spotlightContent: {
+    gap: 0,
+  },
+  spotlightDivider: {
+    height: 1,
+    backgroundColor: '#1a2e49',
+    marginVertical: 16,
   },
   spotlightLabel: {
-    color: '#7f94ad',
+    color: '#7bd3ff',
     fontSize: 11,
-    textTransform: 'uppercase',
     fontWeight: '800',
+    textTransform: 'uppercase',
     letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  spotlightValue: {
+  spotlightTimer: {
     color: '#f4f7fb',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '900',
-    marginTop: 4,
+  },
+  spotlightAmountSection: {
+    gap: 0,
   },
   spotlightAmount: {
     color: '#3dd6a5',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '900',
-  },
-  spotlightMetaRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  spotlightMetaText: {
-    color: '#b8c7da',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  spotlightMetaDot: {
-    color: '#7f94ad',
-    fontSize: 14,
   },
   card: {
     backgroundColor: '#08111d',
     borderRadius: 18,
     padding: 16,
+    gap: 0,
     borderWidth: 1,
     borderColor: '#18283f',
-    gap: 12,
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  cardTitle: {
-    color: '#f4f7fb',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  cardBadge: {
+  cardLabel: {
     color: '#7bd3ff',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+    marginBottom: 12,
   },
-  row: {
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
     gap: 12,
   },
-  rowLabel: {
+  detailLabel: {
     color: '#b8c7da',
-    fontSize: 14,
+    fontSize: 13,
   },
-  rowValue: {
-    color: '#3dd6a5',
-    fontSize: 14,
-    fontWeight: '800',
+  detailValue: {
+    color: '#f4f7fb',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  buttonRow: {
+  detailDivider: {
+    height: 1,
+    backgroundColor: '#1a2e49',
+  },
+  buttonGroup: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 4,
@@ -286,18 +250,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#3dd6a5',
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6,
   },
   primaryButtonText: {
     color: '#071018',
     fontWeight: '800',
+    fontSize: 15,
   },
   secondaryButton: {
     flex: 1,
     backgroundColor: '#1a2e49',
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#26405f',
@@ -305,5 +273,6 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#f4f7fb',
     fontWeight: '700',
+    fontSize: 15,
   },
 });

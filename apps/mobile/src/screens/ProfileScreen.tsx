@@ -159,12 +159,7 @@ export function ProfileScreen({ profileData, locationName, isRefreshing, onRefre
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0b1320',
-    borderRadius: 28,
-    padding: 20,
     gap: 14,
-    borderWidth: 1,
-    borderColor: '#152234',
   },
   heroCard: {
     backgroundColor: '#111c2d',

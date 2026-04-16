@@ -74,58 +74,80 @@ export function ValidationScreen({
 
   return (
     <View style={styles.container}>
+      {/* Hero Card */}
       <View style={styles.heroCard}>
-        <View style={styles.heroHeaderRow}>
-          <Text style={styles.sectionLabel}>Step 2 of 3</Text>
-        </View>
-        <Text style={styles.title}>Validate the assigned slot.</Text>
-        <Text style={styles.subtitle}>Scan the QR on the slot or confirm manually to start the session.</Text>
+        <Text style={styles.kickerText}>Step 2 of 3</Text>
+        <Text style={styles.heroTitle}>Scan or Confirm</Text>
+        <Text style={styles.heroSubtitle}>Validate your parking session by scanning the slot QR or entering it manually.</Text>
       </View>
 
+      {/* Reservation Details Card */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Reservation Details</Text>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Slot</Text>
-          <Text style={styles.rowValue}>{reservation?.slot_label ?? assignedSlotLabel}</Text>
+        <Text style={styles.cardLabel}>Your Reservation</Text>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Slot</Text>
+          <Text style={styles.detailValue}>{reservation?.slot_label ?? assignedSlotLabel}</Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Status</Text>
-          <Text style={styles.rowValue}>{reservation?.reservation_status ?? 'Pending'}</Text>
+        <View style={styles.detailDivider} />
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Expires</Text>
+          <Text style={styles.detailValue}>
+            {reservation?.expires_at ? new Date(reservation.expires_at).toLocaleTimeString() : 'N/A'}
+          </Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Expires</Text>
-          <Text style={styles.rowValue}>{reservation?.expires_at ? new Date(reservation.expires_at).toLocaleTimeString() : 'N/A'}</Text>
-        </View>
-        <Text style={styles.helper}>Validate the created reservation to start the parking session.</Text>
       </View>
 
+      {/* QR Token Input Card */}
       <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Slot QR Token</Text>
-        </View>
+        <Text style={styles.cardLabel}>Validation</Text>
+        
+        {/* Scan Button - Primary Action */}
         <TouchableOpacity
-          style={[styles.scanButton, isSubmitting ? styles.scanButtonDisabled : null]}
+          style={[styles.scanButton, isSubmitting && styles.scanButtonDisabled]}
           onPress={() => void openScanner()}
           disabled={isSubmitting}
         >
-          <Text style={styles.scanButtonText}>Scan QR</Text>
+          <Text style={styles.scanButtonText}>📷 Scan QR</Text>
         </TouchableOpacity>
-        <Text style={styles.helper}>Tap Scan QR to open the camera only when you need it.</Text>
 
-        <TextInput
-          value={slotQrToken}
-          onChangeText={onSlotQrTokenChange}
-          placeholder="Scanned QR token will appear here"
-          placeholderTextColor="#5e7490"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.input}
-        />
-        <Text style={styles.helper}>Manual entry still works if the camera cannot read the code immediately.</Text>
+        {/* Manual Input */}
+        <View style={styles.inputSection}>
+          <Text style={styles.inputLabel}>Manual Entry</Text>
+          <TextInput
+            value={slotQrToken}
+            onChangeText={onSlotQrTokenChange}
+            placeholder="Paste token here"
+            placeholderTextColor="#5e7490"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <Text style={styles.inputHelper}>Use if scanning is unavailable</Text>
+        </View>
+
+        {/* Status Message */}
+        <View style={styles.statusBox}>
+          <Text style={styles.statusText}>{scanMessage}</Text>
+        </View>
       </View>
 
-      <Text style={styles.scanMessage}>{scanMessage}</Text>
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
+      {/* Action Buttons */}
+      <View style={styles.buttonGroup}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
+          <Text style={styles.secondaryButtonText}>Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+          onPress={() => onValidate(slotQrToken.trim() || undefined)}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Validating...' : '✓ Im Parked'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Camera Modal */}
       <Modal
         visible={isScannerVisible}
         animationType="slide"
@@ -170,7 +192,7 @@ export function ValidationScreen({
 
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-      <View style={styles.buttonRow}>
+      <View style={styles.buttonGroup}>
         <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
@@ -188,128 +210,164 @@ export function ValidationScreen({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0b1320',
-    borderRadius: 28,
-    padding: 20,
     gap: 14,
-    borderWidth: 1,
-    borderColor: '#152234',
   },
   heroCard: {
     backgroundColor: '#111c2d',
-    borderRadius: 24,
-    padding: 18,
-    gap: 10,
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
     borderWidth: 1,
     borderColor: '#1b2b43',
   },
-  heroHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  sectionLabel: {
+  kickerText: {
     color: '#7bd3ff',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
     fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  title: {
+  heroTitle: {
     color: '#f4f7fb',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
   },
-  subtitle: {
+  heroSubtitle: {
     color: '#b8c7da',
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
   },
   card: {
     backgroundColor: '#08111d',
     borderRadius: 18,
     padding: 16,
+    gap: 12,
     borderWidth: 1,
     borderColor: '#18283f',
-    gap: 8,
   },
-  cardTitle: {
-    color: '#f4f7fb',
-    fontWeight: '700',
-    fontSize: 16,
+  cardLabel: {
+    color: '#7bd3ff',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  cardHeaderRow: {
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 10,
     gap: 12,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  rowLabel: {
+  detailLabel: {
     color: '#b8c7da',
-    fontSize: 14,
+    fontSize: 13,
   },
-  rowValue: {
+  detailValue: {
     color: '#f4f7fb',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
-  helper: {
-    color: '#b8c7da',
-    fontSize: 14,
-    lineHeight: 20,
+  detailDivider: {
+    height: 1,
+    backgroundColor: '#1a2e49',
   },
   scanButton: {
+    backgroundColor: '#3dd6a5',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  scanButtonDisabled: {
+    opacity: 0.6,
+  },
+  scanButtonText: {
+    color: '#071018',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  inputSection: {
+    gap: 8,
+  },
+  inputLabel: {
+    color: '#b8c7da',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: '#0a1320',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#18283f',
+    color: '#f4f7fb',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  inputHelper: {
+    color: '#b8c7da',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  statusBox: {
+    backgroundColor: '#0a1320',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#18283f',
+    marginTop: 4,
+  },
+  statusText: {
+    color: '#7bd3ff',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+  errorText: {
+    color: '#ff8a80',
+    fontSize: 13,
+    lineHeight: 18,
+    paddingHorizontal: 4,
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: '#3dd6a5',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6,
+  },
+  primaryButtonText: {
+    color: '#071018',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  secondaryButton: {
+    flex: 1,
     backgroundColor: '#1a2e49',
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#26405f',
   },
-  scanButtonDisabled: {
-    opacity: 0.7,
-  },
-  scanButtonText: {
+  secondaryButtonText: {
     color: '#f4f7fb',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  input: {
-    backgroundColor: '#08111d',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#18283f',
-    color: '#f4f7fb',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    fontWeight: '700',
     fontSize: 15,
-  },
-  cameraWrapper: {
-    gap: 10,
-  },
-  cameraFrame: {
-    position: 'relative',
-    backgroundColor: '#08111d',
-    borderRadius: 22,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#18283f',
-  },
-  camera: {
-    height: 420,
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  cameraHint: {
-    color: '#b8c7da',
-    fontSize: 12,
-    lineHeight: 18,
   },
   scannerModal: {
     flex: 1,
@@ -343,6 +401,29 @@ const styles = StyleSheet.create({
   closeScannerText: {
     color: '#f4f7fb',
     fontWeight: '700',
+    fontSize: 13,
+  },
+  cameraWrapper: {
+    gap: 10,
+  },
+  cameraFrame: {
+    position: 'relative',
+    backgroundColor: '#08111d',
+    borderRadius: 18,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#18283f',
+  },
+  camera: {
+    height: 380,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  cameraHint: {
+    color: '#b8c7da',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   permissionCard: {
     gap: 10,
@@ -364,53 +445,11 @@ const styles = StyleSheet.create({
   permissionButtonText: {
     color: '#f4f7fb',
     fontWeight: '700',
-  },
-  scanMessage: {
-    color: '#7bd3ff',
     fontSize: 13,
-    lineHeight: 18,
-    backgroundColor: '#08111d',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#18283f',
   },
-  errorText: {
-    color: '#ff8a80',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: '#3dd6a5',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: '#071018',
-    fontWeight: '800',
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: '#1a2e49',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#26405f',
-  },
-  secondaryButtonText: {
-    color: '#f4f7fb',
-    fontWeight: '700',
+  helper: {
+    color: '#b8c7da',
+    fontSize: 12,
+    lineHeight: 16,
   },
 });
