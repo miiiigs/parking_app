@@ -5,20 +5,9 @@
     "scheme": "smartparking",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "splash": {
-      "backgroundColor": "#07111b"
-    },
-    "android": {
-      "package": "com.anonymous.smartparkingmobile"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "814ee283-82da-417a-aab0-9abb3a1261ba"
-      }
+      "backgroundColor": "#08111f"
     }
   }
 }

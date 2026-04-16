@@ -29,6 +29,10 @@ type Props = {
 
 const statusOrder: SlotItem['status'][] = ['available', 'reserved', 'occupied', 'blocked', 'disputed'];
 
+function renderAvailability(status: SlotItem['status']) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 function renderStatusBadgeLabel(status: SlotItem['status']) {
   if (status === 'available') {
     return 'Open';
@@ -62,6 +66,29 @@ function getSortedSlots(slots: SlotItem[]) {
   });
 }
 
+function ArrivalWindowCard({
+  option,
+  isSelected,
+  onPress,
+}: {
+  option: ArrivalWindowOption;
+  isSelected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.windowCard, isSelected ? styles.windowCardSelected : null]}
+    >
+      <View style={styles.windowRow}>
+        <Text style={styles.rowLabel}>{option.label}</Text>
+        <Text style={styles.rowValue}>PHP {option.fee}</Text>
+      </View>
+      <Text style={styles.windowDescription}>{option.description}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export function ReservationScreen({
   slots,
   selectedSlotId,
@@ -79,77 +106,74 @@ export function ReservationScreen({
   const selectedSlot = slots.find((slot) => slot.id === selectedSlotId);
   const sortedSlots = getSortedSlots(slots);
   const availableSlotCount = slots.filter((slot) => slot.status === 'available').length;
+  const reservedSlotCount = slots.filter((slot) => slot.status === 'reserved').length;
 
   return (
     <View style={styles.container}>
-      {/* Hero Card */}
-      <View style={styles.heroCard}>
-        <Text style={styles.kickerText}>Step 1 of 3</Text>
-        <Text style={styles.heroTitle}>Select a Slot</Text>
-        <Text style={styles.heroSubtitle}>Choose your preferred parking spot and arrival window.</Text>
-        {!isLiveData ? (
-          <View style={styles.warningBanner}>
-            <Text style={styles.warningText}>Fallback mode active • Connect for live data</Text>
-          </View>
-        ) : null}
-      </View>
+      <Text style={styles.sectionLabel}>Step 1 of 3</Text>
+      <Text style={styles.title}>Reserve a real slot.</Text>
+      <Text style={styles.subtitle}>Choose a controlled slot and an arrival window.</Text>
 
-      {/* Slot Selection Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardLabel}>Available Slots</Text>
-          <Text style={styles.cardMeta}>{availableSlotCount} available</Text>
+      {!isLiveData ? (
+        <View style={styles.warningBox}>
+          <Text style={styles.warningTitle}>Backend data is offline</Text>
+          <Text style={styles.warningText}>
+            You are viewing fallback demo slots. Connect to Supabase before creating a real reservation.
+          </Text>
         </View>
-        {sortedSlots.length > 0 ? (
-          <View style={styles.slotList}>
-            {sortedSlots.map((slot) => {
-              const isSelected = slot.id === selectedSlotId;
-              const isAvailable = slot.status === 'available';
+      ) : null}
 
-              return (
-                <TouchableOpacity
-                  key={slot.id}
-                  style={[styles.slotItem, isSelected && styles.slotItemSelected]}
-                  onPress={() => onSelectSlot(slot.id)}
-                  disabled={!isAvailable}
-                >
-                  <View style={styles.slotInfo}>
-                    <Text style={styles.slotLabel}>{slot.label}</Text>
-                    <Text style={[styles.slotStatus, !isAvailable && styles.slotStatusDisabled]}>
-                      {renderStatusBadgeLabel(slot.status)}
-                    </Text>
-                  </View>
-                  {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ) : (
-          <Text style={styles.emptyState}>No slots available</Text>
-        )}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Available Slots</Text>
+          <Text style={styles.cardMeta}>{availableSlotCount} open</Text>
+        </View>
+        <Text style={styles.cardSubMeta}>{reservedSlotCount} currently reserved</Text>
+        {sortedSlots.map((slot) => {
+          const isSelected = slot.id === selectedSlotId;
+
+          return (
+            <TouchableOpacity
+              key={slot.id}
+              style={[styles.slotCard, isSelected ? styles.slotCardSelected : null]}
+              onPress={() => onSelectSlot(slot.id)}
+            >
+              <View style={styles.slotLeftColumn}>
+                <Text style={styles.slotLabel}>{slot.label}</Text>
+                <Text style={styles.slotStatus}>{renderAvailability(slot.status)}</Text>
+              </View>
+              <View
+                style={[
+                  styles.badge,
+                  slot.status === 'available' ? styles.badgeAvailable : null,
+                  slot.status === 'reserved' ? styles.badgeReserved : null,
+                  slot.status === 'occupied' ? styles.badgeOccupied : null,
+                  slot.status === 'blocked' ? styles.badgeBlocked : null,
+                  slot.status === 'disputed' ? styles.badgeDisputed : null,
+                ]}
+              >
+                <Text style={styles.badgeText}>{renderStatusBadgeLabel(slot.status)}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+        {slots.length === 0 ? <Text style={styles.emptyState}>No slots loaded yet.</Text> : null}
       </View>
 
-      {/* Arrival Window Card */}
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Arrival Window</Text>
+        <Text style={styles.cardTitle}>Arrival Window</Text>
         {ARRIVAL_WINDOW_OPTIONS.map((option) => (
-          <TouchableOpacity
+          <ArrivalWindowCard
             key={option.minutes}
-            style={[styles.optionItem, selectedArrivalWindowMinutes === option.minutes && styles.optionItemSelected]}
+            option={option}
+            isSelected={option.minutes === selectedArrivalWindowMinutes}
             onPress={() => onSelectArrivalWindow(option.minutes)}
-          >
-            <View style={styles.optionInfo}>
-              <Text style={styles.optionLabel}>{option.label}</Text>
-              <Text style={styles.optionDescription}>{option.description}</Text>
-            </View>
-            <Text style={styles.optionFee}>PHP {option.fee}</Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
 
-      {/* Vehicle Plate Card */}
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Vehicle Plate</Text>
+        <Text style={styles.cardTitle}>Vehicle Plate Number</Text>
         <TextInput
           value={plateNumber}
           onChangeText={onPlateNumberChange}
@@ -158,45 +182,42 @@ export function ReservationScreen({
           autoCapitalize="characters"
           style={styles.input}
         />
-        <Text style={styles.inputHelper}>Guards use this to confirm your booking</Text>
+        <Text style={styles.helperText}>This helps guards confirm the booking on arrival.</Text>
       </View>
 
-      {/* Summary Card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Slot</Text>
-          <Text style={styles.summaryValue}>{selectedSlot?.label ?? '—'}</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Reservation Summary</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Slot</Text>
+          <Text style={styles.rowValue}>{selectedSlot?.label ?? 'Select a slot'}</Text>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Window</Text>
-          <Text style={styles.summaryValue}>
-            {ARRIVAL_WINDOW_OPTIONS.find((o) => o.minutes === selectedArrivalWindowMinutes)?.label ?? '—'}
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Arrival Window</Text>
+          <Text style={styles.rowValue}>
+            {ARRIVAL_WINDOW_OPTIONS.find((option) => option.minutes === selectedArrivalWindowMinutes)?.label}
           </Text>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Fee</Text>
-          <Text style={styles.summaryValue}>
-            PHP {ARRIVAL_WINDOW_OPTIONS.find((o) => o.minutes === selectedArrivalWindowMinutes)?.fee ?? '—'}
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Reservation Fee</Text>
+          <Text style={styles.rowValue}>
+            PHP {ARRIVAL_WINDOW_OPTIONS.find((option) => option.minutes === selectedArrivalWindowMinutes)?.fee}
           </Text>
         </View>
       </View>
 
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-      {/* Action Buttons */}
-      <View style={styles.buttonGroup}>
+      <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.secondaryButton} onPress={onBack}>
           <Text style={styles.secondaryButtonText}>Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.primaryButton, (isSubmitting || !isLiveData) && styles.primaryButtonDisabled]}
+          style={[styles.primaryButton, isSubmitting || !isLiveData ? styles.primaryButtonDisabled : null]}
           onPress={onSubmit}
           disabled={isSubmitting || !isLiveData}
         >
           <Text style={styles.primaryButtonText}>
-            {isSubmitting ? 'Creating...' : 'Continue to Validation'}
+            {isSubmitting ? 'Creating...' : !isLiveData ? 'Connect Backend First' : 'Confirm Reservation'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -206,208 +227,206 @@ export function ReservationScreen({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 16,
-  },
-  heroCard: {
-    backgroundColor: '#111c2d',
-    borderRadius: 20,
+    backgroundColor: '#0f1b2c',
+    borderRadius: 24,
     padding: 20,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#1b2b43',
+    gap: 14,
   },
-  kickerText: {
+  sectionLabel: {
     color: '#7bd3ff',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    letterSpacing: 1.2,
+    fontSize: 12,
   },
-  heroTitle: {
+  title: {
     color: '#f4f7fb',
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
   },
-  heroSubtitle: {
+  subtitle: {
     color: '#b8c7da',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
-  warningBanner: {
+  warningBox: {
     backgroundColor: '#2a220f',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 4,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#8a6b2f',
+    gap: 6,
+  },
+  warningTitle: {
+    color: '#ffcf66',
+    fontWeight: '800',
+    fontSize: 14,
   },
   warningText: {
-    color: '#ffcf66',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#f5e6bf',
+    fontSize: 13,
+    lineHeight: 18,
   },
   card: {
     backgroundColor: '#08111d',
     borderRadius: 18,
     padding: 16,
-    gap: 12,
     borderWidth: 1,
     borderColor: '#18283f',
+    gap: 10,
   },
-  cardHeader: {
+  cardTitle: {
+    color: '#f4f7fb',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
-  },
-  cardLabel: {
-    color: '#7bd3ff',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   cardMeta: {
     color: '#3dd6a5',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
-  slotList: {
-    gap: 8,
+  cardSubMeta: {
+    color: '#b8c7da',
+    fontSize: 12,
+    lineHeight: 18,
   },
-  slotItem: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#18283f',
-    backgroundColor: '#0a1320',
   },
-  slotItemSelected: {
-    borderColor: '#3dd6a5',
-    backgroundColor: '#0c1a28',
-  },
-  slotInfo: {
-    gap: 3,
+  rowLabel: {
+    color: '#f4f7fb',
+    fontSize: 14,
     flex: 1,
+  },
+  rowValue: {
+    color: '#7bd3ff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  slotLeftColumn: {
+    flex: 1,
+    gap: 4,
   },
   slotLabel: {
     color: '#f4f7fb',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   slotStatus: {
-    color: '#7bd3ff',
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  slotStatusDisabled: {
     color: '#b8c7da',
+    fontSize: 12,
   },
-  checkmark: {
-    color: '#3dd6a5',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  optionItem: {
+  slotCard: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#18283f',
+    borderRadius: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#18283f',
-    backgroundColor: '#0a1320',
     gap: 12,
   },
-  optionItemSelected: {
+  slotCardSelected: {
+    backgroundColor: '#12233a',
+    borderColor: '#3dd6a5',
+    shadowColor: '#3dd6a5',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#263b56',
+    backgroundColor: '#08111d',
+  },
+  badgeAvailable: {
     borderColor: '#3dd6a5',
     backgroundColor: '#0c1a28',
   },
-  optionInfo: {
-    flex: 1,
-    gap: 2,
+  badgeReserved: {
+    borderColor: '#7bd3ff',
+    backgroundColor: '#0d1a2a',
   },
-  optionLabel: {
+  badgeOccupied: {
+    borderColor: '#ffb74d',
+    backgroundColor: '#23190c',
+  },
+  badgeBlocked: {
+    borderColor: '#ff8a80',
+    backgroundColor: '#281214',
+  },
+  badgeDisputed: {
+    borderColor: '#d1a3ff',
+    backgroundColor: '#20142a',
+  },
+  badgeText: {
     color: '#f4f7fb',
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
-  optionDescription: {
+  windowCard: {
+    backgroundColor: '#08111d',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#18283f',
+    gap: 6,
+  },
+  windowCardSelected: {
+    borderColor: '#3dd6a5',
+    backgroundColor: '#0c1a28',
+  },
+  windowRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  windowDescription: {
     color: '#b8c7da',
     fontSize: 12,
-    lineHeight: 16,
-  },
-  optionFee: {
-    color: '#3dd6a5',
-    fontSize: 13,
-    fontWeight: '700',
+    lineHeight: 18,
   },
   input: {
-    backgroundColor: '#0a1320',
-    borderRadius: 12,
+    backgroundColor: '#08111d',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#18283f',
     color: '#f4f7fb',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  inputHelper: {
-    color: '#b8c7da',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  summaryCard: {
-    backgroundColor: '#0f1b2c',
-    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    gap: 0,
-    borderWidth: 1,
-    borderColor: '#1a2e49',
+    fontSize: 16,
+    letterSpacing: 1.1,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    gap: 12,
-  },
-  summaryLabel: {
+  helperText: {
     color: '#b8c7da',
-    fontSize: 13,
-  },
-  summaryValue: {
-    color: '#f4f7fb',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: '#1a2e49',
+    fontSize: 12,
+    lineHeight: 18,
   },
   errorText: {
     color: '#ff8a80',
-    fontSize: 13,
-    lineHeight: 18,
-    paddingHorizontal: 4,
+    fontSize: 14,
+    lineHeight: 20,
   },
   emptyState: {
     color: '#b8c7da',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingVertical: 12,
+    fontSize: 14,
   },
-  buttonGroup: {
+  buttonRow: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 4,
@@ -416,22 +435,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#3dd6a5',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   primaryButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: '#071018',
     fontWeight: '800',
-    fontSize: 15,
   },
   secondaryButton: {
     flex: 1,
     backgroundColor: '#1a2e49',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#26405f',
@@ -439,6 +457,5 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#f4f7fb',
     fontWeight: '700',
-    fontSize: 15,
   },
 });

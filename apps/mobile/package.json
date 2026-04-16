@@ -3,22 +3,13 @@
   "private": true,
   "main": "index.js",
   "dependencies": {
-    "@react-native-camera-roll/camera-roll": "^7.5.0",
     "@supabase/supabase-js": "^2.49.0",
-    "axios": "^1.7.7",
     "expo": "^52.0.0",
     "expo-camera": "^16.0.0",
-    "expo-location": "^17.0.0",
     "expo-notifications": "^55.0.17",
-    "expo-router": "^55.0.12",
     "expo-secure-store": "^14.0.0",
-    "lucide-react-native": "^0.341.0",
-    "nativewind": "^4.2.3",
     "react": "^18.3.0",
-    "react-native": "^0.76.0",
-    "react-native-maps": "^1.14.0",
-    "react-native-safe-area-context": "^5.7.0",
-    "zustand": "^4.5.5"
+    "react-native": "^0.76.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0"
