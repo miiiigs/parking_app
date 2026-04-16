@@ -110,9 +110,24 @@ export function ReservationScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>Step 1 of 3</Text>
-      <Text style={styles.title}>Reserve a real slot.</Text>
-      <Text style={styles.subtitle}>Choose a controlled slot and an arrival window.</Text>
+      <View style={styles.heroCard}>
+        <View style={styles.heroHeaderRow}>
+          <Text style={styles.sectionLabel}>Step 1 of 3</Text>
+          <Text style={styles.liveTag}>{isLiveData ? 'Live data' : 'Fallback view'}</Text>
+        </View>
+        <Text style={styles.title}>Reserve a real slot.</Text>
+        <Text style={styles.subtitle}>Choose a controlled slot and an arrival window.</Text>
+        <View style={styles.heroMetaRow}>
+          <View style={styles.heroMetaCard}>
+            <Text style={styles.heroMetaLabel}>Open</Text>
+            <Text style={styles.heroMetaValue}>{availableSlotCount}</Text>
+          </View>
+          <View style={styles.heroMetaCard}>
+            <Text style={styles.heroMetaLabel}>Reserved</Text>
+            <Text style={styles.heroMetaValue}>{reservedSlotCount}</Text>
+          </View>
+        </View>
+      </View>
 
       {!isLiveData ? (
         <View style={styles.warningBox}>
@@ -227,10 +242,33 @@ export function ReservationScreen({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0f1b2c',
-    borderRadius: 24,
+    backgroundColor: '#0b1320',
+    borderRadius: 28,
     padding: 20,
     gap: 14,
+    borderWidth: 1,
+    borderColor: '#152234',
+  },
+  heroCard: {
+    backgroundColor: '#111c2d',
+    borderRadius: 24,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#1b2b43',
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  liveTag: {
+    color: '#3dd6a5',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   sectionLabel: {
     color: '#7bd3ff',
@@ -248,6 +286,34 @@ const styles = StyleSheet.create({
     color: '#b8c7da',
     fontSize: 15,
     lineHeight: 22,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  heroMetaCard: {
+    flex: 1,
+    minWidth: 88,
+    backgroundColor: '#08111d',
+    borderRadius: 16,
+    padding: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#18283f',
+  },
+  heroMetaLabel: {
+    color: '#7f94ad',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
+  heroMetaValue: {
+    color: '#f4f7fb',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   warningBox: {
     backgroundColor: '#2a220f',
@@ -335,6 +401,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
+    backgroundColor: '#0a1320',
   },
   slotCardSelected: {
     backgroundColor: '#12233a',
@@ -437,6 +504,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
+    shadowColor: '#3dd6a5',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 2,
   },
   primaryButtonDisabled: {
     opacity: 0.7,

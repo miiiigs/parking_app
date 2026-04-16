@@ -1,5 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
+import type { ParkingSessionResult, ReservationResult } from './reservations';
+
 const WORKFLOW_STORAGE_KEY = 'smart-parking-mobile-workflow-v1';
 
 export type StoredWorkflowSnapshot = {
@@ -7,6 +9,9 @@ export type StoredWorkflowSnapshot = {
   selectedSlotId: string | null;
   selectedArrivalWindowMinutes: number;
   plateNumber: string;
+  validationQrToken: string;
+  createdReservation: ReservationResult | null;
+  activeParkingSession: ParkingSessionResult | null;
   reservationId: string | null;
   scheduledNotificationIds: string[];
   savedAt: string;
@@ -31,6 +36,9 @@ export async function loadStoredWorkflowSnapshot(): Promise<StoredWorkflowSnapsh
       selectedSlotId: parsedValue.selectedSlotId ?? null,
       selectedArrivalWindowMinutes: parsedValue.selectedArrivalWindowMinutes,
       plateNumber: parsedValue.plateNumber ?? 'ABC-1234',
+      validationQrToken: parsedValue.validationQrToken ?? '',
+      createdReservation: parsedValue.createdReservation ?? null,
+      activeParkingSession: parsedValue.activeParkingSession ?? null,
       reservationId: parsedValue.reservationId ?? null,
       scheduledNotificationIds: Array.isArray(parsedValue.scheduledNotificationIds) ? parsedValue.scheduledNotificationIds : [],
       savedAt: parsedValue.savedAt ?? new Date().toISOString(),

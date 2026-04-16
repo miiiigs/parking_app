@@ -74,9 +74,13 @@ export function ValidationScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>Step 2 of 3</Text>
-      <Text style={styles.title}>Validate the assigned slot.</Text>
-      <Text style={styles.subtitle}>Scan the QR on the slot or confirm manually to start the session.</Text>
+      <View style={styles.heroCard}>
+        <View style={styles.heroHeaderRow}>
+          <Text style={styles.sectionLabel}>Step 2 of 3</Text>
+        </View>
+        <Text style={styles.title}>Validate the assigned slot.</Text>
+        <Text style={styles.subtitle}>Scan the QR on the slot or confirm manually to start the session.</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Reservation Details</Text>
@@ -96,7 +100,9 @@ export function ValidationScreen({
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Slot QR Token</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Slot QR Token</Text>
+        </View>
         <TouchableOpacity
           style={[styles.scanButton, isSubmitting ? styles.scanButtonDisabled : null]}
           onPress={() => void openScanner()}
@@ -128,7 +134,9 @@ export function ValidationScreen({
       >
         <View style={styles.scannerModal}>
           <View style={styles.scannerHeader}>
-            <Text style={styles.scannerTitle}>Scan the slot QR</Text>
+            <View style={styles.scannerHeaderCopy}>
+              <Text style={styles.scannerTitle}>Scan the slot QR</Text>
+            </View>
             <TouchableOpacity
               style={styles.closeScannerButton}
               onPress={() => setIsScannerVisible(false)}
@@ -139,12 +147,14 @@ export function ValidationScreen({
 
           {permission?.granted ? (
             <View style={styles.cameraWrapper}>
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={(event: { data: string }) => handleBarcodeScanned(event.data)}
-              />
+              <View style={styles.cameraFrame}>
+                <CameraView
+                  style={styles.camera}
+                  facing="back"
+                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  onBarcodeScanned={(event: { data: string }) => handleBarcodeScanned(event.data)}
+                />
+              </View>
               <Text style={styles.cameraHint}>Point the camera at the QR sticker on the assigned slot.</Text>
             </View>
           ) : (
@@ -178,10 +188,26 @@ export function ValidationScreen({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0f1b2c',
-    borderRadius: 24,
+    backgroundColor: '#0b1320',
+    borderRadius: 28,
     padding: 20,
     gap: 14,
+    borderWidth: 1,
+    borderColor: '#152234',
+  },
+  heroCard: {
+    backgroundColor: '#111c2d',
+    borderRadius: 24,
+    padding: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#1b2b43',
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
   },
   sectionLabel: {
     color: '#7bd3ff',
@@ -212,6 +238,12 @@ const styles = StyleSheet.create({
     color: '#f4f7fb',
     fontWeight: '700',
     fontSize: 16,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
   },
   row: {
     flexDirection: 'row',
@@ -261,6 +293,14 @@ const styles = StyleSheet.create({
   cameraWrapper: {
     gap: 10,
   },
+  cameraFrame: {
+    position: 'relative',
+    backgroundColor: '#08111d',
+    borderRadius: 22,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#18283f',
+  },
   camera: {
     height: 420,
     borderRadius: 18,
@@ -273,7 +313,7 @@ const styles = StyleSheet.create({
   },
   scannerModal: {
     flex: 1,
-    backgroundColor: '#08111f',
+    backgroundColor: '#0b1320',
     padding: 20,
     gap: 16,
   },
@@ -283,11 +323,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  scannerHeaderCopy: {
+    flex: 1,
+    gap: 4,
+  },
   scannerTitle: {
     color: '#f4f7fb',
     fontSize: 20,
     fontWeight: '800',
-    flex: 1,
   },
   closeScannerButton: {
     backgroundColor: '#1a2e49',
@@ -326,6 +369,12 @@ const styles = StyleSheet.create({
     color: '#7bd3ff',
     fontSize: 13,
     lineHeight: 18,
+    backgroundColor: '#08111d',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#18283f',
   },
   errorText: {
     color: '#ff8a80',

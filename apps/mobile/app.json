@@ -10,7 +10,7 @@
       "android"
     ],
     "splash": {
-      "backgroundColor": "#08111f"
+      "backgroundColor": "#07111b"
     },
     "android": {
       "package": "com.anonymous.smartparkingmobile"

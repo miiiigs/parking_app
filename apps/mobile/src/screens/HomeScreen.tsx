@@ -28,19 +28,44 @@ export function HomeScreen({
 }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.kicker}>Smart Parking Reservation</Text>
-      <Text style={styles.title}>Guaranteed parking before you arrive.</Text>
-      <Text style={styles.subtitle}>
-        Reserve a specific slot, validate on site, and pay only for the time you actually use.
-      </Text>
+      <View style={styles.heroCard}>
+        <View style={styles.heroHeaderRow}>
+          <Text style={styles.kickerText}>Smart Parking</Text>
+          <Text style={styles.stateText}>{isLoading ? 'Syncing' : 'Live'}</Text>
+        </View>
+        <Text style={styles.title}>Guaranteed parking before you arrive.</Text>
+        <Text style={styles.subtitle}>
+          Reserve a slot, validate on site, and finish the session without extra steps.
+        </Text>
+        <View style={styles.flowRow}>
+          <View style={styles.flowChip}>
+            <Text style={styles.flowChipTitle}>Reserve</Text>
+            <Text style={styles.flowChipText}>Book before you leave</Text>
+          </View>
+          <View style={styles.flowChip}>
+            <Text style={styles.flowChipTitle}>Validate</Text>
+            <Text style={styles.flowChipText}>Scan and confirm fast</Text>
+          </View>
+          <View style={styles.flowChip}>
+            <Text style={styles.flowChipTitle}>Track</Text>
+            <Text style={styles.flowChipText}>See history and status</Text>
+          </View>
+        </View>
+      </View>
       <View style={styles.liveCard}>
-        <Text style={styles.liveLabel}>Live Location</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.liveLabel}>Live Location</Text>
+          <Text style={styles.liveStatus}>{isLoading ? 'Loading' : 'Ready'}</Text>
+        </View>
         <Text style={styles.liveValue}>{locationName}</Text>
         <Text style={styles.liveHelper}>{locationAddress}</Text>
-        <Text style={styles.liveStatus}>{isLoading ? 'Loading live data...' : slotCountLabel}</Text>
+        <Text style={styles.liveMeta}>{isLoading ? 'Loading live data...' : slotCountLabel}</Text>
       </View>
       <View style={styles.noticeCard}>
-        <Text style={styles.noticeLabel}>{notificationLabel}</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.noticeLabel}>{notificationLabel}</Text>
+          <Text style={styles.noticeBadge}>Reminders</Text>
+        </View>
         <Text style={styles.noticeMessage}>{notificationMessage}</Text>
         <TouchableOpacity
           style={[styles.noticeButton, isRefreshingNotifications ? styles.noticeButtonDisabled : null]}
@@ -64,28 +89,77 @@ export function HomeScreen({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#12233a',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: '#0b1320',
+    borderRadius: 28,
+    padding: 20,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#152234',
   },
-  kicker: {
+  heroCard: {
+    backgroundColor: '#111c2d',
+    borderRadius: 24,
+    padding: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#1b2b43',
+  },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kickerText: {
     color: '#7bd3ff',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    letterSpacing: 1.4,
+  },
+  stateText: {
+    color: '#3dd6a5',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   title: {
     color: '#f4f7fb',
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: '800',
   },
   subtitle: {
     color: '#b8c7da',
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  flowRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  flowChip: {
+    flex: 1,
+    minWidth: 92,
+    backgroundColor: '#08111d',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#18283f',
+    gap: 3,
+  },
+  flowChipTitle: {
+    color: '#f4f7fb',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  flowChipText: {
+    color: '#b8c7da',
+    fontSize: 12,
+    lineHeight: 16,
   },
   liveCard: {
     backgroundColor: '#08111d',
@@ -94,6 +168,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#18283f',
     gap: 6,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
   },
   liveLabel: {
     color: '#7bd3ff',
@@ -104,7 +184,7 @@ const styles = StyleSheet.create({
   },
   liveValue: {
     color: '#f4f7fb',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
   liveHelper: {
@@ -113,21 +193,35 @@ const styles = StyleSheet.create({
   },
   liveStatus: {
     color: '#3dd6a5',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  liveMeta: {
+    color: '#3dd6a5',
+    fontSize: 13,
+    fontWeight: '800',
   },
   noticeCard: {
     backgroundColor: '#0d1726',
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#273e57',
+    borderColor: '#24374f',
     gap: 10,
   },
   noticeLabel: {
     color: '#f4f7fb',
     fontSize: 15,
     fontWeight: '800',
+  },
+  noticeBadge: {
+    color: '#7bd3ff',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   noticeMessage: {
     color: '#b8c7da',
@@ -154,7 +248,7 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 4,
+    marginTop: 2,
   },
   primaryButton: {
     flex: 1,

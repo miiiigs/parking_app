@@ -9,7 +9,8 @@
     "dev:mobile": "npm --workspace apps/mobile run start",
     "dev:admin": "npm --workspace apps/admin run dev",
     "build:admin": "npm --workspace apps/admin run build",
-    "test:mobile": "npm --workspace apps/mobile run test"
+    "test:mobile": "npm --workspace apps/mobile run test",
+    "test": "npm run test:mobile"
   },
   "dependencies": {
     "expo-camera": "~16.0.18",

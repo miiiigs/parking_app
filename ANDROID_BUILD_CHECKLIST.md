@@ -33,9 +33,27 @@ If the SDK path is set correctly, `npm --workspace apps/mobile run android` shou
 ## What To Check Before Release
 
 - Reservation and session state survive app restart.
-- Notification reminders behave correctly in the Android build.
+- Notification reminders behave correctly in a native Android build.
 - Fallback/offline messages are clear when Supabase is unavailable.
 - QR validation and session end still work on a real device.
+
+## Production Readiness Checklist
+
+Use this as the final gate before release.
+
+- [x] Core reservation/session recovery works on a real phone after backgrounding and reconnecting.
+- [ ] Reservation creation works in a release or development build, not just Expo Go.
+- [ ] Validation and session start work on a real device.
+- [ ] Session end and payment completion work on a real device.
+- [ ] Booking confirmation notification fires once per reservation.
+- [ ] Reservation reminder and expiry notifications fire once each and do not duplicate after reconnect.
+- [ ] Session-completed notification fires once after ending a session.
+- [ ] Offline and degraded-state banners clearly explain what the app is doing.
+- [ ] Retry actions recover the app cleanly when Supabase comes back online.
+- [ ] Android production build installs successfully on a device.
+- [ ] Internal test install or release candidate has been verified end to end.
+
+If any notification item fails in Expo Go, that is expected. Confirm notification behavior only in a native build.
 
 ## Notes
 

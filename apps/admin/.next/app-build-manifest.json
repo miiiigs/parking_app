@@ -10,10 +10,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/page.js"
     ],
-    "/qr/page": [
+    "/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/qr/page.js"
+      "static/chunks/app/login/page.js"
     ]
   }
 }

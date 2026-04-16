@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
+// @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
+import { getSupabaseConfigStatus } from './supabaseConfig';
+
 function getEnv() {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 }
@@ -44,12 +47,14 @@ export function getSupabaseClient(): any {
   }
 
   const env = getEnv();
-  const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  const configStatus = getSupabaseConfigStatus(env);
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!configStatus.isConfigured) {
     return null;
   }
+
+  const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL as string;
+  const supabaseAnonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 
   cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {

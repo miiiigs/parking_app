@@ -46,7 +46,10 @@ test('builds a stored workflow snapshot with notification ids', () => {
       selectedSlotId: 'slot-9',
       selectedArrivalWindowMinutes: 60,
       plateNumber: 'ABC-1234',
+      validationQrToken: 'qr-token-9',
       scheduledNotificationIds: ['notif-1', 'notif-2'],
+      createdReservation: { reservation_id: 'reservation-9' },
+      activeParkingSession: { session_id: 'session-9' },
     },
     'reservation-123',
   );
@@ -55,7 +58,10 @@ test('builds a stored workflow snapshot with notification ids', () => {
   assert.equal(snapshot.selectedSlotId, 'slot-9');
   assert.equal(snapshot.selectedArrivalWindowMinutes, 60);
   assert.equal(snapshot.plateNumber, 'ABC-1234');
+  assert.equal(snapshot.validationQrToken, 'qr-token-9');
   assert.equal(snapshot.reservationId, 'reservation-123');
+  assert.deepEqual(snapshot.createdReservation, { reservation_id: 'reservation-9' });
+  assert.deepEqual(snapshot.activeParkingSession, { session_id: 'session-9' });
   assert.deepEqual(snapshot.scheduledNotificationIds, ['notif-1', 'notif-2']);
   assert.equal(typeof snapshot.savedAt, 'string');
 });
