@@ -2,7 +2,7 @@
   "expo": {
     "name": "Smart Parking Mobile",
     "slug": "smart-parking-mobile",
-    "scheme": "smartparking",
+    "scheme": "smartparkingmobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "platforms": [
@@ -10,15 +10,10 @@
       "android"
     ],
     "splash": {
-      "backgroundColor": "#07111b"
+      "backgroundColor": "#08111f"
     },
     "android": {
-      "package": "com.anonymous.smartparkingmobile"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "814ee283-82da-417a-aab0-9abb3a1261ba"
-      }
+      "package": "com.miiigs.smartparkingmobile"
     }
   }
 }

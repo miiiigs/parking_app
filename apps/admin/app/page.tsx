@@ -68,53 +68,18 @@ export default async function Page() {
   const slots = dashboardData.slots;
 
   return (
-    <main style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 24px 56px', display: 'grid', gap: 24 }}>
-      <section
-        style={{
-          display: 'grid',
-          gap: 22,
-          padding: 28,
-          borderRadius: 28,
-          border: '1px solid #18283f',
-          background: 'linear-gradient(180deg, #12233a 0%, #0f1b2c 100%)',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.18)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div style={{ display: 'grid', gap: 12, maxWidth: 760 }}>
-            <p style={{ color: '#7bd3ff', textTransform: 'uppercase', letterSpacing: 1.6, fontSize: 12, fontWeight: 700, margin: 0 }}>
-              Operator Dashboard
-            </p>
-            <h1 style={{ fontSize: 48, lineHeight: 1.02, margin: 0 }}>Parking control built for live operations.</h1>
-            <p style={{ color: '#a9bdd6', fontSize: 18, lineHeight: 1.6, margin: 0 }}>
-              Monitor reservations, resolve conflicts, and keep slot state accurate across the property.
-            </p>
-          </div>
-          <div
-            style={{
-              minWidth: 240,
-              padding: 16,
-              borderRadius: 20,
-              background: '#08111d',
-              border: '1px solid #18283f',
-              display: 'grid',
-              gap: 10,
-            }}
-          >
-            <div style={{ color: '#7f94ad', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 800 }}>
-              Active Location
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>{dashboardData.location?.name ?? 'BGC Pilot Site'}</div>
-            <div style={{ color: '#a9bdd6', fontSize: 13, lineHeight: 1.5 }}>
-              {dashboardData.location?.address ?? 'Bonifacio Global City, Taguig'}
-            </div>
-            <div style={{ color: '#3dd6a5', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              {dashboardData.metrics.activeReservations} active reservations
-            </div>
-          </div>
-        </div>
+    <main style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px' }}>
+      <section style={{ display: 'grid', gap: 20, marginBottom: 24 }}>
+        <p style={{ color: '#7bd3ff', textTransform: 'uppercase', letterSpacing: 1.6, fontSize: 12, fontWeight: 700 }}>
+          Operator Dashboard
+        </p>
+        <h1 style={{ fontSize: 44, lineHeight: 1.05, margin: 0 }}>Parking control built for live operations.</h1>
+        <p style={{ maxWidth: 760, color: '#a9bdd6', fontSize: 18, lineHeight: 1.6, margin: 0 }}>
+          Monitor reservations, resolve conflicts, and keep slot state accurate across the property.
+        </p>
         <div style={{ color: '#a9bdd6', fontSize: 14, lineHeight: 1.6 }}>
-          Keep the QR board, slot states, and reconciliation in sync from one place.
+          Active location: <strong style={{ color: '#f4f7fb' }}>{dashboardData.location?.name ?? 'BGC Pilot Site'}</strong>
+          {dashboardData.location?.address ? ` · ${dashboardData.location.address}` : ''}
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link
@@ -216,7 +181,7 @@ export default async function Page() {
         </div>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
           ['Active Reservations', String(dashboardData.metrics.activeReservations)],
           ['Occupied Slots', String(dashboardData.metrics.occupiedSlots)],
@@ -225,33 +190,20 @@ export default async function Page() {
           ['Data Mismatches', String(dashboardData.metrics.dataIntegrityMismatches)],
           ['Revenue', `PHP ${dashboardData.metrics.revenue.toFixed(2)}`],
         ].map(([label, value]) => (
-          <div
-            key={label}
-            style={{
-              background: 'linear-gradient(180deg, #101d2e 0%, #0a1320 100%)',
-              borderRadius: 20,
-              padding: 20,
-              border: '1px solid #18283f',
-              boxShadow: '0 12px 24px rgba(0, 0, 0, 0.14)',
-              display: 'grid',
-              gap: 8,
-            }}
-          >
-            <div style={{ color: '#7f94ad', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.7, fontWeight: 800 }}>{label}</div>
-            <div style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.05 }}>{value}</div>
+          <div key={label} style={{ background: '#0f1b2c', borderRadius: 20, padding: 20, border: '1px solid #18283f' }}>
+            <div style={{ color: '#7f94ad', fontSize: 14 }}>{label}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{value}</div>
           </div>
         ))}
       </section>
 
-      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-          <div style={{ display: 'grid', gap: 6 }}>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Live Reservations</h2>
-            <p style={{ margin: 0, color: '#a9bdd6' }}>Recent bookings currently in the system.</p>
+      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Live Reservations</h2>
+            <p style={{ margin: '6px 0 0', color: '#a9bdd6' }}>Recent bookings currently in the system.</p>
           </div>
-          <div style={{ color: '#7bd3ff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 12 }}>
-            {dashboardData.reservations.length} records
-          </div>
+          <div style={{ color: '#7bd3ff', fontWeight: 700 }}>{dashboardData.reservations.length} records</div>
         </div>
 
         <div style={{ display: 'grid', gap: 12 }}>
@@ -265,7 +217,7 @@ export default async function Page() {
                 alignItems: 'center',
                 padding: '16px 18px',
                 borderRadius: 16,
-                background: 'linear-gradient(180deg, #0a1320 0%, #08111d 100%)',
+                background: '#08111d',
                 border: '1px solid #18283f',
               }}
             >
@@ -283,18 +235,16 @@ export default async function Page() {
       </section>
 
       <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f' }}>
-        <div style={{ display: 'grid', gap: 6, marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>Slot Board</h2>
-          <p style={{ color: '#a9bdd6', margin: 0 }}>
+        <h2 style={{ marginTop: 0 }}>Slot Board</h2>
+        <p style={{ color: '#a9bdd6', marginTop: -6, marginBottom: 18 }}>
           The status here mirrors the same reusable QR tokens printed on each physical slot.
-          </p>
-        </div>
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 18 }}>
           {stateDescriptions.map((state) => (
             <div
               key={state.title}
               style={{
-                background: 'linear-gradient(180deg, #0a1320 0%, #08111d 100%)',
+                background: '#08111d',
                 border: `1px solid ${statusTheme[state.status].border}`,
                 borderRadius: 16,
                 padding: 16,
@@ -345,32 +295,20 @@ export default async function Page() {
         </div>
       </section>
 
-      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f' }}>
-        <div style={{ display: 'grid', gap: 6, marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>Production Health</h2>
-          <p style={{ color: '#a9bdd6', margin: 0 }}>
+      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f', marginBottom: 24 }}>
+        <h2 style={{ marginTop: 0 }}>Production Health</h2>
+        <p style={{ color: '#a9bdd6', marginTop: -6, marginBottom: 18 }}>
           Audit trail, reconciliation activity, and integrity signals for operators.
-          </p>
-        </div>
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 18 }}>
           {[
             ['Latest Audit Events', String(dashboardData.auditEvents.length)],
             ['Recent Reconciliations', String(dashboardData.reconciliationRuns.length)],
             ['Open Mismatches', String(dashboardData.metrics.dataIntegrityMismatches)],
           ].map(([label, value]) => (
-            <div
-              key={label}
-              style={{
-                background: 'linear-gradient(180deg, #0a1320 0%, #08111d 100%)',
-                borderRadius: 18,
-                padding: 18,
-                border: '1px solid #18283f',
-                display: 'grid',
-                gap: 8,
-              }}
-            >
-              <div style={{ color: '#7f94ad', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 800 }}>{label}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.05 }}>{value}</div>
+            <div key={label} style={{ background: '#08111d', borderRadius: 18, padding: 18, border: '1px solid #18283f' }}>
+              <div style={{ color: '#7f94ad', fontSize: 14 }}>{label}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}>{value}</div>
             </div>
           ))}
         </div>
@@ -379,15 +317,7 @@ export default async function Page() {
             <div style={{ color: '#a9bdd6', fontSize: 14 }}>No reconciliation runs yet.</div>
           ) : null}
           {dashboardData.reconciliationRuns.map((run) => (
-            <div
-              key={run.id}
-              style={{
-                background: 'linear-gradient(180deg, #0a1320 0%, #08111d 100%)',
-                borderRadius: 16,
-                padding: 16,
-                border: '1px solid #18283f',
-              }}
-            >
+            <div key={run.id} style={{ background: '#08111d', borderRadius: 16, padding: 16, border: '1px solid #18283f' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <strong>{run.runStatus.toUpperCase()}</strong>
                 <span style={{ color: '#7f94ad' }}>{new Date(run.startedAt).toLocaleString()}</span>
@@ -401,25 +331,15 @@ export default async function Page() {
         </div>
       </section>
 
-      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f' }}>
-        <div style={{ display: 'grid', gap: 6, marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>Recent Audit Trail</h2>
-          <p style={{ color: '#a9bdd6', margin: 0 }}>Latest database changes captured by the audit triggers.</p>
-        </div>
+      <section style={{ background: '#0f1b2c', borderRadius: 24, padding: 24, border: '1px solid #18283f', marginBottom: 24 }}>
+        <h2 style={{ marginTop: 0 }}>Recent Audit Trail</h2>
+        <p style={{ color: '#a9bdd6', marginTop: -6, marginBottom: 18 }}>Latest database changes captured by the audit triggers.</p>
         <div style={{ display: 'grid', gap: 10 }}>
           {dashboardData.auditEvents.length === 0 ? (
             <div style={{ color: '#a9bdd6', fontSize: 14 }}>No audit events yet.</div>
           ) : null}
           {dashboardData.auditEvents.map((event) => (
-            <div
-              key={event.id}
-              style={{
-                background: 'linear-gradient(180deg, #0a1320 0%, #08111d 100%)',
-                borderRadius: 16,
-                padding: 16,
-                border: '1px solid #18283f',
-              }}
-            >
+            <div key={event.id} style={{ background: '#08111d', borderRadius: 16, padding: 16, border: '1px solid #18283f' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <strong>{event.tableName}</strong>
                 <span style={{ color: '#7f94ad' }}>{new Date(event.createdAt).toLocaleString()}</span>

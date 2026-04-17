@@ -110,35 +110,18 @@ export function DashboardLiveRefresh({ intervalMs = 8000 }: Props) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '12px 14px',
-        borderRadius: 16,
+        gap: 8,
+        padding: '10px 14px',
+        borderRadius: 999,
         border: '1px solid #26405f',
-        background: 'linear-gradient(180deg, #0f1b2c 0%, #08111d 100%)',
-        color: '#f4f7fb',
+        background: '#08111d',
+        color: '#7bd3ff',
         fontSize: 13,
         fontWeight: 700,
-        boxShadow: '0 12px 24px rgba(0, 0, 0, 0.18)',
       }}
     >
-      <span
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          background: syncMode === 'realtime' ? '#3dd6a5' : syncMode === 'polling' ? '#7bd3ff' : '#ffb74d',
-          boxShadow: `0 0 0 6px ${syncMode === 'realtime' ? '#3dd6a522' : syncMode === 'polling' ? '#7bd3ff22' : '#ffb74d22'}`,
-          flexShrink: 0,
-        }}
-      />
-      <span style={{ display: 'grid', gap: 2 }}>
-        <strong style={{ fontSize: 13, fontWeight: 800 }}>
-          {syncMode === 'realtime' ? 'Realtime connected' : syncMode === 'polling' ? 'Live sync polling' : 'Live sync fallback'}
-        </strong>
-        <span style={{ color: '#a9bdd6', fontSize: 11, fontWeight: 600 }}>
-          {syncMode === 'realtime' ? 'Fast updates from Supabase' : syncMode === 'polling' ? 'Polling backup active' : 'Realtime unavailable'}
-        </span>
-      </span>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3dd6a5', boxShadow: '0 0 0 6px #3dd6a522' }} />
+      {syncMode === 'realtime' ? 'Realtime connected' : syncMode === 'polling' ? 'Live sync polling' : 'Live sync fallback'}
     </span>
   );
 }

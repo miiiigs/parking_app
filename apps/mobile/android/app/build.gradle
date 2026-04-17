@@ -86,9 +86,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.smartparkingmobile'
+    namespace 'com.miiigs.smartparkingmobileclean'
     defaultConfig {
-        applicationId 'com.anonymous.smartparkingmobile'
+        applicationId 'com.miiigs.smartparkingmobileclean'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
