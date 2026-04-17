@@ -212,7 +212,8 @@ export default function App() {
 
   async function scheduleFollowUpNotificationsOnBackground() {
     const currentWorkflow = workflowRef.current;
-    const reservationId = currentWorkflow.createdReservation?.reservation_id;
+    const currentReservation = currentWorkflow.createdReservation;
+    const reservationId = currentReservation?.reservation_id;
 
     if (!reservationId) {
       return;
@@ -227,8 +228,8 @@ export default function App() {
     const reminderIds = await scheduleReservationFollowUpNotifications({
       reservationId,
       slotLabel:
-        parkingData.slots.find((slot) => slot.id === currentWorkflow.createdReservation?.slot_id)?.label ?? 'Assigned slot',
-      expiresAt: currentWorkflow.createdReservation.expires_at,
+        parkingData.slots.find((slot) => slot.id === currentReservation?.slot_id)?.label ?? 'Assigned slot',
+      expiresAt: currentReservation.expires_at,
     });
 
     if (reminderIds.length > 0) {
