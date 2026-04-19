@@ -33,6 +33,10 @@ declare
   v_billed_minutes integer;
   v_billed_amount numeric(10,2);
 begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
   select *
     into v_session
     from parking_sessions
@@ -51,6 +55,10 @@ begin
 
   if not found then
     raise exception 'Reservation not found';
+  end if;
+
+  if v_reservation.user_id <> auth.uid() then
+    raise exception 'Reservation does not belong to the current user';
   end if;
 
   select *

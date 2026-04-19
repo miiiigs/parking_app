@@ -427,6 +427,8 @@ export default function App() {
       void refreshFromBackend();
     };
 
+    
+
     let channel: ReturnType<NonNullable<typeof supabaseClient>['channel']> | null = null;
 
     if (supabaseClient) {
@@ -599,7 +601,8 @@ export default function App() {
     } finally {
       setIsSubmittingReservation(false);
     }
-  }
+  } 
+  
 
   async function handleStartSession(slotQrTokenOverride?: string) {
     if (!currentReservation) {

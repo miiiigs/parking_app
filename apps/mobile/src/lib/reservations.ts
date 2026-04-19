@@ -1,5 +1,4 @@
 import { ensureMobileAuthSession, getSupabaseClient } from './supabaseClient';
-import { getArrivalWindowOption } from './reservationOptions';
 
 export type ReservationResult = {
   reservation_id: string;
@@ -40,12 +39,6 @@ export type ReservationRequest = {
   plateNumber: string;
 };
 
-function generateGuestUserId() {
-  const randomSegment = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-
-  return `${randomSegment()}${randomSegment()}-${randomSegment()}-${randomSegment()}-${randomSegment()}-${randomSegment()}${randomSegment()}${randomSegment()}`;
-}
-
 function isUuidLike(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
@@ -61,14 +54,12 @@ export async function createParkingReservation(request: ReservationRequest) {
     throw new Error('Please reconnect to live backend data before reserving. The current slot list is only fallback data.');
   }
 
-  const selectedWindow = getArrivalWindowOption(request.arrivalWindowMinutes);
+  await ensureMobileAuthSession();
 
   const { data, error } = await supabase.rpc('reserve_parking_slot', {
     p_slot_id: request.slotId,
-    p_user_id: generateGuestUserId(),
     p_plate_number: request.plateNumber,
     p_arrival_window_minutes: request.arrivalWindowMinutes,
-    p_reservation_fee: selectedWindow.fee,
   });
 
   if (error) {
@@ -251,6 +242,8 @@ export async function endParkingSession(request: {
     throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
   }
 
+  await ensureMobileAuthSession();
+
   const { data, error } = await supabase.rpc('end_parking_session', {
     p_reservation_id: request.reservationId,
     p_billed_minutes: request.billedMinutes ?? null,
@@ -273,6 +266,8 @@ export async function startParkingSession(request: {
   if (!supabase) {
     throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
   }
+
+  await ensureMobileAuthSession();
 
   const { data, error } = await supabase.rpc('start_parking_session', {
     p_reservation_id: request.reservationId,

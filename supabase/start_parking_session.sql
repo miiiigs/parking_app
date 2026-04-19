@@ -30,6 +30,10 @@ declare
   v_session_id uuid := gen_random_uuid();
   v_started_at timestamptz := now();
 begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
   select *
     into v_reservation
     from reservations
@@ -42,6 +46,14 @@ begin
 
   if v_reservation.status not in ('confirmed') then
     raise exception 'Reservation is not active';
+  end if;
+
+  if v_reservation.user_id <> auth.uid() then
+    raise exception 'Reservation does not belong to the current user';
+  end if;
+
+  if v_reservation.expires_at <= now() then
+    raise exception 'Reservation has expired';
   end if;
 
   select *
