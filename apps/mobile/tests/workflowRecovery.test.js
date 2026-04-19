@@ -91,3 +91,47 @@ test('blocks background reminders for the wrong workflow state', () => {
     assert.equal(shouldScheduleReservationFollowUpNotifications(workflowState, false), false);
   }
 });
+
+test('does not restore a stored workflow when the saved stage is home', () => {
+  const patch = buildOfflineRecoveryPatch({
+    fallbackSlots: [{ id: 'slot-1', status: 'available' }],
+    currentStage: 'home',
+    storedWorkflow: {
+      stage: 'home',
+      selectedSlotId: 'slot-1',
+      selectedArrivalWindowMinutes: 60,
+      plateNumber: 'ABC-1234',
+      validationQrToken: 'qr-token-1',
+      createdReservation: null,
+      activeParkingSession: null,
+      scheduledNotificationIds: [],
+    },
+  });
+
+  assert.equal(patch.stage, undefined);
+  assert.equal(patch.selectedSlotId, undefined);
+  assert.equal(patch.connectionState, 'offline');
+});
+
+test('keeps a valid selected slot when reconnecting to live data', () => {
+  const patch = buildOfflineRecoveryPatch({
+    fallbackSlots: [
+      { id: 'slot-1', status: 'available' },
+      { id: 'slot-2', status: 'available' },
+    ],
+    currentStage: 'home',
+    storedWorkflow: {
+      stage: 'validate',
+      selectedSlotId: 'slot-2',
+      selectedArrivalWindowMinutes: 60,
+      plateNumber: 'ABC-1234',
+      validationQrToken: 'qr-token-2',
+      createdReservation: { reservation_id: 'reservation-2', slot_id: 'slot-2' },
+      activeParkingSession: null,
+      scheduledNotificationIds: [],
+    },
+  });
+
+  assert.equal(patch.selectedSlotId, 'slot-2');
+  assert.equal(patch.selectedArrivalWindowMinutes, 60);
+});

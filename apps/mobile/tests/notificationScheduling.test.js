@@ -55,3 +55,30 @@ test('returns no follow-up notifications when the reservation is effectively imm
 
   assert.deepEqual(notificationPlan, []);
 });
+
+test('uses the provided reminder offset when building the plan', () => {
+  const now = Date.parse('2026-04-11T10:00:00.000Z');
+  const expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
+
+  const notificationPlan = buildReservationFollowUpNotificationPlan({
+    reservationId: 'reservation-4',
+    slotLabel: 'D-04',
+    expiresAt,
+    now,
+    reminderOffsetMinutes: 10,
+  });
+
+  assert.deepEqual(notificationPlan.map((notification) => notification.type), ['reservation-expiry-reminder', 'reservation-expired']);
+  assert.equal(notificationPlan[0].body, 'D-04 expires in 10 minutes.');
+});
+
+test('rejects malformed expiry inputs by not scheduling notifications', () => {
+  const notificationPlan = buildReservationFollowUpNotificationPlan({
+    reservationId: 'reservation-5',
+    slotLabel: 'E-05',
+    expiresAt: 'not-a-date',
+    now: Date.parse('2026-04-11T10:00:00.000Z'),
+  });
+
+  assert.deepEqual(notificationPlan, []);
+});

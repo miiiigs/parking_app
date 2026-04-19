@@ -1,9 +1,7 @@
 create or replace function reserve_parking_slot(
   p_slot_id uuid,
-  p_user_id uuid,
   p_plate_number text,
-  p_arrival_window_minutes integer,
-  p_reservation_fee numeric
+  p_arrival_window_minutes integer
 )
 returns table (
   reservation_id uuid,
@@ -21,12 +19,32 @@ as $$
 declare
   v_slot parking_slots%rowtype;
   v_reservation_id uuid := gen_random_uuid();
-  v_user_id uuid := coalesce(auth.uid(), p_user_id, gen_random_uuid());
+  v_user_id uuid := auth.uid();
   v_reserved_at timestamptz := now();
   v_expires_at timestamptz := now() + make_interval(mins => p_arrival_window_minutes);
+  v_reservation_fee numeric(10,2);
 begin
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if trim(coalesce(p_plate_number, '')) = '' then
+    raise exception 'Plate number is required';
+  end if;
+
   if p_arrival_window_minutes <= 0 then
     raise exception 'Arrival window must be greater than zero';
+  end if;
+
+  v_reservation_fee := case p_arrival_window_minutes
+    when 30 then 25.00
+    when 60 then 40.00
+    when 120 then 60.00
+    else null
+  end;
+
+  if v_reservation_fee is null then
+    raise exception 'Unsupported arrival window';
   end if;
 
   select *
@@ -59,7 +77,7 @@ begin
     p_slot_id,
     p_plate_number,
     p_arrival_window_minutes,
-    p_reservation_fee,
+    v_reservation_fee,
     'confirmed',
     v_reserved_at,
     v_expires_at
@@ -80,7 +98,7 @@ begin
     'reservation_created',
     jsonb_build_object(
       'arrival_window_minutes', p_arrival_window_minutes,
-      'reservation_fee', p_reservation_fee,
+      'reservation_fee', v_reservation_fee,
       'plate_number', p_plate_number
     )
   );
@@ -97,4 +115,4 @@ begin
 end;
 $$;
 
-grant execute on function reserve_parking_slot(uuid, uuid, text, integer, numeric) to anon, authenticated;
+grant execute on function reserve_parking_slot(uuid, text, integer) to anon, authenticated;
