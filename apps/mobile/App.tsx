@@ -601,9 +601,7 @@ export default function App() {
     } finally {
       setIsSubmittingReservation(false);
     }
-  }
-
-  
+  } 
   
 
   async function handleStartSession(slotQrTokenOverride?: string) {
