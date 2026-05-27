@@ -362,7 +362,7 @@ export default function App() {
         } else {
           const storedWorkflow = await loadStoredWorkflowSnapshot();
 
-          if (storedWorkflow && storedWorkflow.stage !== 'home') {
+          if (storedWorkflow && storedWorkflow.stage !== 'home' && storedWorkflow.stage !== 'reserve') {
             dispatchWorkflow({
               type: 'patch',
               patch: {
@@ -447,8 +447,6 @@ export default function App() {
         }
 
         const table = payload.table;
-        const eventType = payload.eventType || payload.type || (payload?.event?.type ?? null);
-
         if (table === 'parking_slots') {
           // Update local slot state in-place to avoid full refresh
           const newRow = payload.new ?? payload.record ?? null;
@@ -590,6 +588,11 @@ export default function App() {
     const currentReservationId = workflow.createdReservation?.reservation_id ?? workflow.activeParkingSession?.reservation_id ?? null;
 
     if (workflow.stage === 'home' && !currentReservationId) {
+      void clearStoredWorkflowSnapshot();
+      return;
+    }
+
+    if (workflow.stage === 'reserve') {
       void clearStoredWorkflowSnapshot();
       return;
     }
@@ -1059,6 +1062,17 @@ export default function App() {
     );
   };
 
+  if (workflow.stage === 'reserve') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.reserveFullScreen}>
+          {renderStage()}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -1126,6 +1140,11 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     gap: 16,
+    flexGrow: 1,
+  },
+  reserveFullScreen: {
+    flex: 1,
+    backgroundColor: '#08111f',
   },
   banner: {
     borderRadius: 18,
