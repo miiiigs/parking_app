@@ -39,6 +39,7 @@ import {
   DEFAULT_ARRIVAL_WINDOW_MINUTES,
   ARRIVAL_WINDOW_OPTIONS,
 } from './src/lib/reservationOptions';
+import { buildParkingBillBreakdown } from './src/lib/billing';
 import {
   clearStoredWorkflowSnapshot,
   loadStoredWorkflowSnapshot,
@@ -718,9 +719,15 @@ export default function App() {
     });
 
     try {
+      const parkingBill = buildParkingBillBreakdown({
+        startedAt: currentSession?.started_at ?? null,
+        reservationFee: Number(currentSession?.reservation_fee ?? 0),
+      });
+
       const sessionRecords = await endParkingSession({
         reservationId: currentReservation.reservation_id,
-        billedAmount: currentSession?.reservation_fee ?? null,
+        billedAmount: parkingBill.total,
+        billedMinutes: parkingBill.elapsedMinutes,
       });
 
       const session = Array.isArray(sessionRecords) ? sessionRecords[0] ?? null : sessionRecords;
@@ -739,24 +746,19 @@ export default function App() {
         type: 'patch',
         patch: {
           activeParkingSession: session,
+          stage: 'session',
           reservationError: null,
+          operation: 'idle',
+          scheduledNotificationIds: [],
         },
       });
 
       const refreshed = await loadParkingDashboardData();
       setParkingData(refreshed);
 
-      await clearStoredWorkflowSnapshot();
       dispatchWorkflow({
         type: 'patch',
         patch: {
-          stage: 'home',
-          createdReservation: null,
-          activeParkingSession: null,
-          validationQrToken: '',
-          reservationError: null,
-          operation: 'idle',
-          scheduledNotificationIds: [],
           connectionState: refreshed.isLiveData ? 'live' : 'degraded',
           connectionMessage: refreshed.isLiveData
             ? null
@@ -859,15 +861,21 @@ export default function App() {
         <SessionScreen
           parkingSession={currentSession}
           reservation={currentReservation}
+          selectedArrivalWindowMinutes={workflow.selectedArrivalWindowMinutes}
           isSubmitting={workflow.operation === 'endingSession' || isEndingSession}
           errorMessage={workflow.reservationError}
           onFinish={handleEndSession}
-          onBack={() =>
+          onBack={() => {
+            if (currentSession?.session_status === 'completed') {
+              void handleEndSession();
+              return;
+            }
+
             dispatchWorkflow({
               type: 'patch',
               patch: { stage: 'validate' },
-            })
-          }
+            });
+          }}
         />
       );
     }

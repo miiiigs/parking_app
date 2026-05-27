@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import QRCode from 'react-native-qrcode-svg';
 
 import type { ReservationResult } from '../lib/reservations';
 
@@ -15,6 +16,20 @@ type Props = {
   onValidate: (slotQrToken?: string) => void;
   onBack: () => void;
 };
+
+function buildEntryPassValue(reservation: ReservationResult | null) {
+  if (!reservation) {
+    return '';
+  }
+
+  return [
+    'parking-entry',
+    reservation.reservation_id,
+    reservation.slot_id,
+    reservation.slot_label,
+    reservation.expires_at,
+  ].join('|');
+}
 
 export function ValidationScreen({
   reservation,
@@ -31,6 +46,7 @@ export function ValidationScreen({
   const [scanMessage, setScanMessage] = useState('Press Scan QR to open the camera.');
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const hasTriggeredValidation = useRef(false);
+  const entryPassValue = buildEntryPassValue(reservation);
 
   useEffect(() => {
     hasTriggeredValidation.current = false;
@@ -93,6 +109,20 @@ export function ValidationScreen({
           <Text style={styles.rowValue}>{reservation?.expires_at ? new Date(reservation.expires_at).toLocaleTimeString() : 'N/A'}</Text>
         </View>
         <Text style={styles.helper}>Validate the created reservation to start the parking session.</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Entry Pass QR</Text>
+        <Text style={styles.helper}>Show this QR at the parking entrance to verify the reservation quickly.</Text>
+        <View style={styles.qrPanel}>
+          <View style={styles.qrBox}>
+            <QRCode value={entryPassValue || 'parking-entry-unavailable'} size={168} color="#08111d" backgroundColor="#ffffff" />
+          </View>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel} numberOfLines={1} ellipsizeMode="tail">Entry Pass ID</Text>
+          <Text style={[styles.rowValue, styles.referenceValue]}>{reservation?.reservation_id ?? 'Pending'}</Text>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -208,6 +238,16 @@ const styles = StyleSheet.create({
     borderColor: '#18283f',
     gap: 8,
   },
+  qrPanel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  qrBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 14,
+  },
   cardTitle: {
     color: '#f4f7fb',
     fontWeight: '700',
@@ -226,6 +266,12 @@ const styles = StyleSheet.create({
     color: '#f4f7fb',
     fontSize: 14,
     fontWeight: '700',
+  },
+  referenceValue: {
+    flex: 1,
+    minWidth: 0,
+    flexWrap: 'wrap',
+    textAlign: 'right',
   },
   helper: {
     color: '#b8c7da',
