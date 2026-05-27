@@ -122,6 +122,9 @@ export default function App() {
   const hasBootstrappedRef = useRef(false);
   const workflowRef = useRef(workflow);
   const [isRefreshingBackend, setIsRefreshingBackend] = useState(false);
+  const telemetryRef = useRef({ polls: 0, realtimeEvents: 0, errors: 0 });
+  const retryBackoffRef = useRef<number>(0);
+  const lastFailedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     workflowRef.current = workflow;
@@ -377,7 +380,16 @@ export default function App() {
           }
         }
       }
+      // Successful sync: reset retry backoff
+      retryBackoffRef.current = 0;
+      lastFailedAtRef.current = null;
     } catch {
+      // Record failure and increase backoff
+      telemetryRef.current.errors += 1;
+      const previous = retryBackoffRef.current || 0;
+      const next = previous > 0 ? Math.min(120000, previous * 2) : 5000;
+      retryBackoffRef.current = next;
+      lastFailedAtRef.current = Date.now();
       const storedWorkflow = await loadStoredWorkflowSnapshot();
       const fallbackParkingData = getFallbackParkingData();
       setParkingData(fallbackParkingData);
@@ -424,8 +436,75 @@ export default function App() {
     void refreshNotificationReadiness();
 
     const supabaseClient = getSupabaseClient();
-    const liveRefresh = () => {
-      void refreshFromBackend();
+    const liveRefresh = (payload?: any) => {
+      // Targeted handling: apply minimal updates based on table and event.
+      try {
+        telemetryRef.current.realtimeEvents += 1;
+
+        if (!payload || !payload.table) {
+          void refreshFromBackend();
+          return;
+        }
+
+        const table = payload.table;
+        const eventType = payload.eventType || payload.type || (payload?.event?.type ?? null);
+
+        if (table === 'parking_slots') {
+          // Update local slot state in-place to avoid full refresh
+          const newRow = payload.new ?? payload.record ?? null;
+          const oldRow = payload.old ?? null;
+
+          if (newRow) {
+            setParkingData((prev) => ({
+              ...prev,
+              slots: prev.slots.map((s) => (s.id === newRow.id ? { ...s, status: newRow.status, label: newRow.slot_label ?? s.label, qrToken: newRow.qr_token ?? s.qrToken } : s)),
+            }));
+          } else if (oldRow) {
+            // possible deletion
+            setParkingData((prev) => ({ ...prev, slots: prev.slots.filter((s) => s.id !== oldRow.id) }));
+          }
+
+          return;
+        }
+
+        if (table === 'reservations') {
+          const newRow = payload.new ?? payload.record ?? null;
+          const oldRow = payload.old ?? null;
+          const currentUserId = (supabaseClient && (supabaseClient.auth?.getUser ? undefined : undefined));
+          // We don't have user id here reliably; fallback to full refresh for reservation events affecting the current user.
+          void refreshFromBackend();
+          return;
+        }
+
+        if (table === 'parking_sessions') {
+          const newRow = payload.new ?? payload.record ?? null;
+          if (newRow) {
+            // if the session is tied to our active reservation, update it
+            const currentWorkflow = workflowRef.current;
+            const myReservationId = currentWorkflow.createdReservation?.reservation_id ?? currentWorkflow.activeParkingSession?.reservation_id ?? null;
+            if (myReservationId && newRow.reservation_id === myReservationId) {
+              // fetch latest single session record to ensure shape
+              (async () => {
+                try {
+                  const latest = await getParkingSessionByReservationId(myReservationId);
+                  if (latest) {
+                    dispatchWorkflow({ type: 'patch', patch: { activeParkingSession: latest, stage: 'session' } });
+                  }
+                } catch (_) {
+                  // ignore
+                }
+              })();
+              return;
+            }
+          }
+        }
+
+        // fallback to full refresh for other events
+        void refreshFromBackend();
+      } catch (e) {
+        // on any handler error, fall back to full refresh
+        void refreshFromBackend();
+      }
     };
 
     
@@ -435,25 +514,63 @@ export default function App() {
     if (supabaseClient) {
       channel = supabaseClient
         .channel('mobile-dashboard-live-sync')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_slots' }, liveRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, liveRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_sessions' }, liveRefresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, liveRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_slots' }, (payload: any) => liveRefresh(payload))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, (payload: any) => liveRefresh(payload))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_sessions' }, (payload: any) => liveRefresh(payload))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, (payload: any) => liveRefresh(payload))
         .subscribe();
     }
 
+    // Track app active state to avoid polling while backgrounded
+    let isAppActive = true;
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
+        isAppActive = true;
         void refreshFromBackend();
         void refreshNotificationReadiness();
       } else if (nextAppState === 'background') {
+        isAppActive = false;
         void scheduleFollowUpNotificationsOnBackground();
       }
     });
 
+    // If we have a real-time channel, reduce polling frequency and use push updates.
+    // Fallback to more frequent polling only when realtime channel isn't available.
+    const pollIntervalMs = channel ? 60000 : 15000;
+    const telemetryRefLocal = telemetryRef;
+    const lastFailedAtRefLocal = lastFailedAtRef;
+    const retryBackoffRefLocal = retryBackoffRef;
+
     const intervalId = setInterval(() => {
+      if (!isAppActive) {
+        return;
+      }
+
+      // skip while still backing off from recent failures
+      if (lastFailedAtRefLocal.current && retryBackoffRefLocal.current > 0) {
+        const since = Date.now() - lastFailedAtRefLocal.current;
+        if (since < retryBackoffRefLocal.current) {
+          return;
+        }
+      }
+
+      // Only poll when not currently syncing.
+      if (syncInProgressRef.current) {
+        return;
+      }
+
+      const currentWorkflow = workflowRef.current;
+      const hasActive = !!(currentWorkflow.createdReservation || currentWorkflow.activeParkingSession);
+      const realtimeAvailable = !!channel;
+
+      // If realtime is available and there's no active user session/reservation, skip frequent polling.
+      if (realtimeAvailable && !hasActive) {
+        return;
+      }
+
+      telemetryRefLocal.current.polls += 1;
       void refreshFromBackend();
-    }, 15000);
+    }, pollIntervalMs);
 
     return () => {
       if (supabaseClient && channel) {
@@ -864,10 +981,38 @@ export default function App() {
           selectedArrivalWindowMinutes={workflow.selectedArrivalWindowMinutes}
           isSubmitting={workflow.operation === 'endingSession' || isEndingSession}
           errorMessage={workflow.reservationError}
-          onFinish={handleEndSession}
+          onFinish={currentSession?.session_status === 'completed' ? async () => {
+            // Completed session: navigate home and clear stored state without re-invoking end flow.
+            await clearStoredWorkflowSnapshot();
+            await cancelReminderNotifications();
+            dispatchWorkflow({
+              type: 'patch',
+              patch: {
+                stage: 'home',
+                createdReservation: null,
+                activeParkingSession: null,
+                validationQrToken: '',
+                reservationError: null,
+                operation: 'idle',
+                scheduledNotificationIds: [],
+              },
+            });
+          } : handleEndSession}
           onBack={() => {
+            // If already completed, simply go home instead of re-triggering end flow.
             if (currentSession?.session_status === 'completed') {
-              void handleEndSession();
+              dispatchWorkflow({
+                type: 'patch',
+                patch: {
+                  stage: 'home',
+                  createdReservation: null,
+                  activeParkingSession: null,
+                  validationQrToken: '',
+                  reservationError: null,
+                  operation: 'idle',
+                  scheduledNotificationIds: [],
+                },
+              });
               return;
             }
 

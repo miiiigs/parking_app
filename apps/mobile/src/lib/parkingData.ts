@@ -55,6 +55,30 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
     return getFallbackParkingData();
   }
 
+  // Try to use a batched RPC that returns the dashboard and current user's reservation/session
+  try {
+    // Acquire user if possible
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData?.user ?? null;
+
+    if (currentUser) {
+      const { data: snapshot, error } = await supabase.rpc('mobile_dashboard_snapshot', { p_user_id: currentUser.id });
+
+      if (!error && snapshot) {
+        const loc = snapshot.location ?? null;
+        const slots = Array.isArray(snapshot.slots) ? snapshot.slots : (snapshot.slots ? Object.values(snapshot.slots) : []);
+
+        return {
+          location: loc ? { id: loc.id, name: loc.name, address: loc.address, city: loc.city } : null,
+          slots: (slots || []).map((s: any) => ({ id: s.id, label: s.label, status: s.status, displayOrder: s.displayOrder, qrToken: s.qrToken })),
+          isLiveData: true,
+        };
+      }
+    }
+  } catch (_) {
+    // Fall back to standard queries on any error
+  }
+
   const { data: locations, error: locationError } = await supabase
     .from('locations')
     .select('id, name, address, city')

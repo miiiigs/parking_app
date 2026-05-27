@@ -9,6 +9,7 @@ function getEnv() {
 }
 
 let cachedClient: any = null;
+let cachedUser: any = null;
 
 const authStorageCache = new Map<string, string>();
 
@@ -75,9 +76,15 @@ export async function ensureMobileAuthSession() {
     return null;
   }
 
+  // Return cached user when available to avoid repeated network auth calls.
+  if (cachedUser) {
+    return cachedUser;
+  }
+
   const { data: sessionData } = await supabase.auth.getSession();
 
   if (sessionData.session?.user) {
+    cachedUser = sessionData.session.user;
     return sessionData.session.user;
   }
 
@@ -87,5 +94,11 @@ export async function ensureMobileAuthSession() {
     throw new Error(error.message);
   }
 
-  return data.user ?? null;
+  cachedUser = data.user ?? null;
+  return cachedUser;
+}
+
+// Expose a helper to reset cached user (useful for tests or sign-out flows)
+export function clearCachedAuthUser() {
+  cachedUser = null;
 }
