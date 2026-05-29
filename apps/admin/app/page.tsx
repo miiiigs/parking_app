@@ -83,6 +83,39 @@ export default async function Page() {
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link
+            href="/parking-map"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: '#1a2e49',
+              color: '#f4f7fb',
+              fontWeight: 800,
+              textDecoration: 'none',
+            }}
+          >
+            Open Map Page
+          </Link>
+          <Link
+            href="/lot-builder"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: '#0c1a28',
+              color: '#7bd3ff',
+              fontWeight: 800,
+              textDecoration: 'none',
+              border: '1px solid #26405f',
+            }}
+          >
+            Open Builder
+          </Link>
+          <Link
             href="/qr"
             style={{
               display: 'inline-flex',

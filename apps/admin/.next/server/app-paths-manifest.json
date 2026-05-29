@@ -1,3 +1,4 @@
 {
-  "/page": "app/page.js"
+  "/lot-builder/page": "app/lot-builder/page.js",
+  "/parking-map/page": "app/parking-map/page.js"
 }

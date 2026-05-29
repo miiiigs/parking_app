@@ -16,6 +16,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/" style={{ color: '#7bd3ff', fontWeight: 800, fontSize: 18, textDecoration: 'none' }}>Smart Parking</Link>
               <nav style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <Link href="/" style={{ color: '#a9bdd6', textDecoration: 'none' }}>Dashboard</Link>
+                <Link href="/parking-map" style={{ color: '#a9bdd6', textDecoration: 'none' }}>Map</Link>
+                <Link href="/lot-builder" style={{ color: '#a9bdd6', textDecoration: 'none' }}>Builder</Link>
                 <Link href="/qr" style={{ color: '#a9bdd6', textDecoration: 'none' }}>QR</Link>
                 <Link href="/login" style={{ color: '#a9bdd6', textDecoration: 'none' }}>Login</Link>
               </nav>
