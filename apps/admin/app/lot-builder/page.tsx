@@ -11,6 +11,18 @@ import {
   type ParkingSlotStatus,
   type ParkingMapArrowDirection,
 } from '../../lib/parkingMap';
+import { loadLotBuilderState, saveLotBuilderLayout } from '../actions';
+import {
+  collectRoadEndpointTargets,
+  connectRoadEndpointToNearest,
+  extendStraightRoadEnd,
+  getRoadBounds,
+  moveRoadToOrigin,
+  setRoadPoint,
+  syncRoadFromPoints,
+  translateRoadPoints,
+} from '../../lib/lotBuilderRoad';
+import { lotDefinitionToDraftItems } from '../../lib/parkingLotLayout';
 
 type DraftItemType = 'slot' | 'road-straight' | 'road-curve' | 'entry' | 'exit' | 'arrow';
 
@@ -24,21 +36,18 @@ function cloneItem(item: DraftItem): DraftItem {
   return JSON.parse(JSON.stringify(item)) as DraftItem;
 }
 
-function getRoadBounds(points: ParkingMapPoint[]) {
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-
-  return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
-  };
-}
-
-function translatePoints(points: ParkingMapPoint[], deltaX: number, deltaY: number) {
-  return points.map((point) => ({ x: point.x + deltaX, y: point.y + deltaY }));
-}
+type CanvasDrag =
+  | {
+      mode: 'road-move';
+      roadId: string;
+      pointerStart: ParkingMapPoint;
+      originPoints: ParkingMapPoint[];
+    }
+  | {
+      mode: 'road-point';
+      roadId: string;
+      pointIndex: number;
+    };
 
 function removeRoadPoint(points: ParkingMapPoint[], pointIndex: number) {
   if (points.length <= 2) {
@@ -67,10 +76,10 @@ function createDraftItem(type: DraftItemType, id: string, x: number, y: number):
   }
 
   if (type === 'road-straight') {
-    return {
+    return syncRoadFromPoints({
       id,
-      type: 'road',
-      roadKind: 'straight',
+      type: 'road' as const,
+      roadKind: 'straight' as const,
       label: 'Road',
       x,
       y,
@@ -81,14 +90,14 @@ function createDraftItem(type: DraftItemType, id: string, x: number, y: number):
         { x, y },
         { x: x + 300, y },
       ],
-    };
+    });
   }
 
   if (type === 'road-curve') {
-    return {
+    return syncRoadFromPoints({
       id,
-      type: 'road',
-      roadKind: 'curve',
+      type: 'road' as const,
+      roadKind: 'curve' as const,
       label: 'Road',
       x,
       y,
@@ -101,7 +110,7 @@ function createDraftItem(type: DraftItemType, id: string, x: number, y: number):
         { x: x + 220, y: y + 140 },
         { x: x + 360, y: y + 90 },
       ],
-    };
+    });
   }
 
   if (type === 'entry') {
@@ -131,11 +140,15 @@ export default function LotBuilderPage() {
     const entry = base.nodes.find((n) => n.kind === 'entry');
     if (!entry) return [];
 
-    const entryItem: DraftItem = { id: entry.id, type: 'entry', label: entry.label, x: entry.x, y: entry.y, rotation: 0, direction: entry.direction };
+    const entryItem: DraftItem = { id: entry.id, type: 'entry', label: entry.label, x: entry.x, y: entry.y, rotation: 0, direction: entry.direction ?? 'east' };
     return [entryItem];
   });
   const [selectedId, setSelectedId] = useState<string | null>(items[0]?.id ?? null);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [isLoadingLayout, setIsLoadingLayout] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [locationId, setLocationId] = useState<string | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
 
@@ -145,6 +158,31 @@ export default function LotBuilderPage() {
   const zoomRef = useRef(1);
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ clientX: 0, clientY: 0, startX: 0, startY: 0 });
+  const [canvasDrag, setCanvasDrag] = useState<CanvasDrag | null>(null);
+  const canvasDragRef = useRef<CanvasDrag | null>(null);
+
+  function setCanvasDragState(next: CanvasDrag | null) {
+    canvasDragRef.current = next;
+    setCanvasDrag(next);
+  }
+
+  function screenToLot(clientX: number, clientY: number) {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return { x: 0, y: 0 };
+    }
+
+    const rect = viewport.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - panRef.current.x) / zoomRef.current,
+      y: (clientY - rect.top - panRef.current.y) / zoomRef.current,
+    };
+  }
+
+  const roadItems = useMemo(
+    () => items.filter((item): item is Extract<DraftItem, { type: 'road' }> => item.type === 'road'),
+    [items],
+  );
 
   function setPanState(next: { x: number; y: number }) {
     panRef.current = next;
@@ -215,7 +253,7 @@ export default function LotBuilderPage() {
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, input, select, textarea, a')) return;
+    if (target?.closest('button, input, select, textarea, a, [data-lot-object]')) return;
 
     panStartRef.current = { clientX: e.clientX, clientY: e.clientY, startX: panRef.current.x, startY: panRef.current.y };
     setIsPanning(true);
@@ -245,27 +283,151 @@ export default function LotBuilderPage() {
     }
   }, [isPanning]);
 
-  // center viewport on entry gate on first mount
   useEffect(() => {
-    if (!viewportRef.current) return;
-    const rect = viewportRef.current.getBoundingClientRect();
-    const entry = createEmptyParkingLotDefinition(lotName).nodes.find((n) => n.kind === 'entry');
-    if (!entry) return;
+    if (!canvasDrag) {
+      return;
+    }
 
-    const desiredX = rect.width / 2; // center horizontally
-    const desiredY = rect.height * 0.75; // place entry ~25% from bottom (75% from top)
+    function handleMove(event: PointerEvent) {
+      const drag = canvasDragRef.current;
+      if (!drag) {
+        return;
+      }
 
-    setPanState({ x: desiredX - entry.x * zoomRef.current, y: desiredY - entry.y * zoomRef.current });
-    // only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      const lotPoint = screenToLot(event.clientX, event.clientY);
+
+      if (drag.mode === 'road-move') {
+        const deltaX = lotPoint.x - drag.pointerStart.x;
+        const deltaY = lotPoint.y - drag.pointerStart.y;
+
+        setItems((current) =>
+          current.map((item) => {
+            if (item.id !== drag.roadId || item.type !== 'road') {
+              return item;
+            }
+
+            return syncRoadFromPoints({
+              ...item,
+              points: drag.originPoints.map((point) => ({
+                x: point.x + deltaX,
+                y: point.y + deltaY,
+              })),
+            });
+          }),
+        );
+        return;
+      }
+
+      const snapTargets = collectRoadEndpointTargets(
+        roadItems.map((road) => ({ id: road.id, points: road.points })),
+        drag.roadId,
+        drag.pointIndex,
+      );
+
+      setItems((current) =>
+        current.map((item) => {
+          if (item.id !== drag.roadId || item.type !== 'road') {
+            return item;
+          }
+
+          return setRoadPoint(item, drag.pointIndex, lotPoint, snapTargets);
+        }),
+      );
+    }
+
+    function handleUp() {
+      const drag = canvasDragRef.current;
+      if (drag?.mode === 'road-point') {
+        setItems((current) =>
+          current.map((item) => {
+            if (item.id !== drag.roadId || item.type !== 'road') {
+              return item;
+            }
+
+            return connectRoadEndpointToNearest(
+              item,
+              drag.roadId,
+              drag.pointIndex,
+              current
+                .filter((entry): entry is Extract<DraftItem, { type: 'road' }> => entry.type === 'road')
+                .map((road) => ({ id: road.id, points: road.points })),
+            );
+          }),
+        );
+      }
+
+      setCanvasDragState(null);
+    }
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+  }, [canvasDrag, roadItems]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateFromSupabase() {
+      try {
+        const state = await loadLotBuilderState();
+        if (cancelled || !state) {
+          return;
+        }
+
+        setLocationId(state.locationId);
+        if (state.locationName) {
+          setLotName(state.locationName);
+        }
+
+        if (state.layout) {
+          const draftItems = lotDefinitionToDraftItems(state.layout) as DraftItem[];
+          if (draftItems.length > 0) {
+            setItems(draftItems);
+            setSelectedId(draftItems[0]?.id ?? null);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSaveMessage(error instanceof Error ? error.message : 'Failed to load saved layout.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingLayout(false);
+        }
+      }
+    }
+
+    hydrateFromSupabase();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (isLoadingLayout || !viewportRef.current) return;
+    const rect = viewportRef.current.getBoundingClientRect();
+    const entry =
+      items.find((item) => item.type === 'entry') ??
+      createEmptyParkingLotDefinition(lotName).nodes.find((n) => n.kind === 'entry');
+    if (!entry || !('x' in entry)) return;
+
+    setPanState({
+      x: rect.width / 2 - entry.x * zoomRef.current,
+      y: rect.height * 0.75 - entry.y * zoomRef.current,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingLayout]);
 
   function resetToEntryGate() {
     const base = createEmptyParkingLotDefinition(lotName);
     const entry = base.nodes.find((n) => n.kind === 'entry');
     if (!entry) return;
 
-    const entryItem: DraftItem = { id: entry.id, type: 'entry', label: entry.label, x: entry.x, y: entry.y, rotation: 0, direction: entry.direction };
+    const entryItem: DraftItem = { id: entry.id, type: 'entry', label: entry.label, x: entry.x, y: entry.y, rotation: 0, direction: entry.direction ?? 'east' };
     setItems([entryItem]);
     setSelectedId(entryItem.id);
   }
@@ -337,21 +499,113 @@ export default function LotBuilderPage() {
   }
 
   function updateItem(id: string, patch: Partial<DraftItem>) {
-    setItems((current) => current.map((item) => (item.id === id ? ({ ...item, ...patch } as DraftItem) : item)));
+    setItems((current) =>
+      current.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        const merged = { ...item, ...patch } as DraftItem;
+
+        if (merged.type !== 'road') {
+          return merged;
+        }
+
+        // If rotation is being changed for a straight road, rotate the geometry
+        // by updating the endpoint based on the current length so points remain
+        // the canonical geometry (rotation is derived from points).
+        if ('rotation' in patch && patch.rotation !== undefined && merged.roadKind === 'straight') {
+          const start = item.points[0];
+          const lastPoint = item.points[item.points.length - 1];
+          const length = Math.hypot(lastPoint.x - start.x, lastPoint.y - start.y) || merged.width || 0;
+          const radians = (patch.rotation * Math.PI) / 180;
+          const end = {
+            x: start.x + length * Math.cos(radians),
+            y: start.y + length * Math.sin(radians),
+          };
+
+          return syncRoadFromPoints({
+            ...merged,
+            points: [start, end],
+          });
+        }
+
+        if ('x' in patch || 'y' in patch) {
+          return moveRoadToOrigin(merged, patch.x ?? merged.x, patch.y ?? merged.y);
+        }
+
+        if ('width' in patch && patch.width !== undefined) {
+          // When changing the width (length) of a straight road, preserve
+          // the current rotation and compute the new end point accordingly.
+          const start = merged.points[0];
+          const radians = ((merged.rotation ?? 0) * Math.PI) / 180;
+          const end = {
+            x: start.x + patch.width * Math.cos(radians),
+            y: start.y + patch.width * Math.sin(radians),
+          };
+
+          return syncRoadFromPoints({
+            ...merged,
+            width: patch.width,
+            points: [start, end],
+          });
+        }
+
+        if ('points' in patch) {
+          return syncRoadFromPoints(merged);
+        }
+
+        return syncRoadFromPoints(merged);
+      }),
+    );
   }
 
   function updateRoadPoint(roadId: string, pointIndex: number, patch: Partial<ParkingMapPoint>) {
-    setItems((current) =>
-      current.map((item) => {
+    setItems((current) => {
+      const roads = current
+        .filter((entry): entry is Extract<DraftItem, { type: 'road' }> => entry.type === 'road')
+        .map((road) => ({ id: road.id, points: road.points }));
+      const snapTargets = collectRoadEndpointTargets(roads, roadId, pointIndex);
+
+      return current.map((item) => {
         if (item.id !== roadId || item.type !== 'road') {
           return item;
         }
 
-        const points = item.points.map((point, index) => (index === pointIndex ? { ...point, ...patch } : point));
+        const point = item.points[pointIndex];
+        if (!point) {
+          return item;
+        }
 
-        return { ...item, points };
-      }),
-    );
+        return setRoadPoint(item, pointIndex, { ...point, ...patch }, snapTargets);
+      });
+    });
+  }
+
+  function beginRoadMove(roadId: string, event: React.PointerEvent<HTMLElement>) {
+    const road = items.find((item) => item.id === roadId && item.type === 'road');
+    if (!road || road.type !== 'road') {
+      return;
+    }
+
+    event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedId(roadId);
+    setCanvasDragState({
+      mode: 'road-move',
+      roadId,
+      pointerStart: screenToLot(event.clientX, event.clientY),
+      originPoints: road.points.map((point) => ({ ...point })),
+    });
+  }
+
+  function beginRoadPointDrag(roadId: string, pointIndex: number, event: React.PointerEvent<HTMLElement>) {
+    event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedId(roadId);
+    setCanvasDragState({ mode: 'road-point', roadId, pointIndex });
   }
 
   function removeSelected() {
@@ -387,19 +641,7 @@ export default function LotBuilderPage() {
             const bounds = getRoadBounds(item.points);
             const currentCenterX = (bounds.minX + bounds.maxX) / 2;
             const currentCenterY = (bounds.minY + bounds.maxY) / 2;
-            const deltaX = x - currentCenterX;
-            const deltaY = y - currentCenterY;
-            const translatedPoints = translatePoints(item.points, deltaX, deltaY);
-            const translatedBounds = getRoadBounds(translatedPoints);
-
-            return {
-              ...cloneItem(item),
-              x: translatedBounds.minX,
-              y: translatedBounds.minY,
-              width: translatedBounds.maxX - translatedBounds.minX,
-              height: translatedBounds.maxY - translatedBounds.minY,
-              points: translatedPoints,
-            };
+            return translateRoadPoints(item, x - currentCenterX, y - currentCenterY);
           }
 
           if (item.type === 'slot' || item.type === 'entry' || item.type === 'exit' || item.type === 'arrow') {
@@ -421,6 +663,20 @@ export default function LotBuilderPage() {
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
 
+  async function handleSaveLayout() {
+    setIsSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const result = await saveLotBuilderLayout(JSON.stringify(lot));
+      setSaveMessage(`Map saved at ${new Date(result.savedAt).toLocaleTimeString()}. Mobile loads this on refresh.`);
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Failed to save map.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <main style={{ display: 'grid', gap: 20 }}>
       <section style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -428,25 +684,52 @@ export default function LotBuilderPage() {
           <p style={{ color: '#7bd3ff', textTransform: 'uppercase', letterSpacing: 1.4, fontSize: 12, fontWeight: 800, margin: 0 }}>Parking Lot Builder</p>
           <h1 style={{ margin: '8px 0 0', fontSize: 40, lineHeight: 1.05 }}>Drag, place, and shape your parking lot.</h1>
           <p style={{ color: '#a9bdd6', maxWidth: 780, lineHeight: 1.6 }}>
-            This is the admin editor for creating a lot layout. Add slots, driveways, curves, entry and exit points, then tune the data before the app renders it.
+            Build your lot, then save the map to Supabase. The mobile reservation screen loads it automatically on refresh.
           </p>
+          {isLoadingLayout ? <p style={{ color: '#7bd3ff', margin: '8px 0 0' }}>Loading saved map…</p> : null}
+          {saveMessage ? (
+            <p style={{ color: saveMessage.startsWith('Map saved') ? '#3dd6a5' : '#ff8a80', margin: '8px 0 0', maxWidth: 720 }}>{saveMessage}</p>
+          ) : null}
         </div>
-        <Link
-          href="/parking-map"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px 16px',
-            borderRadius: 12,
-            background: '#1a2e49',
-            color: '#f4f7fb',
-            fontWeight: 800,
-            textDecoration: 'none',
-          }}
-        >
-          View Parking Map
-        </Link>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            disabled={isSaving || isLoadingLayout}
+            onClick={handleSaveLayout}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '14px 20px',
+              borderRadius: 12,
+              background: isSaving || isLoadingLayout ? '#26405f' : '#3dd6a5',
+              color: '#071018',
+              fontWeight: 900,
+              fontSize: 15,
+              border: 'none',
+              cursor: isSaving || isLoadingLayout ? 'not-allowed' : 'pointer',
+              boxShadow: '0 8px 24px rgba(61,214,165,0.25)',
+            }}
+          >
+            {isSaving ? 'Saving map…' : 'Save map to Supabase'}
+          </button>
+          <Link
+            href="/parking-map"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: '#1a2e49',
+              color: '#f4f7fb',
+              fontWeight: 800,
+              textDecoration: 'none',
+            }}
+          >
+            View Parking Map
+          </Link>
+        </div>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16, alignItems: 'start' }}>
@@ -476,12 +759,32 @@ export default function LotBuilderPage() {
 
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={labelStyle}>How it works</div>
-            <div style={helperBoxStyle}>Drag an item into the canvas. Click an item to inspect it. Use the inspector to change its coordinates, rotation, or status.</div>
+            <div style={helperBoxStyle}>
+              Drag palette items onto the canvas. Drag a road body to move it; drag green (S/E) or blue (bend) handles to extend and snap endpoints to other roads within ~22px.
+            </div>
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              disabled={isSaving || isLoadingLayout}
+              onClick={handleSaveLayout}
+              style={{
+                ...paletteButtonStyle,
+                width: '100%',
+                padding: '12px 14px',
+                background: isSaving || isLoadingLayout ? '#26405f' : '#3dd6a5',
+                color: '#071018',
+                fontWeight: 900,
+                cursor: isSaving || isLoadingLayout ? 'not-allowed' : 'pointer',
+                textAlign: 'center',
+              }}
+            >
+              {isSaving ? 'Saving…' : 'Save map to Supabase'}
+            </button>
             <button type="button" onClick={openResetModal} style={{ ...paletteButtonStyle, width: '100%', padding: '10px 12px', background: '#07101a' }}>
               Reset to entry gate
             </button>
+            {locationId ? <p style={{ color: '#7f94ad', fontSize: 11, margin: 0 }}>Location: {locationId.slice(0, 8)}…</p> : null}
           </div>
         </aside>
 
@@ -572,41 +875,72 @@ export default function LotBuilderPage() {
                   </svg>
 
                   {lot.roads.map((road) => {
-                    const shape = buildRoadShape(road);
+                    const draftRoad = items.find((item) => item.id === road.id && item.type === 'road');
+                    const points = draftRoad?.type === 'road' ? draftRoad.points : road.points ?? [];
+                    const bounds = getRoadBounds(points.length >= 2 ? points : [{ x: road.x, y: road.y }]);
+                    const isSelected = selectedId === road.id;
+                    const pad = 28;
 
                     return (
                       <div key={road.id}>
-                        {shape.bendHandles.map((handle, handleIndex) => {
-                          const pointIndex = handleIndex + 1;
-                          const isBendPoint = pointIndex > 0 && pointIndex < road.points.length - 1;
+                        <div
+                          data-lot-object
+                          role="button"
+                          tabIndex={0}
+                          title="Drag to move road"
+                          onPointerDown={(event) => beginRoadMove(road.id, event)}
+                          onClick={() => setSelectedId(road.id)}
+                          style={{
+                            position: 'absolute',
+                            left: bounds.minX - pad,
+                            top: bounds.minY - pad,
+                            width: bounds.maxX - bounds.minX + pad * 2,
+                            height: bounds.maxY - bounds.minY + pad * 2,
+                            cursor: 'grab',
+                            zIndex: 2,
+                            borderRadius: 16,
+                            border: isSelected ? '2px dashed rgba(123,211,255,0.45)' : '1px solid transparent',
+                            background: isSelected ? 'rgba(123,211,255,0.06)' : 'transparent',
+                          }}
+                        />
+
+                        {points.map((point, pointIndex) => {
+                          const isStart = pointIndex === 0;
+                          const isEnd = pointIndex === points.length - 1;
+                          const isBend = !isStart && !isEnd;
 
                           return (
                             <button
-                              key={`${road.id}-bend-${pointIndex}`}
+                              key={`${road.id}-point-${pointIndex}`}
                               type="button"
-                              onClick={() => setSelectedId(road.id)}
-                              title={isBendPoint ? `Bend point ${pointIndex}` : pointIndex === 0 ? 'Start point' : 'End point'}
+                              data-lot-object
+                              onPointerDown={(event) => beginRoadPointDrag(road.id, pointIndex, event)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedId(road.id);
+                              }}
+                              title={isStart ? 'Start — drag to connect' : isEnd ? 'End — drag to extend/connect' : `Bend ${pointIndex}`}
                               style={{
                                 position: 'absolute',
-                                left: handle.x,
-                                top: handle.y,
+                                left: point.x,
+                                top: point.y,
                                 transform: 'translate(-50%, -50%)',
-                                width: 38,
-                                height: 38,
+                                width: isBend ? 34 : 40,
+                                height: isBend ? 34 : 40,
                                 borderRadius: '50%',
-                                border: '2px solid #7bd3ff',
-                                background: 'rgba(61,214,165,0.96)',
-                                color: '#07101a',
-                                fontSize: 12,
+                                border: `2px solid ${isStart ? '#7bd3ff' : isEnd ? '#ffb74d' : '#3dd6a5'}`,
+                                background: isStart ? '#0d1a2a' : isEnd ? '#23190c' : 'rgba(61,214,165,0.96)',
+                                color: '#f4f7fb',
+                                fontSize: isBend ? 11 : 12,
                                 fontWeight: 900,
-                                cursor: 'pointer',
+                                cursor: 'grab',
                                 display: 'grid',
                                 placeItems: 'center',
-                                boxShadow: '0 0 0 7px rgba(123,211,255,0.12)',
-                                zIndex: 3,
+                                boxShadow: '0 0 0 6px rgba(123,211,255,0.1)',
+                                zIndex: 4,
                               }}
                             >
-                              {pointIndex}
+                              {isStart ? 'S' : isEnd ? 'E' : pointIndex}
                             </button>
                           );
                         })}
@@ -729,7 +1063,7 @@ export default function LotBuilderPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <div>
                         <div style={{ color: '#f4f7fb', fontWeight: 800 }}>Bend points</div>
-                        <div style={{ color: '#8ea4bc', fontSize: 12 }}>Blue outer ring = handle, green chip = editable bend point.</div>
+                        <div style={{ color: '#8ea4bc', fontSize: 12 }}>S = start, E = end (snap to other roads), numbered chips = bends.</div>
                       </div>
                       <button
                         type="button"
@@ -743,7 +1077,7 @@ export default function LotBuilderPage() {
                               const anchorA = item.points[Math.max(0, item.points.length - 2)] ?? { x: item.x, y: item.y };
                               const anchorB = item.points[item.points.length - 1] ?? { x: item.x + item.width, y: item.y };
                               const inserted = [...item.points.slice(0, -1), { x: (anchorA.x + anchorB.x) / 2, y: (anchorA.y + anchorB.y) / 2 - 48 }, anchorB];
-                              return { ...item, points: inserted };
+                              return syncRoadFromPoints({ ...item, points: inserted });
                             }),
                           )
                         }
@@ -783,7 +1117,7 @@ export default function LotBuilderPage() {
                                           return item;
                                         }
 
-                                        return { ...item, points: removeRoadPoint(item.points, pointIndex) };
+                                        return syncRoadFromPoints({ ...item, points: removeRoadPoint(item.points, pointIndex) });
                                       }),
                                     )
                                   }
@@ -806,6 +1140,32 @@ export default function LotBuilderPage() {
                               <input type="number" value={Math.round(point.x)} onChange={(event) => updateRoadPoint(selectedItem.id, pointIndex, { x: Number(event.target.value) })} style={inputStyle} />
                               <input type="number" value={Math.round(point.y)} onChange={(event) => updateRoadPoint(selectedItem.id, pointIndex, { y: Number(event.target.value) })} style={inputStyle} />
                             </div>
+                            {(pointIndex === 0 || pointIndex === selectedItem.points.length - 1) ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setItems((current) =>
+                                    current.map((item) => {
+                                      if (item.id !== selectedItem.id || item.type !== 'road') {
+                                        return item;
+                                      }
+
+                                      return connectRoadEndpointToNearest(
+                                        item,
+                                        selectedItem.id,
+                                        pointIndex,
+                                        current
+                                          .filter((entry): entry is Extract<DraftItem, { type: 'road' }> => entry.type === 'road')
+                                          .map((road) => ({ id: road.id, points: road.points })),
+                                      );
+                                    }),
+                                  )
+                                }
+                                style={{ ...paletteButtonStyle, width: '100%', padding: '8px 10px', fontSize: 12 }}
+                              >
+                                Snap {pointIndex === 0 ? 'start' : 'end'} to nearest road
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -830,32 +1190,42 @@ export default function LotBuilderPage() {
               ) : null}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                 <div>
-                  <label style={labelStyle}>X</label>
-                  <input type="number" value={Math.round(selectedItem.x)} onChange={(event) => updateItem(selectedItem.id, { x: Number(event.target.value) } as Partial<DraftItem>)} style={inputStyle} />
+                  <label style={labelStyle}>{selectedItem.type === 'road' ? 'Bounds X' : 'X'}</label>
+                  <input
+                    type="number"
+                    value={Math.round(selectedItem.type === 'road' ? getRoadBounds(selectedItem.points).minX : selectedItem.x)}
+                    onChange={(event) => updateItem(selectedItem.id, { x: Number(event.target.value) } as Partial<DraftItem>)}
+                    style={inputStyle}
+                  />
                 </div>
                 <div>
-                  <label style={labelStyle}>Y</label>
-                  <input type="number" value={Math.round(selectedItem.y)} onChange={(event) => updateItem(selectedItem.id, { y: Number(event.target.value) } as Partial<DraftItem>)} style={inputStyle} />
+                  <label style={labelStyle}>{selectedItem.type === 'road' ? 'Bounds Y' : 'Y'}</label>
+                  <input
+                    type="number"
+                    value={Math.round(selectedItem.type === 'road' ? getRoadBounds(selectedItem.points).minY : selectedItem.y)}
+                    onChange={(event) => updateItem(selectedItem.id, { y: Number(event.target.value) } as Partial<DraftItem>)}
+                    style={inputStyle}
+                  />
                 </div>
               </div>
               {selectedItem.type === 'road' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                   <div>
-                    <label style={labelStyle}>Width</label>
+                    <label style={labelStyle}>{selectedItem.roadKind === 'straight' ? 'Length' : 'Span X'}</label>
                     <input
                       type="number"
                       min={80}
-                      value={selectedItem.width}
+                      value={Math.round(selectedItem.width)}
                       onChange={(event) => updateItem(selectedItem.id, { width: Number(event.target.value) } as Partial<DraftItem>)}
                       style={inputStyle}
                     />
                   </div>
                   <div>
-                    <label style={labelStyle}>Height</label>
+                    <label style={labelStyle}>Thickness</label>
                     <input
                       type="number"
                       min={48}
-                      value={selectedItem.height}
+                      value={Math.round(selectedItem.height)}
                       onChange={(event) => updateItem(selectedItem.id, { height: Number(event.target.value) } as Partial<DraftItem>)}
                       style={inputStyle}
                     />

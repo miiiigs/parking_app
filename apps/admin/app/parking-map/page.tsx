@@ -1,12 +1,25 @@
 import Link from 'next/link';
 
 import { ParkingMapCanvas } from '../../components/parking-map/ParkingMapCanvas';
-import { buildParkingLotDefinitionFromSlots } from '../../lib/parkingMap';
+import { applyLiveSlotStatuses, buildParkingLotDefinitionFromSlots } from '../../lib/parkingMap';
 import { getFallbackAdminDashboardData, loadAdminDashboardData } from '../../lib/dashboard';
+import { fetchLotBuilderPersistedState } from '../../lib/parkingLotLayout';
 
 export default async function ParkingMapPage() {
   const dashboardData = (await loadAdminDashboardData()) ?? getFallbackAdminDashboardData();
-  const lot = buildParkingLotDefinitionFromSlots(dashboardData.slots, dashboardData.location?.name ?? 'BGC Pilot Site');
+  const persisted = await fetchLotBuilderPersistedState();
+  const baseLot =
+    persisted?.layout ??
+    buildParkingLotDefinitionFromSlots(dashboardData.slots, dashboardData.location?.name ?? 'BGC Pilot Site');
+  const lot = applyLiveSlotStatuses(
+    baseLot,
+    dashboardData.slots.map((slot) => ({
+      id: slot.id,
+      label: slot.slotLabel,
+      status: slot.status,
+      displayOrder: slot.displayOrder,
+    })),
+  );
 
   return (
     <main style={{ display: 'grid', gap: 20 }}>

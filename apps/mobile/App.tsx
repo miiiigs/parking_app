@@ -913,6 +913,7 @@ export default function App() {
       return (
         <ReservationScreen
           slots={parkingData.slots}
+          lotLayout={parkingData.lotLayout}
           selectedSlotId={workflow.selectedSlotId}
           selectedArrivalWindowMinutes={workflow.selectedArrivalWindowMinutes}
           plateNumber={workflow.plateNumber}

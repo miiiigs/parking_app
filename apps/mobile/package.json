@@ -3,6 +3,7 @@
   "private": true,
   "main": "index.js",
   "dependencies": {
+    "@parking/shared": "1.0.0",
     "@supabase/supabase-js": "^2.49.0",
     "axios": "^1.15.0",
     "expo": "~52.0.49",

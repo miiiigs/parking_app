@@ -1,3 +1,5 @@
+import type { ParkingLotDefinition } from '@parking/shared/parkingMap';
+
 import { getSupabaseClient } from './supabaseClient';
 
 export type ParkingLocation = {
@@ -18,6 +20,7 @@ export type ParkingSlot = {
 export type ParkingDashboardData = {
   location: ParkingLocation | null;
   slots: ParkingSlot[];
+  lotLayout: ParkingLotDefinition | null;
   isLiveData: boolean;
 };
 
@@ -44,8 +47,36 @@ export function getFallbackParkingData(): ParkingDashboardData {
   return {
     location: fallbackLocation,
     slots: fallbackSlots,
+    lotLayout: null,
     isLiveData: false,
   };
+}
+
+function parseLotLayout(value: unknown): ParkingLotDefinition | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const layout = value as ParkingLotDefinition;
+  if (!Array.isArray(layout.slots) || !Array.isArray(layout.roads)) {
+    return null;
+  }
+
+  return layout;
+}
+
+async function loadLotLayoutForLocation(supabase: NonNullable<ReturnType<typeof getSupabaseClient>>, locationId: string) {
+  const { data, error } = await supabase
+    .from('parking_lot_layouts')
+    .select('layout')
+    .eq('location_id', locationId)
+    .maybeSingle();
+
+  if (error || !data?.layout) {
+    return null;
+  }
+
+  return parseLotLayout(data.layout);
 }
 
 export async function loadParkingDashboardData(): Promise<ParkingDashboardData> {
@@ -71,6 +102,7 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
         return {
           location: loc ? { id: loc.id, name: loc.name, address: loc.address, city: loc.city } : null,
           slots: (slots || []).map((s: any) => ({ id: s.id, label: s.label, status: s.status, displayOrder: s.displayOrder, qrToken: s.qrToken })),
+          lotLayout: parseLotLayout(snapshot.lotLayout),
           isLiveData: true,
         };
       }
@@ -98,10 +130,13 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
     .eq('location_id', activeLocation.id)
     .order('display_order', { ascending: true });
 
+  const lotLayout = await loadLotLayoutForLocation(supabase, activeLocation.id);
+
   if (slotError || !slots || slots.length === 0) {
     return {
       location: activeLocation,
       slots: fallbackSlots,
+      lotLayout,
       isLiveData: false,
     };
   }
@@ -115,6 +150,7 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
       displayOrder: slot.display_order,
       qrToken: slot.qr_token,
     })),
+    lotLayout,
     isLiveData: true,
   };
 }

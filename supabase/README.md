@@ -24,6 +24,12 @@ Auth and RLS setup:
 - Mobile users sign in anonymously and can only read their own reservations and sessions.
 - Admin server actions still use the service role key, so keep that key server-side only.
 
+Parking lot layouts (admin builder → mobile map):
+
+- Run `parking_lot_layouts.sql` to create the layout storage table.
+- Re-run `mobile_dashboard_snapshot.sql` so the mobile RPC returns `lotLayout`.
+- Save from the admin **Lot Builder** (`Save to Supabase`); mobile loads the layout on the next dashboard refresh.
+
 Backup and restore testing:
 
 - Use the backup restore smoke test SQL after restoring a database snapshot.

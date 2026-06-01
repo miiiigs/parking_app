@@ -10,12 +10,20 @@ declare
   v_slots jsonb := '[]'::jsonb;
   v_reservation record;
   v_session record;
+  v_lot_layout jsonb := null;
 begin
   select id, name, address, city into v_location
   from locations
   where is_active = true
   order by created_at asc
   limit 1;
+
+  if v_location.id is not null then
+    select layout into v_lot_layout
+    from parking_lot_layouts
+    where location_id = v_location.id
+    limit 1;
+  end if;
 
   for v_slot in
     select id, slot_label, status, display_order, qr_token from parking_slots where location_id = v_location.id order by display_order asc
@@ -46,6 +54,7 @@ begin
 
   return jsonb_build_object(
     'location', case when v_location is not null then jsonb_build_object('id', v_location.id, 'name', v_location.name, 'address', v_location.address, 'city', v_location.city) else null end,
+    'lotLayout', v_lot_layout,
     'slots', v_slots,
     'reservation', case when v_reservation is not null then jsonb_build_object('id', v_reservation.id, 'slot_id', v_reservation.slot_id, 'slot_label', (select slot_label from parking_slots where id = v_reservation.slot_id), 'status', v_reservation.status, 'reserved_at', v_reservation.reserved_at, 'expires_at', v_reservation.expires_at) else null end,
     'session', case when v_session is not null then jsonb_build_object('id', v_session.id, 'reservation_id', v_session.reservation_id, 'slot_id', v_session.slot_id, 'started_at', v_session.started_at, 'ended_at', v_session.ended_at, 'status', v_session.status, 'billed_minutes', v_session.billed_minutes, 'billed_amount', v_session.billed_amount) else null end

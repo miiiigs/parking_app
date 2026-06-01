@@ -2,6 +2,7 @@
   "name": "@parking/admin",
   "private": true,
   "dependencies": {
+    "@parking/shared": "1.0.0",
     "@supabase/supabase-js": "^2.49.0",
     "@supabase/ssr": "^0.5.2",
     "next": "^15.0.0",

@@ -3,10 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 import { getAdminServiceConfig } from '../lib/adminService';
 import { ADMIN_ROLES } from '../lib/adminAuth';
+import { fetchLotBuilderPersistedState, persistParkingLotLayout } from '../lib/parkingLotLayout';
+import type { ParkingLotDefinition } from '../lib/parkingMap';
 import { getAdminSupabaseConfig } from '../lib/supabase';
 
 async function createAdminAuthClient() {
@@ -23,7 +25,7 @@ async function createAdminAuthClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
         });
@@ -180,12 +182,14 @@ export async function resetParkingSlots(formData: FormData) {
     throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE URL in admin environment variables.');
   }
 
+  const serviceRoleKey = config.serviceRoleKey;
+
   const slotListResponse = await fetch(
     `${config.url}/rest/v1/parking_slots?select=id`,
     {
       headers: {
-        apikey: config.serviceRoleKey,
-        Authorization: `Bearer ${config.serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
@@ -205,8 +209,8 @@ export async function resetParkingSlots(formData: FormData) {
         {
           method: 'PATCH',
           headers: {
-            apikey: config.serviceRoleKey,
-            Authorization: `Bearer ${config.serviceRoleKey}`,
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
             'Content-Type': 'application/json',
             Prefer: 'return=representation',
           },
@@ -223,8 +227,8 @@ export async function resetParkingSlots(formData: FormData) {
   await fetch(`${config.url}/rest/v1/operator_events`, {
     method: 'POST',
     headers: {
-      apikey: config.serviceRoleKey,
-      Authorization: `Bearer ${config.serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
@@ -300,4 +304,24 @@ export async function resetDemoData(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/qr');
   redirect(redirectTo);
+}
+
+export async function loadLotBuilderState() {
+  return fetchLotBuilderPersistedState();
+}
+
+export async function saveLotBuilderLayout(layoutJson: string) {
+  const lot = JSON.parse(layoutJson) as ParkingLotDefinition;
+  const state = await fetchLotBuilderPersistedState();
+
+  if (!state?.locationId) {
+    throw new Error('No active parking location found. Seed Supabase locations first.');
+  }
+
+  await persistParkingLotLayout(lot, state.locationId, state.liveSlots);
+
+  revalidatePath('/lot-builder');
+  revalidatePath('/parking-map');
+
+  return { ok: true as const, savedAt: new Date().toISOString() };
 }

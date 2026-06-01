@@ -1,0 +1,11 @@
+{
+  "name": "@parking/shared",
+  "private": true,
+  "version": "1.0.0",
+  "main": "./src/parkingMap.ts",
+  "types": "./src/parkingMap.ts",
+  "exports": {
+    ".": "./src/parkingMap.ts",
+    "./parkingMap": "./src/parkingMap.ts"
+  }
+}

@@ -11,6 +11,9 @@ import {
   ARRIVAL_WINDOW_OPTIONS,
   type ArrivalWindowOption,
 } from '../lib/reservationOptions';
+import type { ParkingLotDefinition } from '@parking/shared/parkingMap';
+
+import { ParkingLotLayoutMap } from '../components/parking-map/ParkingLotLayoutMap';
 import { ParkingLotMap } from '../components/parking-map/ParkingLotMap';
 
 type SlotItem = {
@@ -22,6 +25,7 @@ type SlotItem = {
 
 type Props = {
   slots: SlotItem[];
+  lotLayout?: ParkingLotDefinition | null;
   selectedSlotId: string | null;
   selectedArrivalWindowMinutes: number;
   plateNumber: string;
@@ -247,6 +251,7 @@ function ReservationBottomSheet({
 
 export function ReservationScreen({
   slots,
+  lotLayout = null,
   selectedSlotId,
   selectedArrivalWindowMinutes,
   plateNumber,
@@ -280,7 +285,11 @@ export function ReservationScreen({
       </View>
 
       <View style={styles.mapShell}>
-        <ParkingLotMap slots={slots} selectedSlotId={displayedSelectedSlotId} onSelectSlot={handleMapSelectSlot} />
+        {lotLayout ? (
+          <ParkingLotLayoutMap lot={lotLayout} slots={slots} selectedSlotId={displayedSelectedSlotId} onSelectSlot={handleMapSelectSlot} />
+        ) : (
+          <ParkingLotMap slots={slots} selectedSlotId={displayedSelectedSlotId} onSelectSlot={handleMapSelectSlot} />
+        )}
       </View>
 
       <ReservationBottomSheet
