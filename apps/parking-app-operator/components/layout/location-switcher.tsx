@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { Loader2, MapPin } from 'lucide-react';
 
-import { refreshOperatorData } from '@/lib/operatorDataStore';
+import { recordOperatorActionFailure, recordOperatorActionSuccess, refreshOperatorData } from '@/lib/operatorDataStore';
 import { useAuth } from '@/lib/auth-context';
 
 export function LocationSwitcher() {
@@ -39,21 +39,26 @@ export function LocationSwitcher() {
               }
 
               startTransition(async () => {
-                const response = await fetch('/api/operator/location', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ locationId: nextLocation.id }),
-                });
+                try {
+                  const response = await fetch('/api/operator/location', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ locationId: nextLocation.id }),
+                  });
 
-                if (!response.ok) {
-                  return;
+                  if (!response.ok) {
+                    throw new Error('Failed to switch operator location.');
+                  }
+
+                  setActiveLocationState(nextLocation);
+                  recordOperatorActionSuccess();
+                  await refreshOperatorData({ silent: true });
+                  router.refresh();
+                } catch {
+                  recordOperatorActionFailure();
                 }
-
-                setActiveLocationState(nextLocation);
-                await refreshOperatorData({ silent: true });
-                router.refresh();
               });
             }}
             className="max-w-[220px] truncate border-0 bg-transparent p-0 text-sm font-medium text-foreground outline-none"

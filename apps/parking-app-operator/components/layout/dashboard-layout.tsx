@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { signOutOperator } from '@/app/actions';
 import { useAuth } from '@/lib/auth-context';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { LocationSwitcher } from './location-switcher';
 import {
   BarChart3,
@@ -20,12 +21,12 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock },
-  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye },
-  { name: 'Parking Map', href: '/dashboard/map', icon: Map },
-  { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap },
-  { name: 'Admin Tools', href: '/dashboard/admin-tools', icon: ShieldCheck },
+  { name: 'Dashboard', href: '/dashboard', icon: BarChart3, capability: 'view-dashboard' as const },
+  { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock, capability: 'view-reservations' as const },
+  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
+  { name: 'Parking Map', href: '/dashboard/map', icon: Map, capability: 'view-parking-map' as const },
+  { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap, capability: 'edit-map-layout' as const },
+  { name: 'Admin Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
 ];
 
 interface DashboardLayoutProps {
@@ -84,7 +85,7 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {navigation.map((item) => {
+          {navigation.filter((item) => hasOperatorCapability(user?.role, item.capability)).map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (

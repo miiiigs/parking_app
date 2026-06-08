@@ -37,6 +37,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --test --experimental-strip-types tests/adminPermissions.test.mjs tests/adminLocation.test.mjs tests/routeContractCoverage.test.js"
   }
 }

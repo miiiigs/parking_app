@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
 
 export async function PATCH(request: Request) {
@@ -8,6 +9,10 @@ export async function PATCH(request: Request) {
 
   if (!operatorUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!hasOperatorCapability(operatorUser.role, 'edit-slot-status')) {
+    return NextResponse.json({ error: 'Insufficient permissions for slot updates.' }, { status: 403 });
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;

@@ -2,7 +2,13 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { getOperatorRealtimeClient } from './realtimeClient';
 import type { ParkingSlotStatus } from './parkingMap';
-import type { AuditLog, OperatorDashboardData, ParkingSlot, Reservation } from './types';
+import type {
+  AuditLog,
+  OperatorDashboardData,
+  OperatorSystemHealth,
+  ParkingSlot,
+  Reservation,
+} from './types';
 
 type RealtimeRecord = Record<string, unknown>;
 
@@ -31,6 +37,58 @@ let channel: RealtimeChannel | null = null;
 let initialized = false;
 let lastRefreshAt = 0;
 let fallbackIntervalId: number | null = null;
+let lastRealtimeEventAt = 0;
+let failedActionCount = 0;
+let realtimeStatus: OperatorSystemHealth['realtime'] = 'unknown';
+let syncMode: OperatorSystemHealth['syncMode'] = 'realtime';
+
+function toIsoTimestamp(value: number) {
+  return value > 0 ? new Date(value).toISOString() : null;
+}
+
+function computeOverallHealth(health: OperatorSystemHealth): OperatorSystemHealth['overall'] {
+  if (health.database === 'offline') {
+    return 'offline';
+  }
+
+  if (health.database === 'degraded' || health.realtime === 'degraded' || health.realtime === 'offline' || health.failedActionCount > 0) {
+    return 'degraded';
+  }
+
+  if (health.database === 'healthy' && (health.realtime === 'healthy' || health.realtime === 'unknown')) {
+    return 'healthy';
+  }
+
+  return 'unknown';
+}
+
+function mergeSystemHealth(base?: OperatorSystemHealth | null): OperatorSystemHealth {
+  const database = base?.backendReachable === false ? 'offline' : base?.database ?? 'unknown';
+  const health: OperatorSystemHealth = {
+    overall: 'unknown',
+    database,
+    realtime: syncMode === 'polling' ? 'degraded' : realtimeStatus,
+    syncMode,
+    backendReachable: base?.backendReachable ?? database !== 'offline',
+    lastSuccessfulSyncAt: toIsoTimestamp(lastRefreshAt) ?? base?.lastSuccessfulSyncAt ?? null,
+    lastDashboardRefreshAt: base?.lastDashboardRefreshAt ?? toIsoTimestamp(lastRefreshAt),
+    lastRealtimeEventAt: toIsoTimestamp(lastRealtimeEventAt) ?? base?.lastRealtimeEventAt ?? null,
+    failedActionCount,
+  };
+  health.overall = computeOverallHealth(health);
+  return health;
+}
+
+function applyHealthToCachedData() {
+  if (!cachedData) {
+    return;
+  }
+
+  cachedData = {
+    ...cachedData,
+    systemHealth: mergeSystemHealth(cachedData.systemHealth),
+  };
+}
 
 function notifyAll() {
   for (const cb of subscribers) cb({ data: cachedData, loading });
@@ -82,17 +140,42 @@ async function doRefresh(options?: { silent?: boolean }) {
   try {
     const res = await fetch(url);
     if (!res.ok) {
+      if (cachedData) {
+        cachedData = {
+          ...cachedData,
+          systemHealth: {
+            ...mergeSystemHealth(cachedData.systemHealth),
+            database: 'offline',
+            backendReachable: false,
+            overall: 'offline',
+          },
+        };
+      }
       return cachedData;
     }
 
     const payload = (await res.json().catch(() => null)) as OperatorDashboardData | null;
     if (payload) {
-      cachedData = payload;
       lastRefreshAt = Date.now();
+      cachedData = {
+        ...payload,
+        systemHealth: mergeSystemHealth(payload.systemHealth),
+      };
     }
 
     return cachedData;
   } catch {
+    if (cachedData) {
+      cachedData = {
+        ...cachedData,
+        systemHealth: {
+          ...mergeSystemHealth(cachedData.systemHealth),
+          database: 'offline',
+          backendReachable: false,
+          overall: 'offline',
+        },
+      };
+    }
     return cachedData;
   } finally {
     loading = false;
@@ -123,6 +206,22 @@ export async function refreshOperatorData(options?: { silent?: boolean }) {
   return inFlightRefresh;
 }
 
+export function recordOperatorActionFailure() {
+  failedActionCount += 1;
+  applyHealthToCachedData();
+  notifyAll();
+}
+
+export function recordOperatorActionSuccess() {
+  if (failedActionCount === 0) {
+    return;
+  }
+
+  failedActionCount = Math.max(0, failedActionCount - 1);
+  applyHealthToCachedData();
+  notifyAll();
+}
+
 export function applyOptimisticSlotStatus(slotId: string, status: string) {
   if (!cachedData?.parkingMap?.slots) {
     return;
@@ -149,7 +248,10 @@ export function applyOptimisticSlotStatus(slotId: string, status: string) {
   };
 
   recomputeMetrics(next);
-  cachedData = next;
+  cachedData = {
+    ...next,
+    systemHealth: mergeSystemHealth(next.systemHealth),
+  };
   notifyAll();
 }
 
@@ -252,6 +354,7 @@ function scheduleApplyEvents() {
           status,
           amount: Number(readRecordNumber(record, 'reservation_fee') ?? 0),
           paymentStatus: 'completed',
+          linkedSessionId: null,
         };
 
         if (eventType === 'INSERT') {
@@ -304,7 +407,11 @@ function scheduleApplyEvents() {
     }
 
     recomputeMetrics(next);
-    cachedData = next;
+    lastRealtimeEventAt = Date.now();
+    cachedData = {
+      ...next,
+      systemHealth: mergeSystemHealth(next.systemHealth),
+    };
     notifyAll();
   }, 200) as unknown as number;
 }
@@ -318,6 +425,8 @@ function ensureRealtimeSubscribed() {
   const realtimeClient = getOperatorRealtimeClient();
 
   if (!realtimeClient) {
+    syncMode = 'polling';
+    realtimeStatus = 'degraded';
     if (!fallbackIntervalId) {
       fallbackIntervalId = window.setInterval(() => {
         if (document.visibilityState === 'visible') {
@@ -333,11 +442,13 @@ function ensureRealtimeSubscribed() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleWindowFocus);
+    applyHealthToCachedData();
     return;
   }
 
   if (channel) return;
 
+  syncMode = 'realtime';
   const topic = 'operator-dashboard-live-sync-store';
   channel = realtimeClient
     .channel(topic)
@@ -348,6 +459,14 @@ function ensureRealtimeSubscribed() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'operator_events' }, (payload) => enqueueOperatorEvent(payload as RealtimePayload))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_lot_layouts' }, (payload) => enqueueOperatorEvent(payload as RealtimePayload))
     .subscribe((status) => {
+      realtimeStatus =
+        status === 'SUBSCRIBED'
+          ? 'healthy'
+          : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'
+            ? 'offline'
+            : 'degraded';
+      applyHealthToCachedData();
+      notifyAll();
       if (status === 'SUBSCRIBED' && !lastRefreshAt) {
         void refreshOperatorData();
       }

@@ -4,6 +4,8 @@ import { ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '../ui/button';
+import { useAdmin } from '../../lib/admin-context';
+import { hasAdminCapability } from '../../lib/adminPermissions';
 import {
   BarChart3,
   Clock,
@@ -17,12 +19,12 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock },
-  { name: 'Slot Board', href: '/dashboard/slots', icon: Grid3x3 },
-  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye },
-  { name: 'Parking Map', href: '/dashboard/map', icon: Map },
-  { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap },
+  { name: 'Dashboard', href: '/dashboard', icon: BarChart3, capability: 'view-dashboard' as const },
+  { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock, capability: 'view-reservations' as const },
+  { name: 'Slot Board', href: '/dashboard/slots', icon: Grid3x3, capability: 'view-parking-map' as const },
+  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
+  { name: 'Parking Map', href: '/dashboard/map', icon: Map, capability: 'view-parking-map' as const },
+  { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap, capability: 'edit-map-layout' as const },
 ];
 
 interface DashboardLayoutProps {
@@ -33,6 +35,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { user, activeLocation } = useAdmin();
 
   const handleLogout = () => {
     // default logout: navigate to login; integrate with admin auth if present
@@ -64,7 +67,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {navigation.map((item) => {
+          {navigation.filter((item) => hasAdminCapability(user?.role, item.capability)).map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
@@ -88,8 +91,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="border-t border-border p-4 space-y-3">
           {sidebarOpen && (
             <div className="px-2 py-2 bg-secondary rounded-lg">
-              <div className="text-xs font-medium text-foreground truncate">Operator</div>
-              <div className="text-xs text-muted-foreground truncate">operator@example.com</div>
+              <div className="text-xs font-medium text-foreground truncate">{user?.name ?? 'Operator'}</div>
+              <div className="text-xs text-muted-foreground truncate">{user?.email || user?.phone || 'operator@example.com'}</div>
+              <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
+                {user?.role ?? 'guest'}{activeLocation?.name ? ` · ${activeLocation.name}` : ''}
+              </div>
             </div>
           )}
           <Button

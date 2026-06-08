@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { resetDemoData, resetParkingSlots, runParkingReconciliation, signOutAdmin, updateSlotStatus } from './actions';
 import { DashboardLiveRefresh } from './DashboardLiveRefresh';
 import { getFallbackAdminDashboardData, loadAdminDashboardData } from '../lib/dashboard';
+import { getCurrentAdminUser } from '../lib/adminAuth';
+import { hasAdminCapability } from '../lib/adminPermissions';
 
 const statusTheme = {
   available: { background: '#0c1a28', border: '#3dd6a5', text: '#3dd6a5' },
@@ -64,6 +66,11 @@ function getStatusButtonStyle(targetStatus: keyof typeof statusTheme, currentSta
 
 export default async function Page() {
   const dashboardData = (await loadAdminDashboardData()) ?? getFallbackAdminDashboardData();
+  const adminUser = await getCurrentAdminUser();
+  const canResetSlots = hasAdminCapability(adminUser?.role, 'reset-slot-statuses');
+  const canResetDemo = hasAdminCapability(adminUser?.role, 'reset-demo-data');
+  const canRunReconciliation = hasAdminCapability(adminUser?.role, 'run-reconciliation');
+  const canEditSlotStatus = hasAdminCapability(adminUser?.role, 'edit-slot-status');
 
   const slots = dashboardData.slots;
 
@@ -151,66 +158,72 @@ export default async function Page() {
               Sign Out
             </button>
           </form>
-          <form action={resetParkingSlots}>
-            <input type="hidden" name="redirectTo" value="/" />
-            <button
-              type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#ff8a80',
-                color: '#1b0c0d',
-                fontWeight: 800,
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Reset Slot Statuses
-            </button>
-          </form>
-          <form action={resetDemoData}>
-            <input type="hidden" name="redirectTo" value="/" />
-            <button
-              type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#ff5d5d',
-                color: '#1b0c0d',
-                fontWeight: 800,
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Full Demo Reset
-            </button>
-          </form>
-          <form action={runParkingReconciliation}>
-            <input type="hidden" name="redirectTo" value="/" />
-            <button
-              type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#7bd3ff',
-                color: '#071018',
-                fontWeight: 800,
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Run Reconciliation
-            </button>
-          </form>
+          {canResetSlots ? (
+            <form action={resetParkingSlots}>
+              <input type="hidden" name="redirectTo" value="/" />
+              <button
+                type="submit"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: '#ff8a80',
+                  color: '#1b0c0d',
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Reset Slot Statuses
+              </button>
+            </form>
+          ) : null}
+          {canResetDemo ? (
+            <form action={resetDemoData}>
+              <input type="hidden" name="redirectTo" value="/" />
+              <button
+                type="submit"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: '#ff5d5d',
+                  color: '#1b0c0d',
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Full Demo Reset
+              </button>
+            </form>
+          ) : null}
+          {canRunReconciliation ? (
+            <form action={runParkingReconciliation}>
+              <input type="hidden" name="redirectTo" value="/" />
+              <button
+                type="submit"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: '#7bd3ff',
+                  color: '#071018',
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Run Reconciliation
+              </button>
+            </form>
+          ) : null}
         </div>
       </section>
 
@@ -310,18 +323,22 @@ export default async function Page() {
               </div>
               <div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}>
                 <div style={getStatusBadgeStyle(slot.status)}>{slot.status}</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  {(['available', 'occupied', 'blocked'] as const).map((status) => (
-                    <form key={status} action={updateSlotStatus}>
-                      <input type="hidden" name="slotId" value={slot.id} />
-                      <input type="hidden" name="status" value={status} />
-                      <input type="hidden" name="redirectTo" value="/" />
-                      <button type="submit" style={getStatusButtonStyle(status, slot.status)}>
-                        {status}
-                      </button>
-                    </form>
-                  ))}
-                </div>
+                {canEditSlotStatus ? (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {(['available', 'occupied', 'blocked'] as const).map((status) => (
+                      <form key={status} action={updateSlotStatus}>
+                        <input type="hidden" name="slotId" value={slot.id} />
+                        <input type="hidden" name="status" value={status} />
+                        <input type="hidden" name="redirectTo" value="/" />
+                        <button type="submit" style={getStatusButtonStyle(status, slot.status)}>
+                          {status}
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: '#7f94ad', fontSize: 12 }}>Read-only role.</div>
+                )}
               </div>
             </div>
           ))}

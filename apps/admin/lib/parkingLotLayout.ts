@@ -143,7 +143,7 @@ async function readJson<T>(response: Response): Promise<T | null> {
   return payload as T;
 }
 
-export async function fetchLotBuilderPersistedState(): Promise<LotBuilderPersistedState | null> {
+export async function fetchLotBuilderPersistedState(locationId?: string | null): Promise<LotBuilderPersistedState | null> {
   const config = getAdminServiceConfig();
   if (!config?.serviceRoleKey) {
     return null;
@@ -156,7 +156,7 @@ export async function fetchLotBuilderPersistedState(): Promise<LotBuilderPersist
   };
 
   const locationResponse = await fetch(
-    `${config.url}/rest/v1/locations?select=id,name&is_active=eq.true&order=created_at.asc&limit=1`,
+    `${config.url}/rest/v1/locations?select=id,name${locationId ? `&id=eq.${locationId}` : '&is_active=eq.true'}&order=created_at.asc&limit=1`,
     { headers, cache: 'no-store' },
   );
   const location = await readJson<{ id: string; name: string }>(locationResponse);

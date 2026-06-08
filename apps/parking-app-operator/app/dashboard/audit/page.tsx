@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import type { AuditLog } from '@/lib/types';
 import { useOperatorData } from '@/lib/useOperatorData';
+import { SystemHealth } from '@/components/dashboard/system-health';
 
 export default function AuditPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +64,8 @@ export default function AuditPage() {
           </p>
         </div>
 
+        <SystemHealth compact />
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Card className="border-border bg-card">
             <CardHeader>
@@ -100,20 +103,8 @@ export default function AuditPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">System Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 animate-pulse rounded-full bg-green-500" />
-                <span className="text-sm text-foreground">System Operational</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-                <span className="text-sm text-foreground">Database Connected</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-                <span className="text-sm text-foreground">Payment Gateway Online</span>
-              </div>
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-green-400">All systems operational</p>
+              <div className="text-sm text-muted-foreground">
+                Health is now sourced from live operator sync state, not hardcoded status text.
               </div>
             </CardContent>
           </Card>

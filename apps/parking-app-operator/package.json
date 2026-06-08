@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test --experimental-strip-types tests/routeLocationEnforcement.test.js tests/routeContractCoverage.test.js tests/locationContext.test.mjs tests/reconciliationPlan.test.mjs tests/slotLabelNormalization.test.mjs tests/slotSyncPlan.test.mjs tests/adminToolScoping.test.mjs tests/dashboardMetricShaping.test.mjs"
+    "test": "node --test --experimental-strip-types tests/routeLocationEnforcement.test.js tests/routeContractCoverage.test.js tests/locationContext.test.mjs tests/reconciliationPlan.test.mjs tests/slotLabelNormalization.test.mjs tests/slotSyncPlan.test.mjs tests/adminToolScoping.test.mjs tests/dashboardMetricShaping.test.mjs tests/operatorPermissions.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

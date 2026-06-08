@@ -9,6 +9,20 @@ export interface OperatorLocation {
 
 export type TimestampValue = string;
 
+export type HealthState = 'healthy' | 'degraded' | 'offline' | 'unknown';
+
+export interface OperatorSystemHealth {
+  overall: HealthState;
+  database: HealthState;
+  realtime: HealthState;
+  syncMode: 'realtime' | 'polling';
+  backendReachable: boolean;
+  lastSuccessfulSyncAt: TimestampValue | null;
+  lastDashboardRefreshAt: TimestampValue | null;
+  lastRealtimeEventAt: TimestampValue | null;
+  failedActionCount: number;
+}
+
 export interface ParkingSlot {
   id: string;
   slotNumber: string;
@@ -34,6 +48,32 @@ export interface Reservation {
   status: 'active' | 'completed' | 'no-show';
   amount: number;
   paymentStatus: 'pending' | 'completed' | 'failed';
+  linkedSessionId: string | null;
+}
+
+export interface ParkingSessionRecord {
+  id: string;
+  sessionId: string;
+  reservationId: string | null;
+  slotId: string;
+  slotNumber: string;
+  startedAt: TimestampValue;
+  endedAt: TimestampValue | null;
+  billedMinutes: number;
+  status: 'active' | 'completed' | 'cancelled' | 'expired' | 'pending';
+  amount: number;
+  paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
+}
+
+export interface PaymentRecord {
+  id: string;
+  paymentId: string;
+  reservationId: string | null;
+  sessionId: string | null;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  amount: number;
+  createdAt: TimestampValue;
+  paidAt: TimestampValue | null;
 }
 
 export interface AuditLog {
@@ -41,8 +81,12 @@ export interface AuditLog {
   timestamp: TimestampValue;
   action: string;
   operator: string;
+  tableName?: string;
   slotId?: string;
   slotNumber?: string;
+  reservationId?: string;
+  sessionId?: string;
+  paymentId?: string;
   details: string;
   status: 'success' | 'failure';
 }
@@ -82,9 +126,12 @@ export interface OperatorDashboardData {
   location: OperatorLocation | null;
   parkingMap: ParkingMap;
   reservations: Reservation[];
+  sessions: ParkingSessionRecord[];
+  payments: PaymentRecord[];
   auditLogs: AuditLog[];
   metrics: DashboardMetrics;
   reconciliationRuns: ReconciliationRun[];
+  systemHealth: OperatorSystemHealth;
 }
 
 export interface User {

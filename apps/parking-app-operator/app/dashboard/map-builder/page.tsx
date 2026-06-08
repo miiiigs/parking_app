@@ -55,9 +55,19 @@ import {
   setRoadPoint,
   syncRoadFromPoints,
 } from '@/lib/lotBuilderRoad';
-import { refreshOperatorData } from '@/lib/operatorDataStore';
+import { recordOperatorActionFailure, recordOperatorActionSuccess, refreshOperatorData } from '@/lib/operatorDataStore';
+import {
+  ensureUniqueSlotLabels,
+  findDuplicateSlotLabels,
+  formatSlotLabel,
+  parseSlotLabel,
+  pickCanonicalSlotPrefix,
+  renumberSlotLabels,
+} from '@/lib/operatorSlotLabeling';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { lotDefinitionToDraftItems } from '@/lib/parkingLotLayout';
 import type { LayoutApplyImpactSummary, LayoutObjectSummary, LayoutRevisionRecord } from '@/lib/operatorLayoutSafety';
+import { useAuth } from '@/lib/auth-context';
 
 type PaletteItemType = 'slot' | 'road-straight' | 'road-curve' | 'entry' | 'exit' | 'junction' | 'arrow';
 
@@ -268,6 +278,39 @@ function getSlotColors(status: ParkingSlotStatus) {
   }
 }
 
+function ensureUniqueDraftItemIds(items: DraftItem[]) {
+  const seen = new Set<string>();
+  let changed = false;
+
+  const nextItems = items.map((item) => {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      return item;
+    }
+
+    changed = true;
+    const prefix =
+      item.type === 'slot'
+        ? 'slot'
+        : item.type === 'road'
+          ? 'road'
+          : item.type === 'arrow'
+            ? 'arrow'
+            : item.type;
+    let nextIdValue = nextId(prefix);
+    while (seen.has(nextIdValue)) {
+      nextIdValue = nextId(prefix);
+    }
+    seen.add(nextIdValue);
+    return {
+      ...item,
+      id: nextIdValue,
+    } as DraftItem;
+  });
+
+  return { items: nextItems, changed };
+}
+
 function getSlotStatusDisplay(status: ParkingSlotStatus) {
   switch (status) {
     case 'blocked':
@@ -459,23 +502,6 @@ function sampleRoadCurvePoints(points: ParkingMapPoint[]) {
   return samples;
 }
 
-function parseSlotLabel(label: string) {
-  const match = label.trim().match(/^(.*?)(\d+)$/);
-  if (!match) {
-    return { prefix: 'S', number: null as number | null, padding: 2 };
-  }
-
-  return {
-    prefix: match[1].trimEnd() || 'S',
-    number: match[2] ? Number(match[2]) : null,
-    padding: match[2]?.length ?? 2,
-  };
-}
-
-function formatSlotLabel(prefix: string, number: number, padding = 2) {
-  return `${prefix}${String(number).padStart(padding, '0')}`;
-}
-
 function normalizeRoadStrokeWidth(width: number) {
   const normalized = Math.max(48, Math.round(width));
   return normalized % 2 === 0 ? normalized : normalized + 1;
@@ -627,6 +653,7 @@ function DeferredNumberInput({
 }
 
 export default function MapBuilderPage() {
+  const { user } = useAuth();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const panRef = useRef({ x: 120, y: 120 });
@@ -657,6 +684,7 @@ export default function MapBuilderPage() {
   const [rowCountDraft, setRowCountDraft] = useState('6');
   const [rowSpacingDraft, setRowSpacingDraft] = useState('24');
   const [autoNumberPrefix, setAutoNumberPrefix] = useState('S');
+  const canEditLayout = hasOperatorCapability(user?.role, 'edit-map-layout');
 
   const panStartRef = useRef({ clientX: 0, clientY: 0, startX: 0, startY: 0 });
 
@@ -997,10 +1025,15 @@ export default function MapBuilderPage() {
     setRecentRevisions(payload.recentRevisions ?? []);
 
     if (payload.layout) {
-      const draftItems = lotDefinitionToDraftItems(payload.layout) as DraftItem[];
+      const hydratedItems = lotDefinitionToDraftItems(payload.layout) as DraftItem[];
+      const { items: draftItems, changed } = ensureUniqueDraftItemIds(hydratedItems);
       setItems(draftItems);
       setSelectedId(draftItems[0]?.id ?? null);
       setSelectedIds(draftItems[0]?.id ? [draftItems[0].id] : []);
+      if (changed) {
+        setSaveState('error');
+        setMessage('Duplicate builder object IDs were repaired while loading this layout. Review the map, then save again.');
+      }
       return;
     }
 
@@ -1021,6 +1054,7 @@ export default function MapBuilderPage() {
         throw new Error(payload?.error || 'Failed to load parking lot layout.');
       }
 
+      recordOperatorActionSuccess();
       hydrateLayoutState(payload as {
         locationId: string;
         locationName?: string | null;
@@ -1030,6 +1064,7 @@ export default function MapBuilderPage() {
         recentRevisions?: LayoutRevisionRecord[];
       });
     } catch (error) {
+      recordOperatorActionFailure();
       setMessage(error instanceof Error ? error.message : 'Failed to load parking lot layout.');
       setSaveState('error');
     } finally {
@@ -1050,13 +1085,12 @@ export default function MapBuilderPage() {
   }, [isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const firstSlot = items.find((item): item is Extract<DraftItem, { type: 'slot' }> => item.type === 'slot');
-    if (!firstSlot) {
+    const slotItems = items.filter((item): item is Extract<DraftItem, { type: 'slot' }> => item.type === 'slot');
+    if (slotItems.length === 0) {
       return;
     }
 
-    const parsed = parseSlotLabel(firstSlot.label);
-    setAutoNumberPrefix(parsed.prefix);
+    setAutoNumberPrefix(pickCanonicalSlotPrefix(slotItems));
   }, [items]);
 
   useEffect(() => {
@@ -1186,6 +1220,12 @@ export default function MapBuilderPage() {
   }
 
   function addItem(type: PaletteItemType, position?: ParkingMapPoint) {
+    if (!canEditLayout) {
+      setSaveState('error');
+      setMessage('Your role is read-only for map layout editing.');
+      return;
+    }
+
     const point = position ?? {
       x: Math.round(lotBounds.width / 2 - 120),
       y: Math.round(lotBounds.height / 2 - 80),
@@ -1204,6 +1244,12 @@ export default function MapBuilderPage() {
   }
 
   function duplicateSlotRowFromSelected() {
+    if (!canEditLayout) {
+      setSaveState('error');
+      setMessage('Your role is read-only for map layout editing.');
+      return;
+    }
+
     if (!selectedItem || selectedItem.type !== 'slot') {
       setSaveState('error');
       setMessage('Select a slot first before duplicating a row.');
@@ -1219,14 +1265,15 @@ export default function MapBuilderPage() {
     const stepX = Math.cos(angle) * step;
     const stepY = Math.sin(angle) * step;
     const parsedLabel = parseSlotLabel(selectedItem.label);
-    const startNumber = parsedLabel.number ?? items.filter((item) => item.type === 'slot').length + 1;
+    const startNumber = parsedLabel.digits ? Number(parsedLabel.digits) : items.filter((item) => item.type === 'slot').length + 1;
+    const parsedPadding = parsedLabel.digits?.length ?? 2;
 
     const newSlots = Array.from({ length: rowCount - 1 }, (_, index) => {
       const slotNumber = startNumber + index + 1;
       return {
         id: nextId('slot'),
         type: 'slot' as const,
-        label: formatSlotLabel(parsedLabel.prefix, slotNumber, parsedLabel.padding),
+        label: formatSlotLabel(parsedLabel.prefix, slotNumber, parsedPadding),
         status: selectedItem.status,
         x: snapValue(selectedItem.x + stepX * (index + 1)),
         y: snapValue(selectedItem.y + stepY * (index + 1)),
@@ -1243,7 +1290,18 @@ export default function MapBuilderPage() {
   }
 
   function autoNumberSlots() {
-    const sortedSlots = items
+    if (!canEditLayout) {
+      setSaveState('error');
+      setMessage('Your role is read-only for map layout editing.');
+      return;
+    }
+
+    const { items: sanitizedItems, changed: changedIds } = ensureUniqueDraftItemIds(items);
+    if (changedIds) {
+      setItems(sanitizedItems);
+    }
+
+    const sortedSlots = sanitizedItems
       .filter((item): item is Extract<DraftItem, { type: 'slot' }> => item.type === 'slot')
       .sort((left, right) => {
         if (Math.abs(left.y - right.y) > 24) {
@@ -1261,17 +1319,63 @@ export default function MapBuilderPage() {
 
     const prefix = autoNumberPrefix.trim() || 'S';
     const padding = Math.max(2, String(sortedSlots.length).length);
-    const labelById = new Map(
-      sortedSlots.map((slot, index) => [slot.id, formatSlotLabel(prefix, index + 1, padding)]),
-    );
+    const renumberedSlots = renumberSlotLabels(sortedSlots, prefix, padding);
+    const labelById = new Map(renumberedSlots.map((slot) => [slot.id, slot.label]));
+    const duplicates = findDuplicateSlotLabels(renumberedSlots);
+
+    if (duplicates.length > 0) {
+      setSaveState('error');
+      setMessage(`Auto-numbering still produced duplicate labels: ${duplicates.join(', ')}.`);
+      return;
+    }
 
     setItems((current) =>
-      current.map((item) =>
+      (changedIds ? sanitizedItems : current).map((item) =>
         item.type === 'slot' ? { ...item, label: labelById.get(item.id) ?? item.label } : item,
       ),
     );
     setSaveState('saved');
-    setMessage(`Auto-numbered ${sortedSlots.length} slots with prefix ${prefix}.`);
+    setMessage(
+      changedIds
+        ? `Duplicate object IDs were repaired, then auto-numbered ${sortedSlots.length} slots with prefix ${prefix}.`
+        : `Auto-numbered ${sortedSlots.length} slots with prefix ${prefix}.`,
+    );
+  }
+
+  function normalizeDraftSlotLabelsBeforePersist() {
+    const { items: sanitizedItems, changed: changedIds } = ensureUniqueDraftItemIds(items);
+    const slotItems = sanitizedItems.filter((item): item is Extract<DraftItem, { type: 'slot' }> => item.type === 'slot');
+    if (slotItems.length === 0) {
+      return true;
+    }
+
+    const normalizedSlots = ensureUniqueSlotLabels(slotItems);
+    const duplicates = findDuplicateSlotLabels(normalizedSlots);
+    const hasBlankLabels = normalizedSlots.some((slot) => slot.label.trim().length === 0);
+    const changed = changedIds || normalizedSlots.some((slot, index) => slot.label !== slotItems[index]?.label);
+
+    if (!changed && duplicates.length === 0 && !hasBlankLabels) {
+      return true;
+    }
+
+    const normalizedById = new Map(normalizedSlots.map((slot) => [slot.id, slot.label]));
+    setItems(
+      sanitizedItems.map((item) =>
+        item.type === 'slot'
+          ? {
+              ...item,
+              label: normalizedById.get(item.id) ?? item.label,
+            }
+          : item,
+      ),
+    );
+    setSaveState('error');
+    setMessage(
+      changedIds
+        ? 'Duplicate object IDs and duplicate or blank slot labels were normalized in the draft. Review the updated numbering, then save or apply again.'
+        : 'Duplicate or blank slot labels were normalized in the draft. Review the updated numbering, then save or apply again.',
+    );
+    return false;
   }
 
   function handlePaletteDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -1397,6 +1501,12 @@ export default function MapBuilderPage() {
   }
 
   function alignSelected(mode: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') {
+    if (!canEditLayout) {
+      setSaveState('error');
+      setMessage('Your role is read-only for map layout editing.');
+      return;
+    }
+
     const selectedSet = new Set(selectedIds);
     const movable = items.filter(
       (item) => selectedSet.has(item.id) && item.type !== 'road',
@@ -1447,6 +1557,12 @@ export default function MapBuilderPage() {
   }
 
   function distributeSelected(axis: 'horizontal' | 'vertical') {
+    if (!canEditLayout) {
+      setSaveState('error');
+      setMessage('Your role is read-only for map layout editing.');
+      return;
+    }
+
     const selectedSet = new Set(selectedIds);
     const movable = items.filter(
       (item) => selectedSet.has(item.id) && item.type !== 'road',
@@ -1775,6 +1891,7 @@ export default function MapBuilderPage() {
       throw new Error(payload?.error || 'Failed to load layout preview.');
     }
 
+    recordOperatorActionSuccess();
     return payload.preview as LayoutPreview;
   }
 
@@ -1827,6 +1944,16 @@ export default function MapBuilderPage() {
       return;
     }
 
+    if (!canEditLayout) {
+      setSaveState('error');
+      setMessage('Your role is read-only for map layout editing.');
+      return;
+    }
+
+    if (!options?.sourceLayout && !normalizeDraftSlotLabelsBeforePersist()) {
+      return;
+    }
+
     setSaveState('saving');
     setMessage(null);
 
@@ -1856,6 +1983,7 @@ export default function MapBuilderPage() {
 
       setSaveState('saved');
       setPendingLayoutAction(null);
+      recordOperatorActionSuccess();
       setMessage(
         options?.rollbackToRevisionId
           ? 'Parking map rolled back to the last applied revision.'
@@ -1864,6 +1992,7 @@ export default function MapBuilderPage() {
             : 'Parking lot layout saved as draft.',
       );
     } catch (error) {
+      recordOperatorActionFailure();
       setSaveState('error');
       setMessage(
         error instanceof Error
@@ -1917,7 +2046,7 @@ export default function MapBuilderPage() {
               variant="outline"
               className="border-border"
               onClick={() => void openRollbackDialog()}
-              disabled={saveState === 'saving' || !lastAppliedRevision?.layoutSnapshot}
+              disabled={!canEditLayout || saveState === 'saving' || !lastAppliedRevision?.layoutSnapshot}
             >
               {saveState === 'saving' && pendingLayoutAction?.kind === 'rollback' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1930,12 +2059,12 @@ export default function MapBuilderPage() {
               variant="outline"
               className="border-border"
               onClick={() => void openApplyDialog()}
-              disabled={saveState === 'saving'}
+              disabled={!canEditLayout || saveState === 'saving'}
             >
               {saveState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
               Apply Map
             </Button>
-            <Button onClick={() => void persistLayout()} disabled={saveState === 'saving'}>
+            <Button onClick={() => void persistLayout()} disabled={!canEditLayout || saveState === 'saving'}>
               {saveState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save Layout
             </Button>
@@ -2022,6 +2151,12 @@ export default function MapBuilderPage() {
             }`}
           >
             {message}
+          </div>
+        ) : null}
+
+        {!canEditLayout ? (
+          <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
+            Read-only access. Your role can inspect the lot layout but cannot save, apply, or edit map geometry.
           </div>
         ) : null}
 
@@ -2143,6 +2278,7 @@ export default function MapBuilderPage() {
                   <Button
                     variant="outline"
                     className="w-full border-border"
+                    disabled={!canEditLayout}
                     onClick={() =>
                       setItems((current) =>
                         current.map((item) =>
@@ -2175,11 +2311,16 @@ export default function MapBuilderPage() {
                     <button
                       key={item.type}
                       type="button"
-                      draggable
+                      draggable={canEditLayout}
+                      disabled={!canEditLayout}
                       onClick={() => addItem(item.type)}
-                      onDragStart={(event) =>
-                        event.dataTransfer.setData('application/json', JSON.stringify({ type: item.type }))
-                      }
+                      onDragStart={(event) => {
+                        if (!canEditLayout) {
+                          event.preventDefault();
+                          return;
+                        }
+                        event.dataTransfer.setData('application/json', JSON.stringify({ type: item.type }));
+                      }}
                       className="flex w-full items-start gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-3 text-left transition-colors hover:bg-secondary"
                     >
                       <div className="rounded-md bg-background p-2 text-primary">
@@ -2246,6 +2387,7 @@ export default function MapBuilderPage() {
                 <Button
                   variant="outline"
                   className="w-full border-border"
+                  disabled={!canEditLayout}
                   onClick={duplicateSlotRowFromSelected}
                 >
                   <Plus className="h-4 w-4" />
@@ -2259,7 +2401,7 @@ export default function MapBuilderPage() {
                     className="border-border bg-input"
                   />
                 </div>
-                <Button variant="outline" className="w-full border-border" onClick={autoNumberSlots}>
+                <Button variant="outline" className="w-full border-border" disabled={!canEditLayout} onClick={autoNumberSlots}>
                   Auto-Number Slots
                 </Button>
               </CardContent>
@@ -2271,28 +2413,28 @@ export default function MapBuilderPage() {
                 <CardDescription>Use multi-select with Shift-click, then align selected non-road objects.</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="border-border" onClick={() => alignSelected('left')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('left')}>
                   Left
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => alignSelected('center')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('center')}>
                   Center
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => alignSelected('right')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('right')}>
                   Right
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => alignSelected('top')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('top')}>
                   Top
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => alignSelected('middle')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('middle')}>
                   Middle
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => alignSelected('bottom')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('bottom')}>
                   Bottom
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => distributeSelected('horizontal')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => distributeSelected('horizontal')}>
                   Dist X
                 </Button>
-                <Button variant="outline" className="border-border" onClick={() => distributeSelected('vertical')}>
+                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => distributeSelected('vertical')}>
                   Dist Y
                 </Button>
               </CardContent>
