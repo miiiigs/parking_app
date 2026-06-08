@@ -7,8 +7,8 @@
   ],
   "scripts": {
     "dev:mobile": "npm --workspace apps/mobile run start",
-    "dev:admin": "npm --workspace apps/admin run dev",
-    "build:admin": "npm --workspace apps/admin run build",
+    "dev:operator": "npm --workspace apps/parking-app-operator run dev",
+    "build:operator": "npm --workspace apps/parking-app-operator run build",
     "test:mobile": "npm --workspace apps/mobile run test",
     "test:operator": "npm --workspace apps/parking-app-operator run test",
     "test": "npm run test:mobile",
@@ -22,6 +22,13 @@
     "expo": "~52.0.49",
     "react": "18.3.1",
     "react-native": "0.76.9"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.15"
+    },
+    "postcss": "^8.5.15",
+    "ws": "^8.21.0"
   },
   "version": "1.0.0"
 }

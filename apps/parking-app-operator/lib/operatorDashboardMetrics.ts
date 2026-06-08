@@ -1,3 +1,5 @@
+import type { ParkingSlot } from './types';
+
 export type SlotSourceStatus = 'available' | 'reserved' | 'occupied' | 'blocked' | 'disputed';
 
 export type NormalizedSlotStatus = 'available' | 'reserved' | 'occupied' | 'blocked';
@@ -50,11 +52,13 @@ export function normalizeSlotStatus({
   return 'available' as const;
 }
 
-export function mapOperatorSlotStatus(status: NormalizedSlotStatus) {
+export function mapOperatorSlotStatus(status: NormalizedSlotStatus): ParkingSlot['status'] {
   return status === 'blocked' ? 'maintenance' : status;
 }
 
-export function buildGridSlots(slotRows: Array<{ id: string; slot_label: string; status: NormalizedSlotStatus }>) {
+export function buildGridSlots(
+  slotRows: Array<{ id: string; slot_label: string; status: NormalizedSlotStatus }>,
+): ParkingSlot[] {
   const columns = 6;
   const slotWidth = 92;
   const slotHeight = 76;
@@ -73,7 +77,7 @@ export function buildGridSlots(slotRows: Array<{ id: string; slot_label: string;
       width: slotWidth,
       height: slotHeight,
       rotation: 0,
-      vehicleType: 'standard',
+      vehicleType: 'standard' as const,
     };
   });
 }

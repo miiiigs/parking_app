@@ -5,7 +5,7 @@ Monorepo scaffold for the Smart Parking Reservation System startup idea.
 ## Structure
 
 - `apps/mobile` - React Native app for drivers
-- `apps/admin` - Next.js dashboard for operators and guards
+- `apps/parking-app-operator` - Next.js operator and admin dashboard for lot operations
 - `packages/shared` - shared TypeScript types
 - `supabase` - backend planning and schema notes
 

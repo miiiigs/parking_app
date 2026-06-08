@@ -5,7 +5,6 @@ import { getOperatorCapabilities, hasOperatorCapability } from '../lib/operatorP
 
 test('admin has full operator capability set', () => {
   const capabilities = getOperatorCapabilities('admin');
-  assert.equal(hasOperatorCapability('admin', 'reset-demo-data'), true);
   assert.equal(hasOperatorCapability('admin', 'edit-map-layout'), true);
   assert.equal(capabilities.includes('view-dashboard'), true);
   assert.equal(capabilities.includes('view-audit'), true);

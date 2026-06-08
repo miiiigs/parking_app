@@ -12,7 +12,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Parking Operator Dashboard',
   description: 'Professional parking lot operator management system',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
@@ -34,7 +33,6 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#0f0f0f',
-  userScalable: false,
   width: 'device-width',
   initialScale: 1,
 }

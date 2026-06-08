@@ -1,21 +1,28 @@
-import { NextResponse } from 'next/server';
-
 import { fetchOperatorLotBuilderState, persistOperatorLotLayout, syncOperatorSlotInventory } from '@/lib/parkingLotLayout';
 import { buildLayoutApplyImpactSummary, summarizeLayout } from '@/lib/operatorLayoutSafety';
 import { assertOperatorLocationRequest } from '@/lib/operatorLocation';
 import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
+import { findIdempotentOperatorEvent } from '@/lib/operatorIdempotency';
+import {
+  createOperatorRouteContext,
+  jsonWithRequestContext,
+  logOperatorRouteError,
+  logOperatorRouteSuccess,
+} from '@/lib/operatorRequestContext';
+import { formatRouteValidationIssues, operatorLayoutRouteRequestSchema } from '@/lib/operatorRouteSchemas';
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
 import { hasOperatorCapability } from '@/lib/operatorPermissions';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const routeContext = createOperatorRouteContext(request, '/api/operator/layout');
   const operatorUser = await getCurrentOperatorUser();
 
   if (!operatorUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return jsonWithRequestContext(routeContext, { error: 'Unauthorized' }, { status: 401 });
   }
 
   if (!hasOperatorCapability(operatorUser.role, 'edit-map-layout')) {
-    return NextResponse.json({ error: 'Insufficient permissions for map layout changes.' }, { status: 403 });
+    return jsonWithRequestContext(routeContext, { error: 'Insufficient permissions for map layout changes.' }, { status: 403 });
   }
 
   try {
@@ -23,18 +30,25 @@ export async function GET() {
     const activeLocation = locationContext.activeLocation;
 
     if (!activeLocation) {
-      return NextResponse.json({ error: 'No active parking location found.' }, { status: 404 });
+      return jsonWithRequestContext(routeContext, { error: 'No active parking location found.' }, { status: 404 });
     }
 
     const state = await fetchOperatorLotBuilderState(activeLocation.id);
 
     if (!state) {
-      return NextResponse.json({ error: 'No active parking location found.' }, { status: 404 });
+      return jsonWithRequestContext(routeContext, { error: 'No active parking location found.' }, { status: 404 });
     }
 
-    return NextResponse.json(state);
+    logOperatorRouteSuccess(routeContext, 'Loaded operator layout', {
+      locationId: activeLocation.id,
+      slotCount: Array.isArray(state.layout?.slots) ? state.layout.slots.length : 0,
+    });
+
+    return jsonWithRequestContext(routeContext, state);
   } catch (error) {
-    return NextResponse.json(
+    logOperatorRouteError(routeContext, 'Failed to load operator layout', error);
+    return jsonWithRequestContext(
+      routeContext,
       { error: error instanceof Error ? error.message : 'Failed to load parking lot layout.' },
       { status: 500 },
     );
@@ -42,29 +56,39 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const routeContext = createOperatorRouteContext(request, '/api/operator/layout');
   const operatorUser = await getCurrentOperatorUser();
 
   if (!operatorUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return jsonWithRequestContext(routeContext, { error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
-  const { locationId, layout, applyMap, previewOnly, rollbackToRevisionId } = body ?? {};
+  const parsedBody = operatorLayoutRouteRequestSchema.safeParse(await request.json().catch(() => null));
 
-  if (!locationId || !layout) {
-    return NextResponse.json({ error: 'locationId and layout are required' }, { status: 400 });
+  if (!parsedBody.success) {
+    return jsonWithRequestContext(
+      routeContext,
+      {
+        error: 'Invalid map layout request.',
+        details: formatRouteValidationIssues(parsedBody.error.issues),
+      },
+      { status: 400 },
+    );
   }
+
+  const { locationId, layout, applyMap, previewOnly, rollbackToRevisionId } = parsedBody.data;
 
   const locationContext = await resolveOperatorLocationContext();
   const activeLocation = locationContext.activeLocation;
   if (!activeLocation) {
-    return NextResponse.json({ error: 'No active parking location found.' }, { status: 404 });
+    return jsonWithRequestContext(routeContext, { error: 'No active parking location found.' }, { status: 404 });
   }
 
   try {
     assertOperatorLocationRequest(activeLocation.id, locationId);
   } catch (error) {
-    return NextResponse.json(
+    return jsonWithRequestContext(
+      routeContext,
       { error: error instanceof Error ? error.message : 'Location mismatch.' },
       { status: 409 },
     );
@@ -72,7 +96,7 @@ export async function POST(request: Request) {
 
   const state = await fetchOperatorLotBuilderState(activeLocation.id);
   if (!state) {
-    return NextResponse.json({ error: 'No active parking location found.' }, { status: 404 });
+    return jsonWithRequestContext(routeContext, { error: 'No active parking location found.' }, { status: 404 });
   }
 
   const layoutSummary = summarizeLayout(layout);
@@ -81,7 +105,7 @@ export async function POST(request: Request) {
     : null;
 
   if (previewOnly) {
-    return NextResponse.json({
+    return jsonWithRequestContext(routeContext, {
       ok: true,
       preview: {
         locationId: state.locationId,
@@ -96,11 +120,11 @@ export async function POST(request: Request) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url) {
-    return NextResponse.json({ error: 'Missing SUPABASE URL' }, { status: 500 });
+    return jsonWithRequestContext(routeContext, { error: 'Missing SUPABASE URL' }, { status: 500 });
   }
 
   if (!serviceRoleKey) {
-    return NextResponse.json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY' }, { status: 403 });
+    return jsonWithRequestContext(routeContext, { error: 'Missing SUPABASE_SERVICE_ROLE_KEY' }, { status: 403 });
   }
 
   const headers = {
@@ -111,43 +135,37 @@ export async function POST(request: Request) {
   } as Record<string, string>;
 
   try {
+    const eventType = rollbackToRevisionId
+      ? 'layout_rolled_back'
+      : applyMap
+        ? 'map_applied'
+        : 'layout_saved';
+    const replayEvent = await findIdempotentOperatorEvent({
+      url,
+      serviceRoleKey,
+      eventTypes: ['layout_saved', 'map_applied', 'layout_rolled_back'],
+      context: routeContext,
+    });
+
+    if (replayEvent?.payload?.response_payload && typeof replayEvent.payload.response_payload === 'object') {
+      logOperatorRouteSuccess(routeContext, 'Replayed idempotent operator layout write', {
+        locationId: state.locationId,
+        eventType,
+      });
+
+      return jsonWithRequestContext(routeContext, {
+        ...(replayEvent.payload.response_payload as Record<string, unknown>),
+        idempotentReplay: true,
+      });
+    }
+
     const syncedLiveSlots = applyMap
       ? await syncOperatorSlotInventory(layout, state.locationId, state.liveSlots)
       : state.liveSlots;
     const normalized = await persistOperatorLotLayout(layout, state.locationId, syncedLiveSlots);
     const createdAt = new Date().toISOString();
     const revisionId = crypto.randomUUID();
-    const eventType = rollbackToRevisionId
-      ? 'layout_rolled_back'
-      : applyMap
-        ? 'map_applied'
-        : 'layout_saved';
-
-    await fetch(`${url}/rest/v1/operator_events`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        event_type: eventType,
-        payload: {
-          revision_id: revisionId,
-          operator: operatorUser.name,
-          actor_user_id: operatorUser.id,
-          actor_role: operatorUser.role,
-          location_id: state.locationId,
-          location_name: state.locationName,
-          slot_count: Array.isArray(normalized.slots) ? normalized.slots.length : 0,
-          layout_summary: summarizeLayout(normalized),
-          impact_summary: impactSummary,
-          layout_snapshot: normalized,
-          confirmed_at: createdAt,
-          action_scope: 'location',
-          source_action: rollbackToRevisionId ? 'rollback' : applyMap ? 'apply' : 'save',
-          rollback_to_revision_id: rollbackToRevisionId ?? null,
-        },
-      }),
-    });
-
-    return NextResponse.json({
+    const responsePayload = {
       ok: true,
       payload: normalized,
       applied: Boolean(applyMap),
@@ -161,9 +179,49 @@ export async function POST(request: Request) {
         layoutSummary: summarizeLayout(normalized),
         impactSummary,
       },
+    };
+
+    await fetch(`${url}/rest/v1/operator_events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        event_type: eventType,
+        payload: {
+          idempotency_key: routeContext.idempotencyKey,
+          request_id: routeContext.requestId,
+          revision_id: revisionId,
+          operator: operatorUser.name,
+          actor_user_id: operatorUser.id,
+          actor_role: operatorUser.role,
+          location_id: state.locationId,
+          location_name: state.locationName,
+          slot_count: Array.isArray(normalized.slots) ? normalized.slots.length : 0,
+          layout_summary: summarizeLayout(normalized),
+          impact_summary: impactSummary,
+          layout_snapshot: normalized,
+          response_payload: responsePayload,
+          confirmed_at: createdAt,
+          action_scope: 'location',
+          source_action: rollbackToRevisionId ? 'rollback' : applyMap ? 'apply' : 'save',
+          rollback_to_revision_id: rollbackToRevisionId ?? null,
+        },
+      }),
     });
+
+    logOperatorRouteSuccess(routeContext, 'Saved operator layout', {
+      locationId: state.locationId,
+      eventType,
+      slotCount: normalized.slots.length,
+    });
+
+    return jsonWithRequestContext(routeContext, responsePayload);
   } catch (error) {
-    return NextResponse.json(
+    logOperatorRouteError(routeContext, 'Failed to save operator layout', error, {
+      locationId: state.locationId,
+      applyMap: Boolean(applyMap),
+    });
+    return jsonWithRequestContext(
+      routeContext,
       { error: error instanceof Error ? error.message : 'Failed to save parking lot layout.' },
       { status: 500 },
     );

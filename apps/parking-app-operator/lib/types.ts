@@ -112,6 +112,13 @@ export interface DashboardMetrics {
   averageSessionDuration: number;
 }
 
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface ParkingMap {
   id: string;
   name: string;
@@ -132,6 +139,22 @@ export interface OperatorDashboardData {
   metrics: DashboardMetrics;
   reconciliationRuns: ReconciliationRun[];
   systemHealth: OperatorSystemHealth;
+}
+
+export interface ReservationListResponse {
+  items: Reservation[];
+  pagination: PaginationMeta;
+  statusCounts: Record<Reservation['status'], number>;
+}
+
+export interface AuditListResponse {
+  items: AuditLog[];
+  pagination: PaginationMeta;
+  uniqueActions: string[];
+  stats: {
+    success: number;
+    failure: number;
+  };
 }
 
 export interface User {

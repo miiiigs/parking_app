@@ -56,6 +56,14 @@ export function RecentReservations() {
     }
   };
 
+  const formatRelativeTime = (value: string | null) => {
+    if (!value) {
+      return 'Not scheduled';
+    }
+
+    return formatDistanceToNow(new Date(value), { addSuffix: true });
+  };
+
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -89,7 +97,7 @@ export function RecentReservations() {
                   <td className="px-4 py-3 font-mono text-muted-foreground">{reservation.vehicleNumber}</td>
                   <td className="px-4 py-3 font-medium text-foreground">{reservation.slotNumber}</td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {formatDistanceToNow(reservation.checkInTime, { addSuffix: true })}
+                    {formatRelativeTime(reservation.checkInTime)}
                   </td>
                   <td className="px-4 py-3 text-foreground">{reservation.duration} min</td>
                   <td className="px-4 py-3">

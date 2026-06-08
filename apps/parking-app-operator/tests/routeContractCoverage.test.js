@@ -1,7 +1,10 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function readSource(relativePath) {
   return fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8');
@@ -28,19 +31,34 @@ test('layout and slot routes enforce active-location ownership on writes', () =>
   assert.equal(layoutRoute.includes('hasOperatorCapability'), true);
   assert.equal(layoutRoute.includes('previewOnly'), true);
   assert.equal(layoutRoute.includes("eventType = rollbackToRevisionId"), true);
+  assert.equal(layoutRoute.includes('operatorLayoutRouteRequestSchema.safeParse'), true);
   assert.equal(slotsRoute.includes('hasOperatorCapability'), true);
   assert.equal(slotsRoute.includes('location_id'), true);
   assert.equal(slotsRoute.includes('does not belong to the active operator location'), true);
+  assert.equal(slotsRoute.includes('operatorSlotUpdateRouteRequestSchema.safeParse'), true);
 });
 
-test('admin tools route uses scoped reconciliation and scoped destructive resets', () => {
+test('admin tools route keeps only reconciliation and slot reset actions in production', () => {
   const adminToolsRoute = readSource('../app/api/operator/admin-tools/route.ts');
 
   assert.equal(adminToolsRoute.includes('buildScopedReconciliationPlan'), true);
-  assert.equal(adminToolsRoute.includes('buildLocationScopedAdminResetTargets'), true);
   assert.equal(adminToolsRoute.includes('hasOperatorCapability'), true);
   assert.equal(adminToolsRoute.includes('previewPayload'), true);
   assert.equal(adminToolsRoute.includes('impact_summary'), true);
+  assert.equal(adminToolsRoute.includes('operatorAdminToolsRouteRequestSchema.safeParse'), true);
   assert.equal(adminToolsRoute.includes("event_type: 'reconciliation_completed'"), true);
-  assert.equal(adminToolsRoute.includes("deleteRowsByIds(config.url, headers, 'reservations'"), true);
+  assert.equal(adminToolsRoute.includes("'reset-slots'"), true);
+  assert.equal(adminToolsRoute.includes("'reset-demo'"), false);
+});
+
+test('reservations and audit pages use server-backed pagination and export paths', () => {
+  const reservationsPage = readSource('../app/dashboard/reservations/page.tsx');
+  const auditPage = readSource('../app/dashboard/audit/page.tsx');
+
+  assert.equal(reservationsPage.includes('/api/operator/reservations'), true);
+  assert.equal(reservationsPage.includes("'no-show'"), true);
+  assert.equal(reservationsPage.includes('Page size'), true);
+  assert.equal(auditPage.includes('/api/operator/audit'), true);
+  assert.equal(auditPage.includes('Export'), true);
+  assert.equal(auditPage.includes('Page Size'), true);
 });

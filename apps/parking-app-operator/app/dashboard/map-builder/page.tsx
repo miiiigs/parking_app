@@ -89,6 +89,8 @@ type DraftItem =
   | { id: string; type: Extract<ParkingMapNodeKind, 'entry' | 'exit' | 'junction'>; label: string; x: number; y: number; rotation: number; direction: ParkingMapArrowDirection }
   | { id: string; type: 'arrow'; label: string; x: number; y: number; rotation: number };
 
+type RoadDraftItem = Extract<DraftItem, { type: 'road' }>;
+
 type CanvasDrag =
   | { mode: 'move-item'; itemId: string; pointerStart: ParkingMapPoint; originX: number; originY: number }
   | { mode: 'road-move'; roadId: string; pointerStart: ParkingMapPoint; originPoints: ParkingMapPoint[] }
@@ -162,6 +164,10 @@ function removeRoadPoint(points: ParkingMapPoint[], pointIndex: number) {
   return points.filter((_, index) => index !== pointIndex);
 }
 
+function isRoadDraftItem(item: DraftItem): item is RoadDraftItem {
+  return item.type === 'road';
+}
+
 function createDraftItem(type: PaletteItemType, x: number, y: number): DraftItem {
   if (type === 'slot') {
     return {
@@ -178,7 +184,7 @@ function createDraftItem(type: PaletteItemType, x: number, y: number): DraftItem
   }
 
   if (type === 'road-straight') {
-    return syncRoadFromPoints({
+    const road: RoadDraftItem = {
       id: nextId('road'),
       type: 'road',
       roadKind: 'straight',
@@ -192,11 +198,13 @@ function createDraftItem(type: PaletteItemType, x: number, y: number): DraftItem
         { x, y },
         { x: x + 320, y },
       ],
-    });
+    };
+
+    return syncRoadFromPoints(road);
   }
 
   if (type === 'road-curve') {
-    return syncRoadFromPoints({
+    const road: RoadDraftItem = {
       id: nextId('road'),
       type: 'road',
       roadKind: 'curve',
@@ -212,7 +220,9 @@ function createDraftItem(type: PaletteItemType, x: number, y: number): DraftItem
         { x: x + 220, y: y + 144 },
         { x: x + 360, y: y + 92 },
       ],
-    });
+    };
+
+    return syncRoadFromPoints(road);
   }
 
   if (type === 'entry') {
@@ -1162,7 +1172,7 @@ export default function MapBuilderPage() {
 
         const merged = { ...item, ...patch } as DraftItem;
 
-        if (merged.type !== 'road') {
+        if (!isRoadDraftItem(merged) || !isRoadDraftItem(item)) {
           return merged;
         }
 

@@ -1,11 +1,10 @@
-import { NextResponse } from 'next/server';
-
 import { buildLocationScopedAdminResetTargets } from '@/lib/operatorAdminScope';
 import {
   buildGridSlots,
   buildOperatorDashboardMetrics,
   mapOperatorSlotStatus,
   normalizeSlotStatus,
+  type NormalizedSlotStatus,
   type SlotSourceStatus,
 } from '@/lib/operatorDashboardMetrics';
 import {
@@ -22,6 +21,8 @@ import {
   type ParkingLotDefinition,
 } from '@/lib/parkingMap';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
+import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
+import { deriveReservationPaymentStatus, deriveReservationStatus } from '@/lib/operatorReservationStatus';
 import type {
   AuditLog,
   OperatorDashboardData,
@@ -55,17 +56,79 @@ function buildServerSystemHealth(timestamp: string): OperatorSystemHealth {
   };
 }
 
-export async function GET() {
+const REST_PAGE_SIZE = 500;
+const FILTER_BATCH_SIZE = 150;
+
+function withQueryValue(url: string, key: string, value: string | number) {
+  return `${url}${url.includes('?') ? '&' : '?'}${key}=${value}`;
+}
+
+function chunkValues(values: string[], size = FILTER_BATCH_SIZE) {
+  const chunks: string[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+async function readPagedRestList<T>(url: string, headers: Record<string, string>, pageSize = REST_PAGE_SIZE): Promise<T[]> {
+  const rows: T[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await readRestList<T>(
+      await fetch(withQueryValue(withQueryValue(url, 'limit', pageSize), 'offset', offset), {
+        headers,
+        cache: 'no-store',
+      }),
+    );
+
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      return rows;
+    }
+
+    offset += page.length;
+  }
+}
+
+async function readBatchedInFilterList<T>(
+  baseUrl: string,
+  filterKey: string,
+  ids: string[],
+  headers: Record<string, string>,
+): Promise<T[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const resultSets = await Promise.all(
+    chunkValues(ids).map((batch) =>
+      readPagedRestList<T>(
+        `${baseUrl}&${filterKey}=in.(${buildInFilter(batch)})`,
+        headers,
+      ),
+    ),
+  );
+
+  return resultSets.flat();
+}
+
+export async function GET(request: Request) {
+  const routeContext = createOperatorRouteContext(request, '/api/operator/dashboard');
   const operatorUser = await getCurrentOperatorUser();
 
   if (!operatorUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return jsonWithRequestContext(routeContext, { error: 'Unauthorized' }, { status: 401 });
   }
 
   const config = getOperatorSupabaseConfig();
 
   if (!config?.url || !config.serviceRoleKey) {
-    return NextResponse.json({ error: 'Missing operator Supabase configuration.' }, { status: 500 });
+    return jsonWithRequestContext(routeContext, { error: 'Missing operator Supabase configuration.' }, { status: 500 });
   }
 
   try {
@@ -75,7 +138,7 @@ export async function GET() {
 
     if (!location) {
       const timestamp = new Date().toISOString();
-      return NextResponse.json({
+      const payload = {
         location: null,
         parkingMap: { id: 'map-empty', name: 'Parking Map', totalSlots: 0, slots: [], layout: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
         reservations: [],
@@ -94,23 +157,25 @@ export async function GET() {
         },
         reconciliationRuns: [],
         systemHealth: buildServerSystemHealth(timestamp),
+      };
+      logOperatorRouteSuccess(routeContext, 'Loaded empty operator dashboard', {
+        locationId: null,
       });
+      return jsonWithRequestContext(routeContext, payload);
     }
 
     assertOperatorLocationRequest(location.id, locationContext.selectedLocationId);
 
     const [slotRows, layoutRows, adminAuditRows] = await Promise.all([
-      readRestList<{
+      readPagedRestList<{
         id: string;
         slot_label: string;
         status: SlotSourceStatus;
         display_order: number;
         qr_token: string;
       }>(
-        await fetch(
-          `${config.url}/rest/v1/parking_slots?select=id,slot_label,status,display_order,qr_token&location_id=eq.${location.id}&order=display_order.asc`,
-          { headers, cache: 'no-store' },
-        ),
+        `${config.url}/rest/v1/parking_slots?select=id,slot_label,status,display_order,qr_token&location_id=eq.${location.id}&order=display_order.asc`,
+        headers,
       ),
       readRestList<{ layout: ParkingLotDefinition }>(
         await fetch(
@@ -118,7 +183,7 @@ export async function GET() {
           { headers, cache: 'no-store' },
         ),
       ),
-      readRestList<{
+      readPagedRestList<{
         id: string;
         table_name: string;
         record_id: string | null;
@@ -127,10 +192,8 @@ export async function GET() {
         metadata: Record<string, unknown> | null;
         created_at: string;
       }>(
-        await fetch(
-          `${config.url}/rest/v1/admin_audit_log?select=id,table_name,record_id,action,actor_user_id,metadata,created_at&order=created_at.desc&limit=200`,
-          { headers, cache: 'no-store' },
-        ),
+        `${config.url}/rest/v1/admin_audit_log?select=id,table_name,record_id,action,actor_user_id,metadata,created_at&order=created_at.desc`,
+        headers,
       ),
     ]);
 
@@ -139,7 +202,7 @@ export async function GET() {
 
     const [reservationRows, sessionRows] = await Promise.all([
       slotIdFilter
-        ? readRestList<{
+        ? readBatchedInFilterList<{
             id: string;
             slot_id: string;
             plate_number: string;
@@ -148,14 +211,14 @@ export async function GET() {
             expires_at: string;
             reservation_fee: number;
           }>(
-            await fetch(
-              `${config.url}/rest/v1/reservations?select=id,slot_id,plate_number,status,reserved_at,expires_at,reservation_fee&slot_id=in.(${slotIdFilter})&order=reserved_at.desc&limit=200`,
-              { headers, cache: 'no-store' },
-            ),
+            `${config.url}/rest/v1/reservations?select=id,slot_id,plate_number,status,reserved_at,expires_at,reservation_fee&order=reserved_at.desc`,
+            'slot_id',
+            slotIds,
+            headers,
           )
         : Promise.resolve([]),
       slotIdFilter
-        ? readRestList<{
+        ? readBatchedInFilterList<{
             id: string;
             reservation_id: string;
             slot_id: string;
@@ -164,10 +227,10 @@ export async function GET() {
             status: string;
             billed_minutes: number | null;
           }>(
-            await fetch(
-              `${config.url}/rest/v1/parking_sessions?select=id,reservation_id,slot_id,started_at,ended_at,status,billed_minutes&slot_id=in.(${slotIdFilter})&order=started_at.desc&limit=200`,
-              { headers, cache: 'no-store' },
-            ),
+            `${config.url}/rest/v1/parking_sessions?select=id,reservation_id,slot_id,started_at,ended_at,status,billed_minutes&order=started_at.desc`,
+            'slot_id',
+            slotIds,
+            headers,
           )
         : Promise.resolve([]),
     ]);
@@ -179,7 +242,7 @@ export async function GET() {
 
     const paymentResultSets = await Promise.all([
       reservationIdFilter
-        ? readRestList<{
+        ? readBatchedInFilterList<{
             id: string;
             reservation_id: string | null;
             session_id: string | null;
@@ -188,14 +251,14 @@ export async function GET() {
             paid_at: string | null;
             created_at: string;
           }>(
-            await fetch(
-              `${config.url}/rest/v1/payments?select=id,reservation_id,session_id,status,amount,paid_at,created_at&reservation_id=in.(${reservationIdFilter})&order=created_at.desc&limit=200`,
-              { headers, cache: 'no-store' },
-            ),
+            `${config.url}/rest/v1/payments?select=id,reservation_id,session_id,status,amount,paid_at,created_at&order=created_at.desc`,
+            'reservation_id',
+            reservationIds,
+            headers,
           )
         : Promise.resolve([]),
       sessionIdFilter
-        ? readRestList<{
+        ? readBatchedInFilterList<{
             id: string;
             reservation_id: string | null;
             session_id: string | null;
@@ -204,10 +267,10 @@ export async function GET() {
             paid_at: string | null;
             created_at: string;
           }>(
-            await fetch(
-              `${config.url}/rest/v1/payments?select=id,reservation_id,session_id,status,amount,paid_at,created_at&session_id=in.(${sessionIdFilter})&order=created_at.desc&limit=200`,
-              { headers, cache: 'no-store' },
-            ),
+            `${config.url}/rest/v1/payments?select=id,reservation_id,session_id,status,amount,paid_at,created_at&order=created_at.desc`,
+            'session_id',
+            sessionIds,
+            headers,
           )
         : Promise.resolve([]),
     ]);
@@ -215,7 +278,7 @@ export async function GET() {
       new Map(paymentResultSets.flat().map((payment) => [payment.id, payment])).values(),
     );
 
-    const rawOperatorEventRows = await readRestList<{
+    const rawOperatorEventRows = await readPagedRestList<{
       id: string;
       slot_id: string | null;
       reservation_id: string | null;
@@ -224,10 +287,8 @@ export async function GET() {
       payload: Record<string, unknown> | null;
       created_at: string;
     }>(
-      await fetch(
-        `${config.url}/rest/v1/operator_events?select=id,slot_id,reservation_id,session_id,event_type,payload,created_at&order=created_at.desc&limit=200`,
-        { headers, cache: 'no-store' },
-      ),
+      `${config.url}/rest/v1/operator_events?select=id,slot_id,reservation_id,session_id,event_type,payload,created_at&order=created_at.desc`,
+      headers,
     );
     const scopedTargets = buildLocationScopedAdminResetTargets({
       locationId: location.id,
@@ -267,11 +328,11 @@ export async function GET() {
 
     const roleRows =
       actorIds.length > 0
-        ? await readRestList<{ user_id: string; display_name: string | null; role: string }>(
-            await fetch(
-              `${config.url}/rest/v1/admin_user_roles?select=user_id,display_name,role&user_id=in.(${actorIds.join(',')})`,
-              { headers, cache: 'no-store' },
-            ),
+        ? await readBatchedInFilterList<{ user_id: string; display_name: string | null; role: string }>(
+            `${config.url}/rest/v1/admin_user_roles?select=user_id,display_name,role`,
+            'user_id',
+            actorIds,
+            headers,
           )
         : [];
 
@@ -289,7 +350,13 @@ export async function GET() {
       reservationRows.filter((reservation) => reservation.status === 'confirmed').map((reservation) => reservation.slot_id),
     );
 
-    const normalizedSlotRows = slotRows.map((slot) => ({
+    const normalizedSlotRows: Array<{
+      id: string;
+      slot_label: string;
+      status: NormalizedSlotStatus;
+      display_order: number;
+      qr_token: string;
+    }> = slotRows.map((slot) => ({
       ...slot,
       status: normalizeSlotStatus({
         rawStatus: slot.status,
@@ -327,14 +394,17 @@ export async function GET() {
       ]),
     );
 
-    const operatorSlots =
+    const operatorSlots: OperatorDashboardData['parkingMap']['slots'] =
       effectiveLayout?.slots && Array.isArray(effectiveLayout.slots)
         ? effectiveLayout.slots.map((slot) => {
             const live =
               liveSlotLookup.get(slot.id) ??
               normalizedSlotRows.find((entry) => entry.slot_label.toLowerCase() === String(slot.label ?? '').toLowerCase());
 
-            const status = live?.status ?? 'available';
+            const status: NormalizedSlotStatus =
+              live?.status === 'occupied' || live?.status === 'reserved' || live?.status === 'blocked'
+                ? live.status
+                : 'available';
             const liveId = live && 'id' in live ? live.id : slot.id;
             const liveLabel =
               live && 'label' in live
@@ -421,6 +491,11 @@ export async function GET() {
     const reservations: Reservation[] = reservationRows.map((reservation) => {
       const linkedPayment = latestPaymentByReservationId.get(reservation.id);
       const linkedSession = sessionByReservationId.get(reservation.id) ?? null;
+      const status = deriveReservationStatus({
+        rawStatus: reservation.status,
+        linkedSessionStatus: linkedSession?.status ?? null,
+        expiresAt: reservation.expires_at,
+      });
 
       return {
         id: reservation.id,
@@ -437,19 +512,12 @@ export async function GET() {
                 (new Date(reservation.expires_at).getTime() - new Date(reservation.reserved_at).getTime()) / 60000,
               )
             : 0,
-        status:
-          reservation.status === 'confirmed'
-            ? 'active'
-            : reservation.status === 'completed'
-              ? 'completed'
-              : reservation.status === 'no_show' || reservation.status === 'expired'
-                ? 'no-show'
-                : reservation.status,
+        status,
         amount: Number(reservation.reservation_fee ?? 0),
         paymentStatus:
           linkedPayment?.status === 'refunded'
             ? 'failed'
-            : linkedPayment?.status ?? 'pending',
+            : deriveReservationPaymentStatus(linkedPayment?.status ?? 'pending'),
         linkedSessionId: linkedSession?.id ?? null,
       };
     });
@@ -541,7 +609,7 @@ export async function GET() {
       })),
     ].sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime());
 
-    const parkingMap = {
+    const parkingMap: OperatorDashboardData['parkingMap'] = {
       id: `map-${location.id}`,
       name: effectiveLayout?.name ?? location.name,
       totalSlots: operatorSlots.length,
@@ -598,9 +666,17 @@ export async function GET() {
       systemHealth: buildServerSystemHealth(generatedAt),
     };
 
-    return NextResponse.json(payload);
+    logOperatorRouteSuccess(routeContext, 'Loaded operator dashboard', {
+      locationId: location.id,
+      slotCount: operatorSlots.length,
+      reservationCount: reservations.length,
+      sessionCount: sessions.length,
+    });
+    return jsonWithRequestContext(routeContext, payload);
   } catch (error) {
-    return NextResponse.json(
+    logOperatorRouteError(routeContext, 'Failed to load operator dashboard', error);
+    return jsonWithRequestContext(
+      routeContext,
       { error: error instanceof Error ? error.message : 'Failed to load operator dashboard.' },
       { status: 500 },
     );
