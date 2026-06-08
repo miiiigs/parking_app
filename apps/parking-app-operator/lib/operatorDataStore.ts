@@ -95,11 +95,31 @@ function notifyAll() {
 }
 
 function normalizeOperatorSlotStatus(status: string): ParkingSlot['status'] {
-  return status === 'blocked' || status === 'disputed' ? 'maintenance' : status;
+  switch (status) {
+    case 'occupied':
+    case 'reserved':
+    case 'available':
+      return status;
+    case 'blocked':
+    case 'disputed':
+    case 'maintenance':
+    default:
+      return 'maintenance';
+  }
 }
 
 function normalizeLayoutSlotStatus(status: string): ParkingSlotStatus {
-  return status === 'maintenance' ? 'blocked' : status;
+  switch (status) {
+    case 'available':
+    case 'reserved':
+    case 'occupied':
+    case 'blocked':
+    case 'disputed':
+      return status;
+    case 'maintenance':
+    default:
+      return 'blocked';
+  }
 }
 
 function readRecordString(record: RealtimeRecord | null, key: string): string | null {

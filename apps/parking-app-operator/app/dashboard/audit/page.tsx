@@ -1,67 +1,147 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Download, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import type { AuditLog } from '@/lib/types';
-import { useOperatorData } from '@/lib/useOperatorData';
 import { SystemHealth } from '@/components/dashboard/system-health';
+import type { AuditListResponse, AuditLog } from '@/lib/types';
+import { useOperatorData } from '@/lib/useOperatorData';
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case 'success':
+      return 'bg-green-400/10 text-green-400 border-green-400/20';
+    case 'failure':
+      return 'bg-red-400/10 text-red-400 border-red-400/20';
+    default:
+      return 'bg-gray-400/10 text-gray-400 border-gray-400/20';
+  }
+}
 
 export default function AuditPage() {
+  const [draftSearch, setDraftSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'success' | 'failure' | null>(null);
   const [actionFilter, setActionFilter] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [list, setList] = useState<AuditListResponse | null>(null);
+  const [loadingList, setLoadingList] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const { data, loading } = useOperatorData();
-  const logs = data?.auditLogs ?? [];
+  const { data, loading: dashboardLoading } = useOperatorData();
 
-  const uniqueActions = Array.from(new Set(logs.map((log) => log.action)));
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(draftSearch), 250);
+    return () => window.clearTimeout(timer);
+  }, [draftSearch]);
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch =
-      String(log.action ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(log.operator ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(log.details ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, actionFilter, pageSize]);
 
-    const matchesStatus = !statusFilter || log.status === statusFilter;
-    const matchesAction = !actionFilter || log.action === actionFilter;
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadingList(true);
+    setLoadError(null);
 
-    return matchesSearch && matchesStatus && matchesAction;
-  });
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success':
-        return 'bg-green-400/10 text-green-400 border-green-400/20';
-      case 'failure':
-        return 'bg-red-400/10 text-red-400 border-red-400/20';
-      default:
-        return 'bg-gray-400/10 text-gray-400 border-gray-400/20';
+    if (searchTerm.trim()) {
+      params.set('search', searchTerm.trim());
     }
-  };
+    if (statusFilter) {
+      params.set('status', statusFilter);
+    }
+    if (actionFilter) {
+      params.set('action', actionFilter);
+    }
 
-  const stats = {
-    success: logs.filter((log) => log.status === 'success').length,
-    failure: logs.filter((log) => log.status === 'failure').length,
-  };
-  const totalOperations = stats.success + stats.failure;
-  const successRate = totalOperations === 0 ? 0 : (stats.success / totalOperations) * 100;
-  const failureRate = totalOperations === 0 ? 0 : (stats.failure / totalOperations) * 100;
+    fetch(`/api/operator/audit?${params.toString()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to load audit logs.');
+        }
+        setList(payload as AuditListResponse);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setLoadError(error instanceof Error ? error.message : 'Failed to load audit logs.');
+      })
+      .finally(() => setLoadingList(false));
+
+    return () => controller.abort();
+  }, [actionFilter, page, pageSize, searchTerm, statusFilter]);
+
+  const logs = list?.items ?? [];
+  const uniqueActions = list?.uniqueActions ?? [];
+  const pagination = list?.pagination ?? { page: 1, pageSize, totalItems: 0, totalPages: 1 };
+  const stats = list?.stats ?? { success: 0, failure: 0 };
+
+  const filteredActions = useMemo(() => uniqueActions, [uniqueActions]);
+
+  async function exportAuditCsv() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        export: 'csv',
+      });
+
+      if (searchTerm.trim()) {
+        params.set('search', searchTerm.trim());
+      }
+      if (statusFilter) {
+        params.set('status', statusFilter);
+      }
+      if (actionFilter) {
+        params.set('action', actionFilter);
+      }
+
+      const response = await fetch(`/api/operator/audit?${params.toString()}`, {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || 'Failed to export audit logs.');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'operator-audit.csv';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Audit Trail</h1>
-          <p className="mt-2 text-muted-foreground">
-            Complete event log of all operator actions and system events
-          </p>
+          <p className="mt-2 text-muted-foreground">Server-backed logs with export, filters, and mobile-friendly cards.</p>
         </div>
 
         <SystemHealth compact />
@@ -78,7 +158,7 @@ export default function AuditPage() {
                   <span className="text-lg font-bold text-green-400">{stats.success}</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-secondary">
-                  <div className="h-2 rounded-full bg-green-500" style={{ width: `${successRate}%` }} />
+                  <div className="h-2 rounded-full bg-green-500" style={{ width: `${stats.success + stats.failure ? (stats.success / (stats.success + stats.failure)) * 100 : 0}%` }} />
                 </div>
               </div>
               <div>
@@ -87,13 +167,8 @@ export default function AuditPage() {
                   <span className="text-lg font-bold text-red-400">{stats.failure}</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-secondary">
-                  <div className="h-2 rounded-full bg-red-500" style={{ width: `${failureRate}%` }} />
+                  <div className="h-2 rounded-full bg-red-500" style={{ width: `${stats.success + stats.failure ? (stats.failure / (stats.success + stats.failure)) * 100 : 0}%` }} />
                 </div>
-              </div>
-              <div className="border-t border-border pt-2">
-                <p className="text-xs text-muted-foreground">
-                  Success Rate: <span className="font-semibold text-green-400">{successRate.toFixed(1)}%</span>
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -103,9 +178,7 @@ export default function AuditPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">System Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="text-sm text-muted-foreground">
-                Health is now sourced from live operator sync state, not hardcoded status text.
-              </div>
+              <div className="text-sm text-muted-foreground">Health is sourced from live operator sync state and route telemetry.</div>
             </CardContent>
           </Card>
         </div>
@@ -114,20 +187,18 @@ export default function AuditPage() {
           <CardHeader>
             <div className="space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                <div className="flex flex-1 gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by action, operator, or details..."
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      className="border-border bg-input pl-10 text-foreground"
-                    />
-                  </div>
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search action, operator, slot, or details..."
+                    value={draftSearch}
+                    onChange={(event) => setDraftSearch(event.target.value)}
+                    className="border-border bg-input pl-10 text-foreground"
+                  />
                 </div>
-                <Button size="sm" variant="outline" className="border-border">
+                <Button size="sm" variant="outline" className="border-border" onClick={() => void exportAuditCsv()} disabled={exporting}>
                   <Download className="mr-2 h-4 w-4" />
-                  Export
+                  {exporting ? 'Exporting' : 'Export'}
                 </Button>
               </div>
 
@@ -135,30 +206,21 @@ export default function AuditPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">Status</label>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => setStatusFilter(null)}
-                      variant={statusFilter === null ? 'default' : 'outline'}
-                      className={statusFilter === null ? 'bg-primary text-primary-foreground' : 'border-border'}
-                    >
-                      All
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setStatusFilter('success')}
-                      variant={statusFilter === 'success' ? 'default' : 'outline'}
-                      className={statusFilter === 'success' ? 'bg-green-500 text-white' : 'border-border'}
-                    >
-                      Success
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setStatusFilter('failure')}
-                      variant={statusFilter === 'failure' ? 'default' : 'outline'}
-                      className={statusFilter === 'failure' ? 'bg-red-500 text-white' : 'border-border'}
-                    >
-                      Failure
-                    </Button>
+                    {[
+                      { label: 'All', value: null },
+                      { label: 'Success', value: 'success' as const },
+                      { label: 'Failure', value: 'failure' as const },
+                    ].map((option) => (
+                      <Button
+                        key={option.label}
+                        size="sm"
+                        onClick={() => setStatusFilter(option.value)}
+                        variant={statusFilter === option.value ? 'default' : 'outline'}
+                        className={statusFilter === option.value ? 'bg-primary text-primary-foreground' : 'border-border'}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
 
@@ -170,9 +232,24 @@ export default function AuditPage() {
                     className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground md:min-w-56"
                   >
                     <option value="">All Actions</option>
-                    {uniqueActions.map((action) => (
+                    {filteredActions.map((action) => (
                       <option key={action} value={action}>
                         {action}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Page Size</label>
+                  <select
+                    value={pageSize}
+                    onChange={(event) => setPageSize(Number(event.target.value))}
+                    className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground md:min-w-28"
+                  >
+                    {[10, 20, 40].map((size) => (
+                      <option key={size} value={size}>
+                        {size}
                       </option>
                     ))}
                   </select>
@@ -180,9 +257,51 @@ export default function AuditPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            {loading && !data ? <div className="py-8 text-center text-muted-foreground">Loading logs...</div> : null}
-            <div className="overflow-x-auto">
+
+          <CardContent className="space-y-4">
+            {loadingList || (dashboardLoading && !data) ? (
+              <div className="py-8 text-center text-muted-foreground">Loading logs...</div>
+            ) : null}
+
+            {loadError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {loadError}
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 lg:hidden">
+              {logs.map((log: AuditLog) => (
+                <Card key={log.id} className="border-border bg-secondary/20">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground">{formatDistanceToNow(log.timestamp, { addSuffix: true })}</div>
+                        <div className="mt-1 font-mono text-sm text-foreground">{log.action}</div>
+                      </div>
+                      <Badge className={`${getStatusColor(log.status)} border text-xs font-medium`}>
+                        {log.status}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Operator</div>
+                        <div className="text-foreground">{log.operator}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Slot</div>
+                        <div className="text-foreground">{log.slotNumber ?? '-'}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="text-xs text-muted-foreground">Details</div>
+                        <div className="line-clamp-3 text-xs text-muted-foreground">{log.details}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b border-border">
@@ -195,7 +314,7 @@ export default function AuditPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLogs.map((log: AuditLog) => (
+                  {logs.map((log: AuditLog) => (
                     <tr key={log.id} className="border-b border-border transition-colors hover:bg-secondary/50">
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                         {formatDistanceToNow(log.timestamp, { addSuffix: true })}
@@ -203,11 +322,7 @@ export default function AuditPage() {
                       <td className="px-4 py-3 font-mono text-xs text-foreground">{log.action}</td>
                       <td className="px-4 py-3 text-foreground">{log.operator}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {log.slotNumber ? (
-                          <span className="font-medium text-foreground">{log.slotNumber}</span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        {log.slotNumber ? <span className="font-medium text-foreground">{log.slotNumber}</span> : <span className="text-muted-foreground">-</span>}
                       </td>
                       <td className="max-w-xs truncate px-4 py-3 text-xs text-muted-foreground">{log.details}</td>
                       <td className="px-4 py-3">
@@ -220,11 +335,42 @@ export default function AuditPage() {
                 </tbody>
               </table>
             </div>
-            {filteredLogs.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                No audit logs found matching your criteria
-              </div>
+
+            {logs.length === 0 && !loadingList ? (
+              <div className="py-12 text-center text-muted-foreground">No audit logs found matching your criteria.</div>
             ) : null}
+
+            <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                {pagination.totalItems} result{pagination.totalItems === 1 ? '' : 's'} across {pagination.totalPages} page
+                {pagination.totalPages === 1 ? '' : 's'}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-border"
+                  disabled={pagination.page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  Page {pagination.page} of {pagination.totalPages}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-border"
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

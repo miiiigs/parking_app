@@ -1,7 +1,10 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function readSource(relativePath) {
   return fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8');
@@ -24,7 +27,7 @@ test('layout route rejects mismatched location requests and location API sets se
   const locationRoute = readSource('../app/api/operator/location/route.ts');
 
   assert.equal(layoutRoute.includes('assertOperatorLocationRequest'), true);
-  assert.equal(layoutRoute.includes("status: 409"), true);
+  assert.equal(layoutRoute.includes('status: 409'), true);
   assert.equal(locationRoute.includes('setOperatorLocationSelection'), true);
   assert.equal(locationRoute.includes('locationId is required'), true);
 });

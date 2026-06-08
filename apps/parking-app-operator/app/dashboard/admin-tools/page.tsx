@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Loader2, RefreshCcw, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
+import { Loader2, RefreshCcw, RotateCcw, ShieldCheck } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import {
@@ -22,7 +22,7 @@ import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import type { ReconciliationRun } from '@/lib/types';
 import { useOperatorData } from '@/lib/useOperatorData';
 
-type AdminAction = 'reconcile' | 'reset-slots' | 'reset-demo';
+type AdminAction = 'reconcile' | 'reset-slots';
 type AdminActionPreview = {
   action: AdminAction;
   title: string;
@@ -43,7 +43,6 @@ export default function AdminToolsPage() {
   const metrics = data?.metrics ?? null;
   const canRunReconciliation = hasOperatorCapability(user?.role, 'run-reconciliation');
   const canResetSlots = hasOperatorCapability(user?.role, 'reset-slot-statuses');
-  const canResetDemo = hasOperatorCapability(user?.role, 'reset-demo-data');
 
   const latestRun = reconciliationRuns[0] ?? null;
 
@@ -67,17 +66,8 @@ export default function AdminToolsPage() {
         buttonLabel: 'Reset Slots',
         tone: 'outline' as const,
       },
-      {
-        id: 'reset-demo' as const,
-        title: 'Full Demo Reset',
-        description: 'Delete reservations, sessions, payments, and operator events, then restore all slots to available.',
-        icon: Trash2,
-        disabled: !canResetDemo,
-        buttonLabel: 'Full Reset',
-        tone: 'destructive' as const,
-      },
     ],
-    [canRunReconciliation, canResetSlots, canResetDemo],
+    [canRunReconciliation, canResetSlots],
   );
 
   async function fetchActionPreview(action: AdminAction) {
@@ -269,7 +259,7 @@ export default function AdminToolsPage() {
               <CardTitle className="text-lg font-semibold text-foreground">Recent Reconciliation Runs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!canRunReconciliation && !canResetSlots && !canResetDemo ? (
+              {!canRunReconciliation && !canResetSlots ? (
                 <div className="rounded-lg border border-border bg-secondary/30 p-3 text-sm text-muted-foreground">
                   Read-only access. Your role can view audit and metrics, but cannot run operator actions.
                 </div>
@@ -318,14 +308,6 @@ export default function AdminToolsPage() {
                     </div>
                   </div>
                 ))}
-              </div>
-
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-                <div className="mb-2 flex items-center gap-2 font-medium">
-                  <AlertTriangle className="h-4 w-4" />
-                  Operational note
-                </div>
-                Full demo reset removes live reservations, sessions, payments, and operator events. Use it only when you intentionally want to clear the pilot state.
               </div>
             </CardContent>
           </Card>

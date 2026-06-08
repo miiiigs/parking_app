@@ -8,8 +8,7 @@ export type OperatorCapability =
   | 'edit-slot-status'
   | 'edit-map-layout'
   | 'run-reconciliation'
-  | 'reset-slot-statuses'
-  | 'reset-demo-data';
+  | 'reset-slot-statuses';
 
 const ROLE_CAPABILITIES: Record<OperatorRole, OperatorCapability[]> = {
   admin: [
@@ -21,7 +20,6 @@ const ROLE_CAPABILITIES: Record<OperatorRole, OperatorCapability[]> = {
     'edit-map-layout',
     'run-reconciliation',
     'reset-slot-statuses',
-    'reset-demo-data',
   ],
   operator: [
     'view-dashboard',

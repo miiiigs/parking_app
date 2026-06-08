@@ -101,7 +101,6 @@ Admin tooling is location-scoped and preview-driven.
 Supported actions:
 - reconciliation
 - reset slot statuses
-- reset demo state for the active location
 
 All destructive actions:
 - require permission checks
@@ -123,7 +122,6 @@ Current capability split:
   - full operator access
 - `operator`
   - operational write access
-  - cannot run the highest-risk demo reset action
 - `support`
   - read-only operational visibility
 - `finance`

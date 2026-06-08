@@ -1,16 +1,12 @@
-import { NextResponse } from 'next/server';
-
-import { buildLocationScopedAdminResetTargets } from '@/lib/operatorAdminScope';
 import { buildScopedReconciliationPlan } from '@/lib/operatorReconciliation';
-import {
-  buildInFilter,
-  getServiceHeaders,
-  readRestList,
-} from '@/lib/operatorLocation';
+import { buildInFilter, getServiceHeaders, readRestList } from '@/lib/operatorLocation';
 import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
+import { formatRouteValidationIssues, operatorAdminToolsRouteRequestSchema } from '@/lib/operatorRouteSchemas';
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
 import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
+import { findIdempotentOperatorEvent } from '@/lib/operatorIdempotency';
+import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
 
 function getHeaders(serviceRoleKey: string) {
   return {
@@ -20,62 +16,50 @@ function getHeaders(serviceRoleKey: string) {
 }
 
 type AdminToolPreview = {
-  action: 'reconcile' | 'reset-slots' | 'reset-demo';
+  action: 'reconcile' | 'reset-slots';
   title: string;
   summary: string;
   counts: Record<string, number>;
 };
 
-async function deleteRowsByIds(
-  baseUrl: string,
-  headers: Record<string, string>,
-  tableName: string,
-  ids: string[],
-) {
-  if (ids.length === 0) {
-    return;
-  }
-
-  const response = await fetch(`${baseUrl}/rest/v1/${tableName}?id=in.(${buildInFilter(ids)})`, {
-    method: 'DELETE',
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error(await response.text());
-  }
-}
-
 export async function POST(request: Request) {
+  const routeContext = createOperatorRouteContext(request, '/api/operator/admin-tools');
   const operatorUser = await getCurrentOperatorUser();
 
   if (!operatorUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return jsonWithRequestContext(routeContext, { error: 'Unauthorized' }, { status: 401 });
   }
 
   const config = getOperatorSupabaseConfig();
 
   if (!config?.url || !config.serviceRoleKey) {
-    return NextResponse.json({ error: 'Missing operator Supabase configuration.' }, { status: 500 });
+    return jsonWithRequestContext(routeContext, { error: 'Missing operator Supabase configuration.' }, { status: 500 });
   }
 
-  const { action, preview } = (await request.json().catch(() => ({}))) as { action?: string; preview?: boolean };
+  const parsedBody = operatorAdminToolsRouteRequestSchema.safeParse(await request.json().catch(() => null));
 
-  if (!action) {
-    return NextResponse.json({ error: 'Missing admin tool action.' }, { status: 400 });
+  if (!parsedBody.success) {
+    return jsonWithRequestContext(
+      routeContext,
+      {
+        error: 'Invalid admin tool request.',
+        details: formatRouteValidationIssues(parsedBody.error.issues),
+      },
+      { status: 400 },
+    );
   }
+
+  const { action, preview } = parsedBody.data;
 
   const requiredCapability =
     action === 'reconcile'
       ? 'run-reconciliation'
       : action === 'reset-slots'
         ? 'reset-slot-statuses'
-        : action === 'reset-demo'
-          ? 'reset-demo-data'
-          : null;
+        : null;
 
   if (!requiredCapability || !hasOperatorCapability(operatorUser.role, requiredCapability)) {
-    return NextResponse.json({ error: 'Insufficient permissions for admin tool action.' }, { status: 403 });
+    return jsonWithRequestContext(routeContext, { error: 'Insufficient permissions for admin tool action.' }, { status: 403 });
   }
 
   const headers = getHeaders(config.serviceRoleKey);
@@ -85,10 +69,28 @@ export async function POST(request: Request) {
     const location = locationContext.activeLocation;
 
     if (!location) {
-      return NextResponse.json({ error: 'No active parking location found.' }, { status: 404 });
+      return jsonWithRequestContext(routeContext, { error: 'No active parking location found.' }, { status: 404 });
     }
 
     if (action === 'reconcile') {
+      const replayEvent = await findIdempotentOperatorEvent({
+        url: config.url,
+        serviceRoleKey: config.serviceRoleKey,
+        eventTypes: ['reconciliation_completed'],
+        context: routeContext,
+      });
+
+      if (replayEvent?.payload?.response_payload && typeof replayEvent.payload.response_payload === 'object') {
+        logOperatorRouteSuccess(routeContext, 'Replayed idempotent reconciliation action', {
+          locationId: location.id,
+          action,
+        });
+        return jsonWithRequestContext(routeContext, {
+          ...(replayEvent.payload.response_payload as Record<string, unknown>),
+          idempotentReplay: true,
+        });
+      }
+
       const slotRows = await readRestList<{
         id: string;
         slot_label: string;
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
       };
 
       if (preview) {
-        return NextResponse.json({ ok: true, preview: previewPayload });
+        return jsonWithRequestContext(routeContext, { ok: true, preview: previewPayload });
       }
 
       for (const fix of reconciliation.fixes) {
@@ -163,12 +165,20 @@ export async function POST(request: Request) {
           ? `No mismatches found for ${location.name}.`
           : `Reconciliation applied to ${location.name}.`;
 
+      const responsePayload = {
+        ok: true,
+        payload: reconciliation.fixes,
+        message,
+      };
+
       await fetch(`${config.url}/rest/v1/operator_events`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           event_type: 'reconciliation_completed',
           payload: {
+            idempotency_key: routeContext.idempotencyKey,
+            request_id: routeContext.requestId,
             location_id: location.id,
             location_name: location.name,
             operator: operatorUser.name,
@@ -184,18 +194,39 @@ export async function POST(request: Request) {
             impact_summary: previewPayload.counts,
             action_scope: 'location',
             confirmed_at: completedAt,
+            response_payload: responsePayload,
           },
         }),
       });
 
-      return NextResponse.json({
-        ok: true,
-        payload: reconciliation.fixes,
-        message,
+      logOperatorRouteSuccess(routeContext, 'Completed reconciliation', {
+        locationId: location.id,
+        mismatchCount: reconciliation.mismatchCount,
+        fixedCount: reconciliation.fixedCount,
       });
+
+      return jsonWithRequestContext(routeContext, responsePayload);
     }
 
     if (action === 'reset-slots') {
+      const replayEvent = await findIdempotentOperatorEvent({
+        url: config.url,
+        serviceRoleKey: config.serviceRoleKey,
+        eventTypes: ['parking_slots_reset'],
+        context: routeContext,
+      });
+
+      if (replayEvent?.payload?.response_payload && typeof replayEvent.payload.response_payload === 'object') {
+        logOperatorRouteSuccess(routeContext, 'Replayed idempotent reset slots action', {
+          locationId: location.id,
+          action,
+        });
+        return jsonWithRequestContext(routeContext, {
+          ...(replayEvent.payload.response_payload as Record<string, unknown>),
+          idempotentReplay: true,
+        });
+      }
+
       const slotRows = await readRestList<{ status: string }>(
         await fetch(
           `${config.url}/rest/v1/parking_slots?select=status&location_id=eq.${location.id}`,
@@ -217,7 +248,7 @@ export async function POST(request: Request) {
       };
 
       if (preview) {
-        return NextResponse.json({ ok: true, preview: previewPayload });
+        return jsonWithRequestContext(routeContext, { ok: true, preview: previewPayload });
       }
 
       const slotResetResponse = await fetch(`${config.url}/rest/v1/parking_slots?location_id=eq.${location.id}`, {
@@ -229,6 +260,11 @@ export async function POST(request: Request) {
       if (!slotResetResponse.ok) {
         throw new Error(await slotResetResponse.text());
       }
+
+      const responsePayload = {
+        ok: true,
+        message: 'All slot statuses reset to available.',
+      };
 
       await fetch(`${config.url}/rest/v1/operator_events`, {
         method: 'POST',
@@ -236,6 +272,8 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           event_type: 'parking_slots_reset',
           payload: {
+            idempotency_key: routeContext.idempotencyKey,
+            request_id: routeContext.requestId,
             status: 'available',
             location_id: location.id,
             location_name: location.name,
@@ -245,137 +283,26 @@ export async function POST(request: Request) {
             impact_summary: previewPayload.counts,
             action_scope: 'location',
             confirmed_at: new Date().toISOString(),
+            response_payload: responsePayload,
           },
         }),
       });
 
-      return NextResponse.json({ ok: true, message: 'All slot statuses reset to available.' });
-    }
-
-    if (action === 'reset-demo') {
-      const slotRows = await readRestList<{ id: string }>(
-        await fetch(
-          `${config.url}/rest/v1/parking_slots?select=id&location_id=eq.${location.id}&order=display_order.asc`,
-          { headers, cache: 'no-store' },
-        ),
-      );
-      const slotIds = slotRows.map((slot) => slot.id);
-
-      const [reservationRows, sessionRows, paymentRows, operatorEventRows] = await Promise.all([
-        readRestList<{ id: string; slot_id: string | null }>(
-          await fetch(
-            `${config.url}/rest/v1/reservations?select=id,slot_id`,
-            { headers, cache: 'no-store' },
-          ),
-        ),
-        readRestList<{ id: string; reservation_id: string | null; slot_id: string | null }>(
-          await fetch(
-            `${config.url}/rest/v1/parking_sessions?select=id,reservation_id,slot_id`,
-            { headers, cache: 'no-store' },
-          ),
-        ),
-        readRestList<{ id: string; reservation_id: string | null; session_id: string | null }>(
-          await fetch(
-            `${config.url}/rest/v1/payments?select=id,reservation_id,session_id`,
-            { headers, cache: 'no-store' },
-          ),
-        ),
-        readRestList<{ id: string; slot_id: string | null; reservation_id: string | null; session_id: string | null; payload: Record<string, unknown> | null }>(
-          await fetch(
-            `${config.url}/rest/v1/operator_events?select=id,slot_id,reservation_id,session_id,payload`,
-            { headers, cache: 'no-store' },
-          ),
-        ),
-      ]);
-
-      const scopedTargets = buildLocationScopedAdminResetTargets({
+      logOperatorRouteSuccess(routeContext, 'Reset slot statuses', {
         locationId: location.id,
-        locationSlotIds: slotIds,
-        reservations: reservationRows.map((row) => ({
-          id: row.id,
-          slotId: row.slot_id,
-        })),
-        sessions: sessionRows.map((row) => ({
-          id: row.id,
-          reservationId: row.reservation_id,
-          slotId: row.slot_id,
-        })),
-        payments: paymentRows.map((row) => ({
-          id: row.id,
-          reservationId: row.reservation_id,
-          sessionId: row.session_id,
-        })),
-        operatorEvents: operatorEventRows.map((row) => ({
-          id: row.id,
-          slotId: row.slot_id,
-          reservationId: row.reservation_id,
-          sessionId: row.session_id,
-          payload: row.payload,
-        })),
+        changedSlotCount: previewPayload.counts.changedSlotCount ?? 0,
       });
 
-      const previewPayload: AdminToolPreview = {
-        action: 'reset-demo',
-        title: 'Full Demo Reset',
-        summary: `This will clear pilot records for ${location.name} and return all slots to available.`,
-        counts: {
-          slotCount: slotIds.length,
-          reservationCount: scopedTargets.reservationIds.length,
-          sessionCount: scopedTargets.sessionIds.length,
-          paymentCount: scopedTargets.paymentIds.length,
-          operatorEventCount: scopedTargets.operatorEventIds.length,
-        },
-      };
-
-      if (preview) {
-        return NextResponse.json({ ok: true, preview: previewPayload });
-      }
-
-      await deleteRowsByIds(config.url, headers, 'operator_events', scopedTargets.operatorEventIds);
-      await deleteRowsByIds(config.url, headers, 'payments', scopedTargets.paymentIds);
-      await deleteRowsByIds(config.url, headers, 'parking_sessions', scopedTargets.sessionIds);
-      await deleteRowsByIds(config.url, headers, 'reservations', scopedTargets.reservationIds);
-
-      const slotResetResponse = await fetch(`${config.url}/rest/v1/parking_slots?location_id=eq.${location.id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ status: 'available' }),
-      });
-
-      if (!slotResetResponse.ok) {
-        throw new Error(await slotResetResponse.text());
-      }
-
-      await fetch(`${config.url}/rest/v1/operator_events`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          event_type: 'demo_state_reset',
-          payload: {
-            status: 'available',
-            location_id: location.id,
-            location_name: location.name,
-            slot_count: slotIds.length,
-            reservation_count: scopedTargets.reservationIds.length,
-            session_count: scopedTargets.sessionIds.length,
-            payment_count: scopedTargets.paymentIds.length,
-            operator_event_count: scopedTargets.operatorEventIds.length,
-            operator: operatorUser.name,
-            actor_user_id: operatorUser.id,
-            actor_role: operatorUser.role,
-            impact_summary: previewPayload.counts,
-            action_scope: 'location',
-            confirmed_at: new Date().toISOString(),
-          },
-        }),
-      });
-
-      return NextResponse.json({ ok: true, message: 'Demo data reset completed.' });
+      return jsonWithRequestContext(routeContext, responsePayload);
     }
 
-    return NextResponse.json({ error: `Unsupported admin tool action: ${action}` }, { status: 400 });
+    return jsonWithRequestContext(routeContext, { error: `Unsupported admin tool action: ${action}` }, { status: 400 });
   } catch (error) {
-    return NextResponse.json(
+    logOperatorRouteError(routeContext, 'Admin tool action failed', error, {
+      action,
+    });
+    return jsonWithRequestContext(
+      routeContext,
       { error: error instanceof Error ? error.message : 'Admin tool action failed.' },
       { status: 500 },
     );

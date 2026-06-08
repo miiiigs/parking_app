@@ -1,13 +1,14 @@
 {
-  "name": "my-project",
+  "name": "parking-app-operator",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test --experimental-strip-types tests/routeLocationEnforcement.test.js tests/routeContractCoverage.test.js tests/locationContext.test.mjs tests/reconciliationPlan.test.mjs tests/slotLabelNormalization.test.mjs tests/slotSyncPlan.test.mjs tests/adminToolScoping.test.mjs tests/dashboardMetricShaping.test.mjs tests/operatorPermissions.test.mjs"
+    "test": "node --test --experimental-strip-types tests/routeLocationEnforcement.test.js tests/routeContractCoverage.test.js tests/routeRequestValidation.test.mjs tests/locationContext.test.mjs tests/reconciliationPlan.test.mjs tests/reservationStatus.test.mjs tests/slotLabelNormalization.test.mjs tests/slotSyncPlan.test.mjs tests/adminToolScoping.test.mjs tests/dashboardMetricShaping.test.mjs tests/operatorPermissions.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -69,7 +70,7 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "postcss": "^8.5",
+    "postcss": "^8.5.15",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
     "typescript": "5.7.3"
