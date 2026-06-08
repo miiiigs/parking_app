@@ -1,1 +1,1 @@
-export * from '@parking/shared/parkingMap';
+export * from '../../../packages/shared/src/parkingMap';
