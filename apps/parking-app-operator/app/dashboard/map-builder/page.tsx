@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import {
   buildRoadShape,
@@ -755,6 +756,25 @@ export default function MapBuilderPage() {
       y: screenY - lotY * clamped,
     });
   }
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return undefined;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      zoomAt(event.clientX, event.clientY, zoomRef.current + (event.deltaY < 0 ? 0.08 : -0.08));
+    };
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      viewport.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
@@ -2173,270 +2193,278 @@ export default function MapBuilderPage() {
           <div className="space-y-6">
             <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-base text-foreground">Publishing Status</CardTitle>
-                <CardDescription>Track the current draft against the last applied revision.</CardDescription>
+                <CardTitle className="text-base text-foreground">Builder Tools</CardTitle>
+                <CardDescription>
+                  Collapse and reopen any tool group without losing access to the others.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                    <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Draft</div>
-                    <div className="mt-2 text-sm font-semibold text-foreground">
-                      {hasUnappliedDraftChanges ? 'Unapplied changes' : 'Matches applied map'}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                    <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last Saved</div>
-                    <div className="mt-2 text-sm font-semibold text-foreground">
-                      {draftUpdatedAt ? new Date(draftUpdatedAt).toLocaleString() : 'Not saved'}
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last Applied Revision</div>
-                  <div className="mt-2 text-sm font-semibold text-foreground">
-                    {lastAppliedRevision ? `${lastAppliedRevision.revisionId.slice(0, 8)} • ${new Date(lastAppliedRevision.createdAt).toLocaleString()}` : 'No applied revision yet'}
-                  </div>
-                  {lastAppliedRevision?.impactSummary ? (
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                      <div>+{lastAppliedRevision.impactSummary.insertCount} inserts</div>
-                      <div>{lastAppliedRevision.impactSummary.updateCount} updates</div>
-                      <div>{lastAppliedRevision.impactSummary.archiveCount} archives</div>
-                    </div>
-                  ) : null}
-                </div>
-                {recentRevisions.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Recent Revisions</div>
-                    <div className="space-y-2">
-                      {recentRevisions.slice(0, 4).map((revision) => (
-                        <div key={revision.eventId} className="rounded-lg border border-border bg-secondary/20 p-3 text-sm">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="font-medium capitalize text-foreground">{revision.action}</div>
-                            <div className="text-xs text-muted-foreground">{new Date(revision.createdAt).toLocaleString()}</div>
+              <CardContent>
+                <Accordion type="multiple" defaultValue={["palette"]} className="w-full">
+                  <AccordionItem value="publishing-status" className="border-border">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Publishing Status</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Track the current draft against the last applied revision.</div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 rounded-lg border border-border bg-secondary/20 p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Draft</div>
+                            <div className="mt-2 text-sm font-semibold text-foreground">
+                              {hasUnappliedDraftChanges ? 'Unapplied changes' : 'Matches applied map'}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {revision.revisionId.slice(0, 8)} • {revision.objectSummary.slotCount} slots
+                          <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last Saved</div>
+                            <div className="mt-2 text-sm font-semibold text-foreground">
+                              {draftUpdatedAt ? new Date(draftUpdatedAt).toLocaleString() : 'Not saved'}
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-base text-foreground">Layout Settings</CardTitle>
-                <CardDescription>Configure the lot name, grid snap, and editing scale.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Lot Name</label>
-                  <Input value={lotName} onChange={(event) => setLotName(event.target.value)} className="border-border bg-input" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    <span>Grid Snap</span>
-                    <span>{gridSize}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={GRID_MIN}
-                    max={GRID_MAX}
-                    value={gridSize}
-                    onChange={(event) => setGridSize(Number(event.target.value))}
-                    className="w-full accent-primary"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                    <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Canvas</div>
-                    <div className="mt-2 text-sm font-semibold text-foreground">
-                      {lotBounds.width} x {lotBounds.height}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                    <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zoom</div>
-                    <div className="mt-2 text-sm font-semibold text-foreground">{Math.round(zoom * 100)}%</div>
-                  </div>
-                </div>
-                <div className="space-y-3 rounded-lg border border-border bg-secondary/30 p-3">
-                  <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Default Slot Footprint</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <DeferredNumberInput
-                      value={defaultSlotWidth}
-                      onCommit={(value) => setDefaultSlotWidth(Math.max(MIN_SLOT_WIDTH, value))}
-                      className="border-border bg-input"
-                    />
-                    <DeferredNumberInput
-                      value={defaultSlotHeight}
-                      onCommit={(value) => setDefaultSlotHeight(Math.max(MIN_SLOT_HEIGHT, value))}
-                      className="border-border bg-input"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full border-border"
-                    disabled={!canEditLayout}
-                    onClick={() =>
-                      setItems((current) =>
-                        current.map((item) =>
-                          item.type === 'slot'
-                            ? {
-                                ...item,
-                                width: defaultSlotWidth,
-                                height: defaultSlotHeight,
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                  >
-                    Apply Footprint to All Slots
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-base text-foreground">Palette</CardTitle>
-                <CardDescription>Drag onto the canvas or click to place at center.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {palette.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.type}
-                      type="button"
-                      draggable={canEditLayout}
-                      disabled={!canEditLayout}
-                      onClick={() => addItem(item.type)}
-                      onDragStart={(event) => {
-                        if (!canEditLayout) {
-                          event.preventDefault();
-                          return;
-                        }
-                        event.dataTransfer.setData('application/json', JSON.stringify({ type: item.type }));
-                      }}
-                      className="flex w-full items-start gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-3 text-left transition-colors hover:bg-secondary"
-                    >
-                      <div className="rounded-md bg-background p-2 text-primary">
-                        <Icon className="h-4 w-4" />
+                        <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                          <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Last Applied Revision</div>
+                          <div className="mt-2 text-sm font-semibold text-foreground">
+                            {lastAppliedRevision ? `${lastAppliedRevision.revisionId.slice(0, 8)} • ${new Date(lastAppliedRevision.createdAt).toLocaleString()}` : 'No applied revision yet'}
+                          </div>
+                          {lastAppliedRevision?.impactSummary ? (
+                            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                              <div>+{lastAppliedRevision.impactSummary.insertCount} inserts</div>
+                              <div>{lastAppliedRevision.impactSummary.updateCount} updates</div>
+                              <div>{lastAppliedRevision.impactSummary.archiveCount} archives</div>
+                            </div>
+                          ) : null}
+                        </div>
+                        {recentRevisions.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Recent Revisions</div>
+                            <div className="space-y-2">
+                              {recentRevisions.slice(0, 4).map((revision) => (
+                                <div key={revision.eventId} className="rounded-lg border border-border bg-secondary/20 p-3 text-sm">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="font-medium capitalize text-foreground">{revision.action}</div>
+                                    <div className="text-xs text-muted-foreground">{new Date(revision.createdAt).toLocaleString()}</div>
+                                  </div>
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    {revision.revisionId.slice(0, 8)} • {revision.objectSummary.slotCount} slots
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-foreground">{item.label}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="layout-settings" className="border-border">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Layout Settings</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Configure the lot name, grid snap, and editing scale.</div>
                       </div>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 rounded-lg border border-border bg-secondary/20 p-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Lot Name</label>
+                          <Input value={lotName} onChange={(event) => setLotName(event.target.value)} className="border-border bg-input" />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                            <span>Grid Snap</span>
+                            <span>{gridSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={GRID_MIN}
+                            max={GRID_MAX}
+                            value={gridSize}
+                            onChange={(event) => setGridSize(Number(event.target.value))}
+                            className="w-full accent-primary"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Canvas</div>
+                            <div className="mt-2 text-sm font-semibold text-foreground">
+                              {lotBounds.width} x {lotBounds.height}
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Zoom</div>
+                            <div className="mt-2 text-sm font-semibold text-foreground">{Math.round(zoom * 100)}%</div>
+                          </div>
+                        </div>
+                        <div className="space-y-3 rounded-lg border border-border bg-secondary/30 p-3">
+                          <div className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Default Slot Footprint</div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <DeferredNumberInput
+                              value={defaultSlotWidth}
+                              onCommit={(value) => setDefaultSlotWidth(Math.max(MIN_SLOT_WIDTH, value))}
+                              className="border-border bg-input"
+                            />
+                            <DeferredNumberInput
+                              value={defaultSlotHeight}
+                              onCommit={(value) => setDefaultSlotHeight(Math.max(MIN_SLOT_HEIGHT, value))}
+                              className="border-border bg-input"
+                            />
+                          </div>
+                          <Button
+                            variant="outline"
+                            className="w-full border-border"
+                            disabled={!canEditLayout}
+                            onClick={() =>
+                              setItems((current) =>
+                                current.map((item) =>
+                                  item.type === 'slot'
+                                    ? {
+                                        ...item,
+                                        width: defaultSlotWidth,
+                                        height: defaultSlotHeight,
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          >
+                            Apply Footprint to All Slots
+                          </Button>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-base text-foreground">Layout Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Slots</div>
-                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.slots}</div>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Roads</div>
-                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.roads}</div>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Gates</div>
-                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.gates}</div>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Markers</div>
-                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.markers}</div>
-                </div>
-              </CardContent>
-            </Card>
+                  <AccordionItem value="palette" className="border-border">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Palette</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Drag onto the canvas or click to place at center.</div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3 rounded-lg border border-border bg-secondary/20 p-4">
+                        {palette.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <button
+                              key={item.type}
+                              type="button"
+                              draggable={canEditLayout}
+                              disabled={!canEditLayout}
+                              onClick={() => addItem(item.type)}
+                              onDragStart={(event) => {
+                                if (!canEditLayout) {
+                                  event.preventDefault();
+                                  return;
+                                }
+                                event.dataTransfer.setData('application/json', JSON.stringify({ type: item.type }));
+                              }}
+                              className="flex w-full items-start gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-3 text-left transition-colors hover:bg-secondary"
+                            >
+                              <div className="rounded-md bg-background p-2 text-primary">
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-foreground">{item.label}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-base text-foreground">Slot Row Tools</CardTitle>
-                <CardDescription>Duplicate rows from a selected slot and normalize slot numbering.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Row Size</label>
-                    <Input
-                      value={rowCountDraft}
-                      onChange={(event) => setRowCountDraft(event.target.value)}
-                      className="border-border bg-input"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Gap</label>
-                    <Input
-                      value={rowSpacingDraft}
-                      onChange={(event) => setRowSpacingDraft(event.target.value)}
-                      className="border-border bg-input"
-                    />
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full border-border"
-                  disabled={!canEditLayout}
-                  onClick={duplicateSlotRowFromSelected}
-                >
-                  <Plus className="h-4 w-4" />
-                  Duplicate Row From Selected Slot
-                </Button>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Numbering Prefix</label>
-                  <Input
-                    value={autoNumberPrefix}
-                    onChange={(event) => setAutoNumberPrefix(event.target.value)}
-                    className="border-border bg-input"
-                  />
-                </div>
-                <Button variant="outline" className="w-full border-border" disabled={!canEditLayout} onClick={autoNumberSlots}>
-                  Auto-Number Slots
-                </Button>
-              </CardContent>
-            </Card>
+                  <AccordionItem value="slot-row-tools" className="border-border">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Slot Row Tools</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Duplicate rows from a selected slot and normalize slot numbering.</div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 rounded-lg border border-border bg-secondary/20 p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Row Size</label>
+                            <Input
+                              value={rowCountDraft}
+                              onChange={(event) => setRowCountDraft(event.target.value)}
+                              className="border-border bg-input"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Gap</label>
+                            <Input
+                              value={rowSpacingDraft}
+                              onChange={(event) => setRowSpacingDraft(event.target.value)}
+                              className="border-border bg-input"
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full border-border"
+                          disabled={!canEditLayout}
+                          onClick={duplicateSlotRowFromSelected}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Duplicate Row From Selected Slot
+                        </Button>
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Numbering Prefix</label>
+                          <Input
+                            value={autoNumberPrefix}
+                            onChange={(event) => setAutoNumberPrefix(event.target.value)}
+                            className="border-border bg-input"
+                          />
+                        </div>
+                        <Button variant="outline" className="w-full border-border" disabled={!canEditLayout} onClick={autoNumberSlots}>
+                          Auto-Number Slots
+                        </Button>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-base text-foreground">Alignment Tools</CardTitle>
-                <CardDescription>Use multi-select with Shift-click, then align selected non-road objects.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('left')}>
-                  Left
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('center')}>
-                  Center
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('right')}>
-                  Right
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('top')}>
-                  Top
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('middle')}>
-                  Middle
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('bottom')}>
-                  Bottom
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => distributeSelected('horizontal')}>
-                  Dist X
-                </Button>
-                <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => distributeSelected('vertical')}>
-                  Dist Y
-                </Button>
+                  <AccordionItem value="alignment-tools" className="border-border">
+                    <AccordionTrigger className="py-3 hover:no-underline">
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Alignment Tools</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Use multi-select with Shift-click, then align selected non-road objects.</div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-secondary/20 p-4">
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('left')}>
+                          Left
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('center')}>
+                          Center
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('right')}>
+                          Right
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('top')}>
+                          Top
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('middle')}>
+                          Middle
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => alignSelected('bottom')}>
+                          Bottom
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => distributeSelected('horizontal')}>
+                          Dist X
+                        </Button>
+                        <Button variant="outline" className="border-border" disabled={!canEditLayout} onClick={() => distributeSelected('vertical')}>
+                          Dist Y
+                        </Button>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </CardContent>
             </Card>
           </div>
@@ -2468,13 +2496,9 @@ export default function MapBuilderPage() {
               <div
                 ref={viewportRef}
                 onPointerDown={handleViewportPointerDown}
-                onWheel={(event) => {
-                  event.preventDefault();
-                  zoomAt(event.clientX, event.clientY, zoomRef.current + (event.deltaY < 0 ? 0.08 : -0.08));
-                }}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={handlePaletteDrop}
-                className="relative h-[70vh] min-h-[560px] overflow-hidden rounded-lg border border-border bg-secondary/30"
+                className="relative h-[70vh] min-h-[560px] overflow-hidden overscroll-contain rounded-lg border border-border bg-secondary/30"
               >
                 {isLoading ? (
                   <div className="absolute inset-0 z-20 grid place-items-center">
@@ -2856,7 +2880,7 @@ export default function MapBuilderPage() {
                 : 'pointer-events-none fixed inset-y-0 right-0 z-50 w-[min(92vw,420px)] translate-x-full overflow-y-auto p-4 xl:pointer-events-auto xl:translate-x-0'
             } xl:static xl:w-auto xl:overflow-visible xl:p-0`}
           >
-            <Card className="border-border bg-card xl:sticky xl:top-6">
+            <Card className="border-border bg-card">
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -3293,6 +3317,31 @@ export default function MapBuilderPage() {
                     Select a slot, gate, road, or marker on the canvas to edit it here.
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="text-base text-foreground">Layout Summary</CardTitle>
+                <CardDescription>Quick totals for the current map draft.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Slots</div>
+                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.slots}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Roads</div>
+                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.roads}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Gates</div>
+                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.gates}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Markers</div>
+                  <div className="mt-2 text-lg font-semibold text-foreground">{stats.markers}</div>
+                </div>
               </CardContent>
             </Card>
           </div>

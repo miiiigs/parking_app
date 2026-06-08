@@ -33,6 +33,9 @@ type DraftItem =
   | { id: string; type: 'entry' | 'exit'; label: string; x: number; y: number; rotation: number; direction: ParkingMapArrowDirection }
   | { id: string; type: 'arrow'; label: string; x: number; y: number; rotation: number };
 
+type BuilderToolTab = 'setup' | 'palette' | 'actions';
+type InspectorToolTab = 'inspector' | 'export';
+
 function cloneItem(item: DraftItem): DraftItem {
   return JSON.parse(JSON.stringify(item)) as DraftItem;
 }
@@ -150,6 +153,8 @@ export default function LotBuilderPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [builderToolTab, setBuilderToolTab] = useState<BuilderToolTab>('palette');
+  const [inspectorToolTab, setInspectorToolTab] = useState<InspectorToolTab>('inspector');
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
 
@@ -666,6 +671,12 @@ export default function LotBuilderPage() {
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
 
+  useEffect(() => {
+    if (selectedId) {
+      setInspectorToolTab('inspector');
+    }
+  }, [selectedId]);
+
   async function handleSaveLayout() {
     setIsSaving(true);
     setSaveMessage(null);
@@ -707,42 +718,85 @@ export default function LotBuilderPage() {
       <section style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16, alignItems: 'start' }}>
         <aside style={{ ...panelStyle, display: 'grid', gap: 14 }}>
           <div>
-            <label style={labelStyle}>Lot name</label>
-            <input value={lotName} onChange={(event) => setLotName(event.target.value)} style={inputStyle} />
-          </div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            <div style={{ ...labelStyle, marginBottom: 2 }}>Palette</div>
-            {palette.map((entry) => (
-              <button
-                key={entry.type}
-                type="button"
-                draggable
-                onDragStart={(event) => {
-                  event.dataTransfer.setData('application/json', JSON.stringify({ type: entry.type }));
-                }}
-                onClick={() => addItem(entry.type)}
-                style={paletteButtonStyle}
-              >
-                <strong>{itemToLabel(entry.type)}</strong>
-                <span style={{ color: '#a9bdd6', fontSize: 12, lineHeight: 1.4 }}>{entry.description}</span>
-              </button>
-            ))}
+            <div style={labelStyle}>Builder tools</div>
+            <div style={{ fontSize: 18, fontWeight: 800 }}>Map controls</div>
           </div>
 
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div style={labelStyle}>How it works</div>
-            <div style={helperBoxStyle}>
-              Drag palette items onto the canvas. Drag a road body to move it; drag green (S/E) or blue (bend) handles to extend and snap endpoints to other roads within ~22px.
-            </div>
+          <div style={toolTabRowStyle}>
+            <button
+              type="button"
+              onClick={() => setBuilderToolTab('setup')}
+              aria-pressed={builderToolTab === 'setup'}
+              style={{ ...toolTabButtonStyle, ...(builderToolTab === 'setup' ? activeToolTabButtonStyle : inactiveToolTabButtonStyle) }}
+            >
+              Setup
+            </button>
+            <button
+              type="button"
+              onClick={() => setBuilderToolTab('palette')}
+              aria-pressed={builderToolTab === 'palette'}
+              style={{ ...toolTabButtonStyle, ...(builderToolTab === 'palette' ? activeToolTabButtonStyle : inactiveToolTabButtonStyle) }}
+            >
+              Palette
+            </button>
+            <button
+              type="button"
+              onClick={() => setBuilderToolTab('actions')}
+              aria-pressed={builderToolTab === 'actions'}
+              style={{ ...toolTabButtonStyle, ...(builderToolTab === 'actions' ? activeToolTabButtonStyle : inactiveToolTabButtonStyle) }}
+            >
+              Actions
+            </button>
           </div>
-          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-            <Button variant="default" disabled={isSaving || isLoadingLayout} onClick={handleSaveLayout} className="w-full text-center">
-              {isSaving ? 'Saving…' : 'Save map to Supabase'}
-            </Button>
-            <Button variant="ghost" onClick={openResetModal} className="w-full">
-              Reset to entry gate
-            </Button>
-            {locationId ? <p style={{ color: '#7f94ad', fontSize: 11, margin: 0 }}>Location: {locationId.slice(0, 8)}…</p> : null}
+
+          <div style={toolTabPanelStyle}>
+            {builderToolTab === 'setup' ? (
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Lot name</label>
+                  <input value={lotName} onChange={(event) => setLotName(event.target.value)} style={inputStyle} />
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={labelStyle}>How it works</div>
+                  <div style={helperBoxStyle}>
+                    Drag palette items onto the canvas. Drag a road body to move it; drag green (S/E) or blue (bend) handles to extend and snap endpoints to other roads within ~22px.
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {builderToolTab === 'palette' ? (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div style={{ ...labelStyle, marginBottom: 2 }}>Palette</div>
+                {palette.map((entry) => (
+                  <button
+                    key={entry.type}
+                    type="button"
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData('application/json', JSON.stringify({ type: entry.type }));
+                    }}
+                    onClick={() => addItem(entry.type)}
+                    style={paletteButtonStyle}
+                  >
+                    <strong>{itemToLabel(entry.type)}</strong>
+                    <span style={{ color: '#a9bdd6', fontSize: 12, lineHeight: 1.4 }}>{entry.description}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {builderToolTab === 'actions' ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <Button variant="default" disabled={isSaving || isLoadingLayout} onClick={handleSaveLayout} className="w-full text-center">
+                  {isSaving ? 'Saving…' : 'Save map to Supabase'}
+                </Button>
+                <Button variant="ghost" onClick={openResetModal} className="w-full">
+                  Reset to entry gate
+                </Button>
+                {locationId ? <p style={{ color: '#7f94ad', fontSize: 11, margin: 0 }}>Location: {locationId.slice(0, 8)}…</p> : null}
+              </div>
+            ) : null}
           </div>
         </aside>
 
@@ -995,214 +1049,239 @@ export default function LotBuilderPage() {
 
         <aside style={{ ...panelStyle, display: 'grid', gap: 12 }}>
           <div>
-            <div style={labelStyle}>Selected item</div>
+            <div style={labelStyle}>Inspector</div>
             <div style={{ fontSize: 18, fontWeight: 800 }}>
               {selectedItem?.type === 'road' ? 'Road object' : selectedItem?.label ?? 'Nothing selected'}
             </div>
           </div>
 
-          {selectedItem ? (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {selectedItem.type === 'road' ? (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Road type</label>
-                    <select
-                      value={selectedItem.roadKind}
-                      onChange={(event) => updateItem(selectedItem.id, { roadKind: event.target.value as 'straight' | 'curve' } as Partial<DraftItem>)}
-                      style={inputStyle}
-                    >
-                      <option value="straight">straight</option>
-                      <option value="curve">curve</option>
-                    </select>
-                  </div>
+          <div style={toolTabRowStyle}>
+            <button
+              type="button"
+              onClick={() => setInspectorToolTab('inspector')}
+              aria-pressed={inspectorToolTab === 'inspector'}
+              style={{ ...toolTabButtonStyle, ...(inspectorToolTab === 'inspector' ? activeToolTabButtonStyle : inactiveToolTabButtonStyle) }}
+            >
+              Item
+            </button>
+            <button
+              type="button"
+              onClick={() => setInspectorToolTab('export')}
+              aria-pressed={inspectorToolTab === 'export'}
+              style={{ ...toolTabButtonStyle, ...(inspectorToolTab === 'export' ? activeToolTabButtonStyle : inactiveToolTabButtonStyle) }}
+            >
+              JSON
+            </button>
+          </div>
 
-                  <div style={{ background: '#08111d', border: '1px solid #1f3550', borderRadius: 16, padding: 12, display: 'grid', gap: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div style={toolTabPanelStyle}>
+            {inspectorToolTab === 'inspector' ? (
+              selectedItem ? (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {selectedItem.type === 'road' ? (
+                    <div style={{ display: 'grid', gap: 12 }}>
                       <div>
-                        <div style={{ color: '#f4f7fb', fontWeight: 800 }}>Bend points</div>
-                        <div style={{ color: '#8ea4bc', fontSize: 12 }}>S = start, E = end (snap to other roads), numbered chips = bends.</div>
+                        <label style={labelStyle}>Road type</label>
+                        <select
+                          value={selectedItem.roadKind}
+                          onChange={(event) => updateItem(selectedItem.id, { roadKind: event.target.value as 'straight' | 'curve' } as Partial<DraftItem>)}
+                          style={inputStyle}
+                        >
+                          <option value="straight">straight</option>
+                          <option value="curve">curve</option>
+                        </select>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setItems((current) =>
-                            current.map((item) => {
-                              if (item.id !== selectedItem.id || item.type !== 'road') {
-                                return item;
-                              }
 
-                              const anchorA = item.points[Math.max(0, item.points.length - 2)] ?? { x: item.x, y: item.y };
-                              const anchorB = item.points[item.points.length - 1] ?? { x: item.x + item.width, y: item.y };
-                              const inserted = [...item.points.slice(0, -1), { x: (anchorA.x + anchorB.x) / 2, y: (anchorA.y + anchorB.y) / 2 - 48 }, anchorB];
-                              return syncRoadFromPoints({ ...item, points: inserted });
-                            }),
-                          )
-                        }
-                        style={{ ...paletteButtonStyle, width: 'auto', padding: '10px 12px' }}
-                      >
-                        Add bend point
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'grid', gap: 10 }}>
-                      {selectedItem.points.map((point, pointIndex) => {
-                        const isBendPoint = pointIndex > 0 && pointIndex < selectedItem.points.length - 1;
-
-                        return (
-                          <div
-                            key={`${selectedItem.id}-point-${pointIndex}`}
-                            style={{
-                              borderRadius: 14,
-                              border: isBendPoint ? '1px solid #24415f' : '1px solid #1a2c43',
-                              background: isBendPoint ? 'rgba(11,22,36,0.92)' : 'rgba(8,17,29,0.9)',
-                              padding: 12,
-                              display: 'grid',
-                              gap: 10,
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                              <div style={{ color: isBendPoint ? '#7bd3ff' : '#a9bdd6', fontWeight: 800, fontSize: 12, textTransform: 'uppercase' }}>
-                                {pointIndex === 0 ? 'Start' : pointIndex === selectedItem.points.length - 1 ? 'End' : `Bend ${pointIndex}`}
-                              </div>
-                              {isBendPoint ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setItems((current) =>
-                                      current.map((item) => {
-                                        if (item.id !== selectedItem.id || item.type !== 'road') {
-                                          return item;
-                                        }
-
-                                        return syncRoadFromPoints({ ...item, points: removeRoadPoint(item.points, pointIndex) });
-                                      }),
-                                    )
-                                  }
-                                  style={{
-                                    borderRadius: 999,
-                                    border: '1px solid #ff8a80',
-                                    background: '#281214',
-                                    color: '#ff8a80',
-                                    padding: '6px 10px',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    fontSize: 12,
-                                  }}
-                                >
-                                  Remove
-                                </button>
-                              ) : null}
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-                              <input type="number" value={Math.round(point.x)} onChange={(event) => updateRoadPoint(selectedItem.id, pointIndex, { x: Number(event.target.value) })} style={inputStyle} />
-                              <input type="number" value={Math.round(point.y)} onChange={(event) => updateRoadPoint(selectedItem.id, pointIndex, { y: Number(event.target.value) })} style={inputStyle} />
-                            </div>
-                            {(pointIndex === 0 || pointIndex === selectedItem.points.length - 1) ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setItems((current) =>
-                                    current.map((item) => {
-                                      if (item.id !== selectedItem.id || item.type !== 'road') {
-                                        return item;
-                                      }
-
-                                      return connectRoadEndpointToNearest(
-                                        item,
-                                        selectedItem.id,
-                                        pointIndex,
-                                        current
-                                          .filter((entry): entry is Extract<DraftItem, { type: 'road' }> => entry.type === 'road')
-                                          .map((road) => ({ id: road.id, points: road.points })),
-                                      );
-                                    }),
-                                  )
-                                }
-                                style={{ ...paletteButtonStyle, width: '100%', padding: '8px 10px', fontSize: 12 }}
-                              >
-                                Snap {pointIndex === 0 ? 'start' : 'end'} to nearest road
-                              </button>
-                            ) : null}
+                      <div style={{ background: '#08111d', border: '1px solid #1f3550', borderRadius: 16, padding: 12, display: 'grid', gap: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div>
+                            <div style={{ color: '#f4f7fb', fontWeight: 800 }}>Bend points</div>
+                            <div style={{ color: '#8ea4bc', fontSize: 12 }}>S = start, E = end (snap to other roads), numbered chips = bends.</div>
                           </div>
-                        );
-                      })}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setItems((current) =>
+                                current.map((item) => {
+                                  if (item.id !== selectedItem.id || item.type !== 'road') {
+                                    return item;
+                                  }
+
+                                  const anchorA = item.points[Math.max(0, item.points.length - 2)] ?? { x: item.x, y: item.y };
+                                  const anchorB = item.points[item.points.length - 1] ?? { x: item.x + item.width, y: item.y };
+                                  const inserted = [...item.points.slice(0, -1), { x: (anchorA.x + anchorB.x) / 2, y: (anchorA.y + anchorB.y) / 2 - 48 }, anchorB];
+                                  return syncRoadFromPoints({ ...item, points: inserted });
+                                }),
+                              )
+                            }
+                            style={{ ...paletteButtonStyle, width: 'auto', padding: '10px 12px' }}
+                          >
+                            Add bend point
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {selectedItem.points.map((point, pointIndex) => {
+                            const isBendPoint = pointIndex > 0 && pointIndex < selectedItem.points.length - 1;
+
+                            return (
+                              <div
+                                key={`${selectedItem.id}-point-${pointIndex}`}
+                                style={{
+                                  borderRadius: 14,
+                                  border: isBendPoint ? '1px solid #24415f' : '1px solid #1a2c43',
+                                  background: isBendPoint ? 'rgba(11,22,36,0.92)' : 'rgba(8,17,29,0.9)',
+                                  padding: 12,
+                                  display: 'grid',
+                                  gap: 10,
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                  <div style={{ color: isBendPoint ? '#7bd3ff' : '#a9bdd6', fontWeight: 800, fontSize: 12, textTransform: 'uppercase' }}>
+                                    {pointIndex === 0 ? 'Start' : pointIndex === selectedItem.points.length - 1 ? 'End' : `Bend ${pointIndex}`}
+                                  </div>
+                                  {isBendPoint ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setItems((current) =>
+                                          current.map((item) => {
+                                            if (item.id !== selectedItem.id || item.type !== 'road') {
+                                              return item;
+                                            }
+
+                                            return syncRoadFromPoints({ ...item, points: removeRoadPoint(item.points, pointIndex) });
+                                          }),
+                                        )
+                                      }
+                                      style={{
+                                        borderRadius: 999,
+                                        border: '1px solid #ff8a80',
+                                        background: '#281214',
+                                        color: '#ff8a80',
+                                        padding: '6px 10px',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : null}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                                  <input type="number" value={Math.round(point.x)} onChange={(event) => updateRoadPoint(selectedItem.id, pointIndex, { x: Number(event.target.value) })} style={inputStyle} />
+                                  <input type="number" value={Math.round(point.y)} onChange={(event) => updateRoadPoint(selectedItem.id, pointIndex, { y: Number(event.target.value) })} style={inputStyle} />
+                                </div>
+                                {(pointIndex === 0 || pointIndex === selectedItem.points.length - 1) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setItems((current) =>
+                                        current.map((item) => {
+                                          if (item.id !== selectedItem.id || item.type !== 'road') {
+                                            return item;
+                                          }
+
+                                          return connectRoadEndpointToNearest(
+                                            item,
+                                            selectedItem.id,
+                                            pointIndex,
+                                            current
+                                              .filter((entry): entry is Extract<DraftItem, { type: 'road' }> => entry.type === 'road')
+                                              .map((road) => ({ id: road.id, points: road.points })),
+                                          );
+                                        }),
+                                      )
+                                    }
+                                    style={{ ...paletteButtonStyle, width: '100%', padding: '8px 10px', fontSize: 12 }}
+                                  >
+                                    Snap {pointIndex === 0 ? 'start' : 'end'} to nearest road
+                                  </button>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : 'status' in selectedItem ? (
+                    <div>
+                      <label style={labelStyle}>Status</label>
+                      <select
+                        value={selectedItem.type === 'slot' ? selectedItem.status : 'available'}
+                        onChange={(event) => selectedItem.type === 'slot' && updateItem(selectedItem.id, { status: event.target.value as ParkingSlotStatus } as Partial<DraftItem>)}
+                        style={inputStyle}
+                      >
+                        <option value="available">available</option>
+                        <option value="reserved">reserved</option>
+                        <option value="occupied">occupied</option>
+                        <option value="blocked">blocked</option>
+                        <option value="disputed">disputed</option>
+                      </select>
+                    </div>
+                  ) : null}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                    <div>
+                      <label style={labelStyle}>{selectedItem.type === 'road' ? 'Bounds X' : 'X'}</label>
+                      <input
+                        type="number"
+                        value={Math.round(selectedItem.type === 'road' ? getRoadBounds(selectedItem.points).minX : selectedItem.x)}
+                        onChange={(event) => updateItem(selectedItem.id, { x: Number(event.target.value) } as Partial<DraftItem>)}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>{selectedItem.type === 'road' ? 'Bounds Y' : 'Y'}</label>
+                      <input
+                        type="number"
+                        value={Math.round(selectedItem.type === 'road' ? getRoadBounds(selectedItem.points).minY : selectedItem.y)}
+                        onChange={(event) => updateItem(selectedItem.id, { y: Number(event.target.value) } as Partial<DraftItem>)}
+                        style={inputStyle}
+                      />
                     </div>
                   </div>
-                </div>
-              ) : 'status' in selectedItem ? (
-                <div>
-                  <label style={labelStyle}>Status</label>
-                  <select
-                    value={selectedItem.type === 'slot' ? selectedItem.status : 'available'}
-                    onChange={(event) => selectedItem.type === 'slot' && updateItem(selectedItem.id, { status: event.target.value as ParkingSlotStatus } as Partial<DraftItem>)}
-                    style={inputStyle}
-                  >
-                    <option value="available">available</option>
-                    <option value="reserved">reserved</option>
-                    <option value="occupied">occupied</option>
-                    <option value="blocked">blocked</option>
-                    <option value="disputed">disputed</option>
-                  </select>
-                </div>
-              ) : null}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>{selectedItem.type === 'road' ? 'Bounds X' : 'X'}</label>
-                  <input
-                    type="number"
-                    value={Math.round(selectedItem.type === 'road' ? getRoadBounds(selectedItem.points).minX : selectedItem.x)}
-                    onChange={(event) => updateItem(selectedItem.id, { x: Number(event.target.value) } as Partial<DraftItem>)}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>{selectedItem.type === 'road' ? 'Bounds Y' : 'Y'}</label>
-                  <input
-                    type="number"
-                    value={Math.round(selectedItem.type === 'road' ? getRoadBounds(selectedItem.points).minY : selectedItem.y)}
-                    onChange={(event) => updateItem(selectedItem.id, { y: Number(event.target.value) } as Partial<DraftItem>)}
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
-              {selectedItem.type === 'road' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                  {selectedItem.type === 'road' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                      <div>
+                        <label style={labelStyle}>{selectedItem.roadKind === 'straight' ? 'Length' : 'Span X'}</label>
+                        <input
+                          type="number"
+                          min={80}
+                          value={Math.round(selectedItem.width)}
+                          onChange={(event) => updateItem(selectedItem.id, { width: Number(event.target.value) } as Partial<DraftItem>)}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Thickness</label>
+                        <input
+                          type="number"
+                          min={48}
+                          value={Math.round(selectedItem.height)}
+                          onChange={(event) => updateItem(selectedItem.id, { height: Number(event.target.value) } as Partial<DraftItem>)}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                   <div>
-                    <label style={labelStyle}>{selectedItem.roadKind === 'straight' ? 'Length' : 'Span X'}</label>
-                    <input
-                      type="number"
-                      min={80}
-                      value={Math.round(selectedItem.width)}
-                      onChange={(event) => updateItem(selectedItem.id, { width: Number(event.target.value) } as Partial<DraftItem>)}
-                      style={inputStyle}
-                    />
+                    <label style={labelStyle}>Rotation</label>
+                    <input type="number" value={selectedItem.rotation} onChange={(event) => updateItem(selectedItem.id, { rotation: Number(event.target.value) } as Partial<DraftItem>)} style={inputStyle} />
                   </div>
-                  <div>
-                    <label style={labelStyle}>Thickness</label>
-                    <input
-                      type="number"
-                      min={48}
-                      value={Math.round(selectedItem.height)}
-                      onChange={(event) => updateItem(selectedItem.id, { height: Number(event.target.value) } as Partial<DraftItem>)}
-                      style={inputStyle}
-                    />
-                  </div>
+                  <button type="button" onClick={removeSelected} style={dangerButtonStyle}>Remove item</button>
                 </div>
-              ) : null}
-              <div>
-                <label style={labelStyle}>Rotation</label>
-                <input type="number" value={selectedItem.rotation} onChange={(event) => updateItem(selectedItem.id, { rotation: Number(event.target.value) } as Partial<DraftItem>)} style={inputStyle} />
-              </div>
-              <button type="button" onClick={removeSelected} style={dangerButtonStyle}>Remove item</button>
-            </div>
-          ) : (
-            <div style={helperBoxStyle}>Select a slot, road, entry, exit, or arrow to adjust it.</div>
-          )}
+              ) : (
+                <div style={helperBoxStyle}>Select a slot, road, entry, exit, or arrow to adjust it.</div>
+              )
+            ) : null}
 
-          <div>
-            <div style={labelStyle}>Export JSON</div>
-            <textarea readOnly value={JSON.stringify(lot, null, 2)} style={{ ...inputStyle, minHeight: 280, fontFamily: 'Consolas, monospace', fontSize: 12 }} />
+            {inspectorToolTab === 'export' ? (
+              <div>
+                <div style={labelStyle}>Export JSON</div>
+                <textarea readOnly value={JSON.stringify(lot, null, 2)} style={{ ...inputStyle, minHeight: 280, fontFamily: 'Consolas, monospace', fontSize: 12 }} />
+              </div>
+            ) : null}
           </div>
         </aside>
       </section>
@@ -1278,6 +1357,41 @@ const helperBoxStyle: React.CSSProperties = {
   padding: 12,
   color: '#a9bdd6',
   lineHeight: 1.6,
+};
+
+const toolTabRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))',
+  gap: 8,
+};
+
+const toolTabButtonStyle: React.CSSProperties = {
+  borderRadius: 14,
+  border: '1px solid #26405f',
+  padding: '10px 12px',
+  fontWeight: 800,
+  cursor: 'pointer',
+  textAlign: 'center',
+};
+
+const activeToolTabButtonStyle: React.CSSProperties = {
+  background: '#102033',
+  color: '#f4f7fb',
+  borderColor: '#3b5c80',
+};
+
+const inactiveToolTabButtonStyle: React.CSSProperties = {
+  background: '#08111d',
+  color: '#8ea4bc',
+};
+
+const toolTabPanelStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 12,
+  padding: 14,
+  borderRadius: 18,
+  border: '1px solid #1a2c43',
+  background: '#0a1522',
 };
 
 const paletteButtonStyle: React.CSSProperties = {
