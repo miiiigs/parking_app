@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 
+import { ReservationDetailSheet, SessionDetailSheet } from '@/components/dashboard/operation-detail-sheet';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,9 +16,14 @@ import { useOperatorData } from '@/lib/useOperatorData';
 export default function ReservationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   const { data, loading } = useOperatorData();
   const reservations = data?.reservations ?? [];
+  const sessions = data?.sessions ?? [];
+  const payments = data?.payments ?? [];
+  const auditLogs = data?.auditLogs ?? [];
 
   const filteredReservations = reservations.filter((reservation) => {
     const matchesSearch =
@@ -29,6 +35,16 @@ export default function ReservationsPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  const selectedReservation = useMemo(
+    () => reservations.find((reservation) => reservation.id === selectedReservationId) ?? null,
+    [reservations, selectedReservationId],
+  );
+
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sessions],
+  );
 
   const formatTime = (value: string | Date | null | undefined) => {
     if (!value) return '';
@@ -138,7 +154,12 @@ export default function ReservationsPage() {
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(reservation.amount)}</td>
                       <td className="px-4 py-3">
-                        <Button size="sm" variant="outline" className="border-border text-xs">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-border text-xs"
+                          onClick={() => setSelectedReservationId(reservation.id)}
+                        >
                           View
                         </Button>
                       </td>
@@ -152,6 +173,37 @@ export default function ReservationsPage() {
             ) : null}
           </CardContent>
         </Card>
+
+        <ReservationDetailSheet
+          open={Boolean(selectedReservation)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedReservationId(null);
+            }
+          }}
+          reservation={selectedReservation}
+          sessions={sessions}
+          payments={payments}
+          auditLogs={auditLogs}
+          onOpenSession={(session) => setSelectedSessionId(session.id)}
+        />
+
+        <SessionDetailSheet
+          open={Boolean(selectedSession)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedSessionId(null);
+            }
+          }}
+          session={selectedSession}
+          reservation={
+            selectedSession?.reservationId
+              ? reservations.find((reservation) => reservation.id === selectedSession.reservationId) ?? null
+              : null
+          }
+          payments={payments}
+          auditLogs={auditLogs}
+        />
       </div>
     </DashboardLayout>
   );

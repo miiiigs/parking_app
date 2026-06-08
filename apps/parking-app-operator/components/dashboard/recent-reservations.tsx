@@ -1,16 +1,34 @@
 "use client";
 
+import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 
+import { ReservationDetailSheet, SessionDetailSheet } from '@/components/dashboard/operation-detail-sheet';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/formatCurrency';
 import { useOperatorData } from '@/lib/useOperatorData';
 import type { Reservation } from '@/lib/types';
 
 export function RecentReservations() {
+  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const { data, loading } = useOperatorData();
   const activeReservations = (data?.reservations ?? []).filter((reservation) => reservation.status === 'active');
+  const sessions = data?.sessions ?? [];
+  const payments = data?.payments ?? [];
+  const auditLogs = data?.auditLogs ?? [];
+
+  const selectedReservation = useMemo(
+    () => activeReservations.find((reservation) => reservation.id === selectedReservationId) ?? null,
+    [activeReservations, selectedReservationId],
+  );
+
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sessions],
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -60,6 +78,7 @@ export function RecentReservations() {
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payment</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Amount</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -84,6 +103,11 @@ export function RecentReservations() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3 font-medium text-foreground">{formatCurrency(reservation.amount)}</td>
+                  <td className="px-4 py-3">
+                    <Button size="sm" variant="outline" className="border-border text-xs" onClick={() => setSelectedReservationId(reservation.id)}>
+                      View
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -92,6 +116,39 @@ export function RecentReservations() {
         {activeReservations.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">No active reservations</div>
         ) : null}
+
+        <ReservationDetailSheet
+          open={Boolean(selectedReservation)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedReservationId(null);
+            }
+          }}
+          reservation={selectedReservation}
+          sessions={sessions}
+          payments={payments}
+          auditLogs={auditLogs}
+          onOpenSession={(session) => setSelectedSessionId(session.id)}
+        />
+
+        <SessionDetailSheet
+          open={Boolean(selectedSession)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedSessionId(null);
+            }
+          }}
+          session={selectedSession}
+          reservation={
+            selectedSession?.reservationId
+              ? activeReservations.find((reservation) => reservation.id === selectedSession.reservationId) ??
+                data?.reservations.find((reservation) => reservation.id === selectedSession.reservationId) ??
+                null
+              : null
+          }
+          payments={payments}
+          auditLogs={auditLogs}
+        />
       </CardContent>
     </Card>
   );

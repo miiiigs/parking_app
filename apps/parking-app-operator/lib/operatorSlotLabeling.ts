@@ -20,6 +20,10 @@ export function normalizeSlotLabelKey(label: string) {
   return label.trim().toLowerCase();
 }
 
+export function formatSlotLabel(prefix: string, number: number, padding = 2) {
+  return `${prefix}${String(number).padStart(padding, '0')}`;
+}
+
 export function pickCanonicalSlotPrefix<T extends Pick<SlotLabelTarget, 'label'>>(slots: T[]) {
   const counts = new Map<string, number>();
 
@@ -42,6 +46,56 @@ export function sortSlotsForNumbering<T extends Pick<SlotLabelTarget, 'x' | 'y'>
   });
 }
 
+export function buildSequentialSlotLabels<T extends SlotLabelTarget>(
+  slots: T[],
+  prefix: string,
+  padding = Math.max(2, String(slots.length).length),
+) {
+  const orderedSlots = sortSlotsForNumbering(slots);
+  const labelByOccurrence = new Map<string, string>();
+  const occurrenceCounts = new Map<string, number>();
+
+  orderedSlots.forEach((slot, index) => {
+    const occurrence = (occurrenceCounts.get(slot.id) ?? 0) + 1;
+    occurrenceCounts.set(slot.id, occurrence);
+    labelByOccurrence.set(`${slot.id}::${occurrence}`, formatSlotLabel(prefix, index + 1, padding));
+  });
+
+  return labelByOccurrence;
+}
+
+export function renumberSlotLabels<T extends SlotLabelTarget>(
+  slots: T[],
+  prefix: string,
+  padding = Math.max(2, String(slots.length).length),
+) {
+  const labelById = buildSequentialSlotLabels(slots, prefix, padding);
+  const occurrenceCounts = new Map<string, number>();
+
+  return slots.map((slot) => ({
+    ...slot,
+    label: (() => {
+      const occurrence = (occurrenceCounts.get(slot.id) ?? 0) + 1;
+      occurrenceCounts.set(slot.id, occurrence);
+      return labelById.get(`${slot.id}::${occurrence}`) ?? slot.label;
+    })(),
+  }));
+}
+
+export function findDuplicateSlotLabels<T extends Pick<SlotLabelTarget, 'label'>>(slots: T[]) {
+  const counts = new Map<string, number>();
+
+  for (const slot of slots) {
+    const key = normalizeSlotLabelKey(parseSlotLabel(slot.label).normalized);
+    if (!key) {
+      continue;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([label]) => label);
+}
+
 export function ensureUniqueSlotLabels<T extends SlotLabelTarget>(slots: T[]): T[] {
   if (slots.length === 0) {
     return slots;
@@ -55,19 +109,11 @@ export function ensureUniqueSlotLabels<T extends SlotLabelTarget>(slots: T[]): T
     return slots;
   }
 
-  const orderedSlots = sortSlotsForNumbering(slots);
   const prefix = pickCanonicalSlotPrefix(slots);
   const padding = Math.max(
     2,
     ...slots.map((slot) => parseSlotLabel(slot.label).digits?.length ?? 0),
     String(slots.length).length,
   );
-  const labelById = new Map(
-    orderedSlots.map((slot, index) => [slot.id, `${prefix}${String(index + 1).padStart(padding, '0')}`]),
-  );
-
-  return slots.map((slot) => ({
-    ...slot,
-    label: labelById.get(slot.id) ?? slot.label,
-  }));
+  return renumberSlotLabels(slots, prefix, padding);
 }

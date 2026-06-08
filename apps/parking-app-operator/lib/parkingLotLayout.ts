@@ -16,6 +16,7 @@ import {
 } from './operatorLocation';
 import {
   buildArchivedSlotLabel,
+  buildDraftLiveSlotMatches,
   buildSlotInventorySyncPlan,
 } from './operatorSlotSyncPlan';
 import {
@@ -132,20 +133,36 @@ export function ensureUniqueLotSlotLabels(lot: ParkingLotDefinition): ParkingLot
 
 export function normalizeLotForSave(lot: ParkingLotDefinition, locationId: string, liveSlots: SavedSlotRef[]): ParkingLotDefinition {
   const uniqueLot = ensureUniqueLotSlotLabels(lot);
-  const slots = uniqueLot.slots.map((slot) => {
-    const live =
-      liveSlots.find((entry) => entry.id === slot.id) ??
-      liveSlots.find((entry) => entry.label.toLowerCase() === slot.label.toLowerCase());
+  const matches = buildDraftLiveSlotMatches(
+    uniqueLot.slots.map((slot) => ({
+      id: slot.id,
+      label: slot.label,
+      status: slot.status,
+      x: slot.x,
+      y: slot.y,
+    })),
+    liveSlots,
+  );
+  const liveByDraftId = new Map(
+    matches
+      .filter((match) => Boolean(match.liveSlot))
+      .map((match) => [match.draftSlot.id, match.liveSlot]),
+  );
+  const slots = uniqueLot.slots.map((slot, index) => {
+    const live = liveByDraftId.get(slot.id);
 
     if (!live) {
-      return slot;
+      return {
+        ...slot,
+        displayOrder: index + 1,
+      };
     }
 
     return {
       ...slot,
       id: live.id,
       status: live.status,
-      displayOrder: live.displayOrder,
+      displayOrder: index + 1,
     };
   });
 

@@ -22,7 +22,14 @@ import {
   type ParkingLotDefinition,
 } from '@/lib/parkingMap';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
-import type { OperatorDashboardData } from '@/lib/types';
+import type {
+  AuditLog,
+  OperatorDashboardData,
+  OperatorSystemHealth,
+  ParkingSessionRecord,
+  PaymentRecord,
+  Reservation,
+} from '@/lib/types';
 
 function buildAuditDetails(row: {
   table_name: string;
@@ -32,6 +39,20 @@ function buildAuditDetails(row: {
 }) {
   const source = typeof row.metadata?.source === 'string' ? row.metadata.source : 'database';
   return `${row.table_name} ${row.action} on ${row.record_id ?? 'unknown record'} via ${source}`;
+}
+
+function buildServerSystemHealth(timestamp: string): OperatorSystemHealth {
+  return {
+    overall: 'healthy',
+    database: 'healthy',
+    realtime: 'unknown',
+    syncMode: 'realtime',
+    backendReachable: true,
+    lastSuccessfulSyncAt: timestamp,
+    lastDashboardRefreshAt: timestamp,
+    lastRealtimeEventAt: null,
+    failedActionCount: 0,
+  };
 }
 
 export async function GET() {
@@ -53,10 +74,13 @@ export async function GET() {
     const location = locationContext.activeLocation;
 
     if (!location) {
+      const timestamp = new Date().toISOString();
       return NextResponse.json({
         location: null,
         parkingMap: { id: 'map-empty', name: 'Parking Map', totalSlots: 0, slots: [], layout: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
         reservations: [],
+        sessions: [],
+        payments: [],
         auditLogs: [],
         metrics: {
           activeReservations: 0,
@@ -69,6 +93,7 @@ export async function GET() {
           averageSessionDuration: 0,
         },
         reconciliationRuns: [],
+        systemHealth: buildServerSystemHealth(timestamp),
       });
     }
 
@@ -333,16 +358,69 @@ export async function GET() {
         : buildGridSlots(normalizedSlotRows);
 
     const slotLabelMap = new Map(operatorSlots.map((slot) => [slot.id, slot.slotNumber]));
-    const latestPaymentStatusByReservationId = new Map<string, string>();
+    const normalizePaymentStatus = (status: string): PaymentRecord['status'] =>
+      status === 'paid'
+        ? 'completed'
+        : status === 'failed'
+          ? 'failed'
+          : status === 'refunded'
+            ? 'refunded'
+            : 'pending';
 
-    for (const payment of paymentRows) {
-      if (payment.reservation_id && !latestPaymentStatusByReservationId.has(payment.reservation_id)) {
-        latestPaymentStatusByReservationId.set(payment.reservation_id, payment.status);
+    const payments: PaymentRecord[] = paymentRows.map((payment) => ({
+      id: payment.id,
+      paymentId: `PAY-${String(payment.id).slice(0, 8).toUpperCase()}`,
+      reservationId: payment.reservation_id ?? null,
+      sessionId: payment.session_id ?? null,
+      status: normalizePaymentStatus(payment.status),
+      amount: Number(payment.amount ?? 0),
+      createdAt: payment.created_at,
+      paidAt: payment.paid_at,
+    }));
+
+    const latestPaymentByReservationId = new Map<string, PaymentRecord>();
+    const latestPaymentBySessionId = new Map<string, PaymentRecord>();
+    for (const payment of payments) {
+      if (payment.reservationId && !latestPaymentByReservationId.has(payment.reservationId)) {
+        latestPaymentByReservationId.set(payment.reservationId, payment);
+      }
+
+      if (payment.sessionId && !latestPaymentBySessionId.has(payment.sessionId)) {
+        latestPaymentBySessionId.set(payment.sessionId, payment);
       }
     }
 
-    const reservations = reservationRows.map((reservation) => {
-      const paymentStatus = latestPaymentStatusByReservationId.get(reservation.id) ?? 'pending';
+    const sessionByReservationId = new Map(sessionRows.map((session) => [session.reservation_id, session]).filter((entry): entry is [string, (typeof sessionRows)[number]] => Boolean(entry[0])));
+    const sessions: ParkingSessionRecord[] = sessionRows.map((session) => {
+      const linkedPayment = latestPaymentBySessionId.get(session.id);
+
+      return {
+        id: session.id,
+        sessionId: `SES-${String(session.id).slice(0, 8).toUpperCase()}`,
+        reservationId: session.reservation_id ?? null,
+        slotId: session.slot_id,
+        slotNumber: slotLabelMap.get(session.slot_id) ?? 'Unknown',
+        startedAt: session.started_at,
+        endedAt: session.ended_at,
+        billedMinutes: Number(session.billed_minutes ?? 0),
+        status:
+          session.status === 'completed'
+            ? 'completed'
+            : session.status === 'cancelled'
+              ? 'cancelled'
+              : session.status === 'expired'
+                ? 'expired'
+                : session.status === 'active'
+                  ? 'active'
+                  : 'pending',
+        amount: Number(linkedPayment?.amount ?? 0),
+        paymentStatus: linkedPayment?.status ?? 'pending',
+      };
+    });
+
+    const reservations: Reservation[] = reservationRows.map((reservation) => {
+      const linkedPayment = latestPaymentByReservationId.get(reservation.id);
+      const linkedSession = sessionByReservationId.get(reservation.id) ?? null;
 
       return {
         id: reservation.id,
@@ -369,15 +447,16 @@ export async function GET() {
                 : reservation.status,
         amount: Number(reservation.reservation_fee ?? 0),
         paymentStatus:
-          paymentStatus === 'paid'
-            ? 'completed'
-            : paymentStatus === 'failed' || paymentStatus === 'refunded'
-              ? 'failed'
-              : 'pending',
+          linkedPayment?.status === 'refunded'
+            ? 'failed'
+            : linkedPayment?.status ?? 'pending',
+        linkedSessionId: linkedSession?.id ?? null,
       };
     });
 
     const occupiedSlotCount = normalizedSlotRows.filter((slot) => slot.status === 'occupied').length;
+
+    const paymentIdSet = new Set(paymentRows.map((payment) => payment.id));
 
     const filteredAdminAuditRows = adminAuditRows.filter((row) => {
       const metadataLocationId =
@@ -403,20 +482,43 @@ export async function GET() {
         return sessionIdSet.has(row.record_id);
       }
 
+      if (row.table_name === 'payments' && row.record_id) {
+        return paymentIdSet.has(row.record_id);
+      }
+
       return false;
     });
 
-    const auditLogs = [
+    const auditLogs: AuditLog[] = [
       ...filteredAdminAuditRows.map((row) => ({
         id: `audit-${row.id}`,
         timestamp: row.created_at,
         action: `${row.table_name}.${row.action}`,
         operator: row.actor_user_id ? actorNameByUserId.get(row.actor_user_id) ?? 'Staff User' : 'System',
+        tableName: row.table_name,
         slotId: row.table_name === 'parking_slots' ? row.record_id ?? undefined : undefined,
         slotNumber:
           row.table_name === 'parking_slots' && row.record_id
             ? slotLabelMap.get(row.record_id) ?? undefined
             : undefined,
+        reservationId:
+          row.table_name === 'reservations'
+            ? row.record_id ?? undefined
+            : typeof row.metadata?.reservation_id === 'string'
+              ? row.metadata.reservation_id
+              : undefined,
+        sessionId:
+          row.table_name === 'parking_sessions'
+            ? row.record_id ?? undefined
+            : typeof row.metadata?.session_id === 'string'
+              ? row.metadata.session_id
+              : undefined,
+        paymentId:
+          row.table_name === 'payments'
+            ? row.record_id ?? undefined
+            : typeof row.metadata?.payment_id === 'string'
+              ? row.metadata.payment_id
+              : undefined,
         details: buildAuditDetails(row),
         status: 'success' as const,
       })),
@@ -425,8 +527,15 @@ export async function GET() {
         timestamp: row.created_at,
         action: row.event_type,
         operator: typeof row.payload?.operator === 'string' ? row.payload.operator : 'System',
+        tableName: 'operator_events',
         slotId: row.slot_id ?? undefined,
         slotNumber: row.slot_id ? slotLabelMap.get(row.slot_id) ?? undefined : undefined,
+        reservationId: row.reservation_id ?? undefined,
+        sessionId: row.session_id ?? undefined,
+        paymentId:
+          typeof row.payload?.payment_id === 'string'
+            ? row.payload.payment_id
+            : undefined,
         details: typeof row.payload === 'object' ? JSON.stringify(row.payload) : String(row.payload ?? ''),
         status: 'success' as const,
       })),
@@ -441,11 +550,14 @@ export async function GET() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    const generatedAt = new Date().toISOString();
 
     const payload: OperatorDashboardData = {
       location,
       parkingMap,
       reservations,
+      sessions,
+      payments,
       auditLogs,
       metrics: buildOperatorDashboardMetrics({
         reservations,
@@ -483,6 +595,7 @@ export async function GET() {
               : row.created_at,
         }))
         .sort((left, right) => new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime()),
+      systemHealth: buildServerSystemHealth(generatedAt),
     };
 
     return NextResponse.json(payload);

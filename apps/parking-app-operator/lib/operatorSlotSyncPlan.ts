@@ -66,6 +66,21 @@ function sortSlotsForNumbering(slots: SlotSyncDraftSlot[]) {
   });
 }
 
+function formatSlotLabel(prefix: string, number: number, padding = 2) {
+  return `${prefix}${String(number).padStart(padding, '0')}`;
+}
+
+function buildSequentialSlotLabels(
+  slots: SlotSyncDraftSlot[],
+  prefix: string,
+  padding = Math.max(2, String(slots.length).length),
+) {
+  const orderedSlots = sortSlotsForNumbering(slots);
+  return new Map(
+    orderedSlots.map((slot, index) => [slot.id, formatSlotLabel(prefix, index + 1, padding)]),
+  );
+}
+
 function ensureUniqueDraftSlotLabels(slots: SlotSyncDraftSlot[]) {
   if (slots.length === 0) {
     return slots;
@@ -86,14 +101,55 @@ function ensureUniqueDraftSlotLabels(slots: SlotSyncDraftSlot[]) {
     ...slots.map((slot) => parseSlotLabel(slot.label).digits?.length ?? 0),
     String(slots.length).length,
   );
-  const labelById = new Map(
-    orderedSlots.map((slot, index) => [slot.id, `${prefix}${String(index + 1).padStart(padding, '0')}`]),
-  );
+  const labelById = buildSequentialSlotLabels(orderedSlots, prefix, padding);
 
   return slots.map((slot) => ({
     ...slot,
     label: labelById.get(slot.id) ?? slot.label,
   }));
+}
+
+export type DraftLiveSlotMatch = {
+  draftSlot: SlotSyncDraftSlot;
+  liveSlot: SlotSyncLiveSlot | null;
+  displayOrder: number;
+};
+
+export function buildDraftLiveSlotMatches(
+  draftSlots: SlotSyncDraftSlot[],
+  liveSlots: SlotSyncLiveSlot[],
+): DraftLiveSlotMatch[] {
+  const remainingLiveSlots = [...liveSlots];
+  const exactIdMatches = new Map<string, SlotSyncLiveSlot>();
+
+  for (const draftSlot of draftSlots) {
+    const liveIndex = remainingLiveSlots.findIndex((live) => live.id === draftSlot.id);
+    if (liveIndex >= 0) {
+      exactIdMatches.set(draftSlot.id, remainingLiveSlots.splice(liveIndex, 1)[0]);
+    }
+  }
+
+  return draftSlots.map((draftSlot, index) => {
+    const displayOrder = index + 1;
+    const exactMatch = exactIdMatches.get(draftSlot.id);
+    if (exactMatch) {
+      return { draftSlot, liveSlot: exactMatch, displayOrder };
+    }
+
+    const displayOrderMatchIndex = remainingLiveSlots.findIndex((live) => live.displayOrder === displayOrder);
+    if (displayOrderMatchIndex >= 0) {
+      return { draftSlot, liveSlot: remainingLiveSlots.splice(displayOrderMatchIndex, 1)[0], displayOrder };
+    }
+
+    const labelMatchIndex = remainingLiveSlots.findIndex(
+      (live) => normalizeSlotLabelKey(live.label) === normalizeSlotLabelKey(draftSlot.label),
+    );
+    if (labelMatchIndex >= 0) {
+      return { draftSlot, liveSlot: remainingLiveSlots.splice(labelMatchIndex, 1)[0], displayOrder };
+    }
+
+    return { draftSlot, liveSlot: null, displayOrder };
+  });
 }
 
 export function buildTemporarySlotLabel(id: string) {
@@ -110,36 +166,20 @@ export function buildSlotInventorySyncPlan(
   locationId: string,
 ): SlotSyncPlan {
   const uniqueDraftSlots = ensureUniqueDraftSlotLabels(draftSlots);
-  const remainingLiveSlots = [...liveSlots];
   const matchedLiveIds = new Set<string>();
   const updates: SlotSyncPlan['updates'] = [];
   const inserts: SlotSyncPlan['inserts'] = [];
+  const matches = buildDraftLiveSlotMatches(uniqueDraftSlots, liveSlots);
 
-  uniqueDraftSlots.forEach((slot, index) => {
-    const displayOrder = index + 1;
-    const exactIdMatchIndex = remainingLiveSlots.findIndex((live) => live.id === slot.id);
-    const labelMatchIndex =
-      exactIdMatchIndex >= 0
-        ? exactIdMatchIndex
-        : remainingLiveSlots.findIndex((live) => normalizeSlotLabelKey(live.label) === normalizeSlotLabelKey(slot.label));
-    const displayOrderMatchIndex =
-      exactIdMatchIndex >= 0 || labelMatchIndex >= 0
-        ? exactIdMatchIndex >= 0
-          ? exactIdMatchIndex
-          : labelMatchIndex
-        : remainingLiveSlots.findIndex((live) => live.displayOrder === displayOrder);
-    const matchIndex =
-      exactIdMatchIndex >= 0 ? exactIdMatchIndex : labelMatchIndex >= 0 ? labelMatchIndex : displayOrderMatchIndex;
-    const liveMatch = matchIndex >= 0 ? remainingLiveSlots.splice(matchIndex, 1)[0] : null;
+  matches.forEach(({ draftSlot, liveSlot, displayOrder }) => {
+    if (liveSlot) {
+      matchedLiveIds.add(liveSlot.id);
 
-    if (liveMatch) {
-      matchedLiveIds.add(liveMatch.id);
-
-      if (liveMatch.label !== slot.label || liveMatch.displayOrder !== displayOrder) {
+      if (liveSlot.label !== draftSlot.label || liveSlot.displayOrder !== displayOrder) {
         updates.push({
-          id: liveMatch.id,
-          currentLabel: liveMatch.label,
-          slot_label: slot.label,
+          id: liveSlot.id,
+          currentLabel: liveSlot.label,
+          slot_label: draftSlot.label,
           display_order: displayOrder,
         });
       }
@@ -149,9 +189,9 @@ export function buildSlotInventorySyncPlan(
 
     inserts.push({
       location_id: locationId,
-      slot_label: slot.label,
+      slot_label: draftSlot.label,
       display_order: displayOrder,
-      status: slot.status === 'blocked' || slot.status === 'disputed' ? slot.status : 'available',
+      status: draftSlot.status === 'blocked' || draftSlot.status === 'disputed' ? draftSlot.status : 'available',
     });
   });
 

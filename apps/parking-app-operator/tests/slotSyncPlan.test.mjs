@@ -65,3 +65,42 @@ test('plans temporary relabels when an updated slot reuses a removed slot label'
     ],
   );
 });
+
+test('keeps existing live ids matched first so a new draft slot cannot steal an old slot label match', () => {
+  const plan = buildSlotInventorySyncPlan(
+    [
+      { id: 'live-1', label: 'Slot #1', status: 'available', x: 0, y: 0 },
+      { id: 'live-20', label: 'Slot #21', status: 'available', x: 80, y: 0 },
+      { id: 'draft-new', label: 'Slot #20', status: 'available', x: 40, y: 0 },
+    ],
+    [
+      { id: 'live-1', label: 'Slot #1', status: 'available', displayOrder: 1 },
+      { id: 'live-20', label: 'Slot #20', status: 'available', displayOrder: 2 },
+    ],
+    'location-1',
+  );
+
+  assert.deepEqual(
+    plan.updates,
+    [
+      {
+        id: 'live-20',
+        currentLabel: 'Slot #20',
+        slot_label: 'Slot #21',
+        display_order: 2,
+      },
+    ],
+  );
+  assert.deepEqual(
+    plan.inserts,
+    [
+      {
+        location_id: 'location-1',
+        slot_label: 'Slot #20',
+        display_order: 3,
+        status: 'available',
+      },
+    ],
+  );
+  assert.equal(plan.temporaryRelabels.some((entry) => entry.id === 'live-20'), true);
+});

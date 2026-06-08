@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { ADMIN_ROLES } from './lib/adminAuth';
+import { getRouteCapability, hasAdminCapability } from './lib/adminPermissions';
 import { getAdminSupabaseConfig } from './lib/supabase';
 
 export async function middleware(request: NextRequest) {
@@ -50,6 +51,11 @@ export async function middleware(request: NextRequest) {
 
     if (!role || !ADMIN_ROLES.includes(role)) {
       return NextResponse.redirect(new URL('/login?error=Access%20denied.%20Ask%20an%20administrator%20to%20assign%20your%20role.', request.url));
+    }
+
+    const requiredCapability = getRouteCapability(pathname);
+    if (requiredCapability && !hasAdminCapability(role, requiredCapability)) {
+      return NextResponse.redirect(new URL('/?error=Access%20denied%20for%20this%20area.', request.url));
     }
   }
 

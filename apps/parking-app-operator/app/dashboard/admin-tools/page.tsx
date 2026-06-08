@@ -17,6 +17,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth-context';
+import { recordOperatorActionFailure, recordOperatorActionSuccess } from '@/lib/operatorDataStore';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import type { ReconciliationRun } from '@/lib/types';
 import { useOperatorData } from '@/lib/useOperatorData';
 
@@ -39,8 +41,9 @@ export default function AdminToolsPage() {
 
   const reconciliationRuns = data?.reconciliationRuns ?? [];
   const metrics = data?.metrics ?? null;
-  const isAdmin = user?.role === 'admin';
-  const canOperate = user?.role === 'admin' || user?.role === 'operator';
+  const canRunReconciliation = hasOperatorCapability(user?.role, 'run-reconciliation');
+  const canResetSlots = hasOperatorCapability(user?.role, 'reset-slot-statuses');
+  const canResetDemo = hasOperatorCapability(user?.role, 'reset-demo-data');
 
   const latestRun = reconciliationRuns[0] ?? null;
 
@@ -51,7 +54,7 @@ export default function AdminToolsPage() {
         title: 'Run Reconciliation',
         description: 'Check the slot board against reservations and sessions, then fix mismatched states.',
         icon: RefreshCcw,
-        disabled: !canOperate,
+        disabled: !canRunReconciliation,
         buttonLabel: 'Run Checkup',
         tone: 'default' as const,
       },
@@ -60,7 +63,7 @@ export default function AdminToolsPage() {
         title: 'Reset Slot Statuses',
         description: 'Force every slot back to available and record the reset in the operator event log.',
         icon: RotateCcw,
-        disabled: !canOperate,
+        disabled: !canResetSlots,
         buttonLabel: 'Reset Slots',
         tone: 'outline' as const,
       },
@@ -69,12 +72,12 @@ export default function AdminToolsPage() {
         title: 'Full Demo Reset',
         description: 'Delete reservations, sessions, payments, and operator events, then restore all slots to available.',
         icon: Trash2,
-        disabled: !isAdmin,
+        disabled: !canResetDemo,
         buttonLabel: 'Full Reset',
         tone: 'destructive' as const,
       },
     ],
-    [canOperate, isAdmin],
+    [canRunReconciliation, canResetSlots, canResetDemo],
   );
 
   async function fetchActionPreview(action: AdminAction) {
@@ -95,7 +98,9 @@ export default function AdminToolsPage() {
       }
 
       setPendingPreview(payload.preview as AdminActionPreview);
+      recordOperatorActionSuccess();
     } catch (error) {
+      recordOperatorActionFailure();
       setMessage(error instanceof Error ? error.message : 'Failed to load action preview.');
       setMessageTone('error');
     } finally {
@@ -125,8 +130,10 @@ export default function AdminToolsPage() {
       setMessage(payload?.message ?? 'Action completed.');
       setMessageTone('success');
       setPendingPreview(null);
+      recordOperatorActionSuccess();
       await refresh({ silent: true });
     } catch (error) {
+      recordOperatorActionFailure();
       setMessage(error instanceof Error ? error.message : 'Admin tool action failed.');
       setMessageTone('error');
     } finally {
@@ -219,7 +226,7 @@ export default function AdminToolsPage() {
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 {user?.role ?? 'Unknown'}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Destructive tools stay restricted to admin users.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Tools are filtered and enforced by role capabilities.</p>
             </CardContent>
           </Card>
         </div>
@@ -262,6 +269,11 @@ export default function AdminToolsPage() {
               <CardTitle className="text-lg font-semibold text-foreground">Recent Reconciliation Runs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!canRunReconciliation && !canResetSlots && !canResetDemo ? (
+                <div className="rounded-lg border border-border bg-secondary/30 p-3 text-sm text-muted-foreground">
+                  Read-only access. Your role can view audit and metrics, but cannot run operator actions.
+                </div>
+              ) : null}
               {loading && !data ? (
                 <div className="py-4 text-sm text-muted-foreground">Loading reconciliation history...</div>
               ) : null}

@@ -512,12 +512,14 @@ export default function LotBuilderPage() {
           return merged;
         }
 
+        const roadItem = item as Extract<DraftItem, { type: 'road' }>;
+
         // If rotation is being changed for a straight road, rotate the geometry
         // by updating the endpoint based on the current length so points remain
         // the canonical geometry (rotation is derived from points).
         if ('rotation' in patch && patch.rotation !== undefined && merged.roadKind === 'straight') {
-          const start = item.points[0];
-          const lastPoint = item.points[item.points.length - 1];
+          const start = roadItem.points[0];
+          const lastPoint = roadItem.points[roadItem.points.length - 1];
           const length = Math.hypot(lastPoint.x - start.x, lastPoint.y - start.y) || merged.width || 0;
           const radians = (patch.rotation * Math.PI) / 180;
           const end = {
@@ -538,7 +540,7 @@ export default function LotBuilderPage() {
         if ('width' in patch && patch.width !== undefined) {
           // When changing the width (length) of a straight road, preserve
           // the current rotation and compute the new end point accordingly.
-          const start = merged.points[0];
+          const start = roadItem.points[0];
           const radians = ((merged.rotation ?? 0) * Math.PI) / 180;
           const end = {
             x: start.x + patch.width * Math.cos(radians),

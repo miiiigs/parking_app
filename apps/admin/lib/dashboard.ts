@@ -1,4 +1,5 @@
 import { getAdminSupabaseConfig } from './supabase';
+import { resolveAdminLocationContext } from './adminLocationServer';
 
 export type AdminLocation = {
   id: string;
@@ -187,16 +188,8 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     Prefer: 'return=representation',
   };
 
-  const locationResponse = await fetch(
-    `${config.url}/rest/v1/locations?select=id,name,code,address,city,is_active,created_at&is_active=eq.true&order=created_at.asc&limit=1`,
-    {
-      headers,
-      cache: 'no-store',
-    },
-  );
-
-  const locationRows = await readRestList<AdminLocation>(locationResponse);
-  const location = locationRows[0] ?? fallbackLocation;
+  const locationContext = await resolveAdminLocationContext();
+  const location = (locationContext.activeLocation ?? fallbackLocation) as AdminLocation;
 
   const slotResponse = await fetch(
     `${config.url}/rest/v1/parking_slots?select=id,slot_label,status,display_order,qr_token,location_id&location_id=eq.${location.id}&order=display_order.asc`,
@@ -213,16 +206,11 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     display_order: number;
     qr_token: string;
   }>(slotResponse);
+  const slotIds = slotRows.map((slot) => slot.id);
+  const slotIdFilter = slotIds.length > 0 ? slotIds.join(',') : null;
 
-  const reservationResponse = await fetch(
-    `${config.url}/rest/v1/reservations?select=id,slot_id,plate_number,status,arrival_window_minutes,reservation_fee,reserved_at,expires_at&status=in.(confirmed)&order=reserved_at.desc&limit=20`,
-    {
-      headers,
-      cache: 'no-store',
-    },
-  );
-
-  const reservationRows = await readRestList<{
+  const reservationRows = slotIdFilter
+    ? await readRestList<{
     id: string;
     slot_id: string;
     plate_number: string;
@@ -231,45 +219,52 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     reservation_fee: number;
     reserved_at: string;
     expires_at: string;
-  }>(reservationResponse);
+      }>(
+        await fetch(
+          `${config.url}/rest/v1/reservations?select=id,slot_id,plate_number,status,arrival_window_minutes,reservation_fee,reserved_at,expires_at&slot_id=in.(${slotIdFilter})&order=reserved_at.desc&limit=20`,
+          {
+            headers,
+            cache: 'no-store',
+          },
+        ),
+      )
+    : [];
+  const reservationIds = reservationRows.map((reservation) => reservation.id);
+  const reservationIdFilter = reservationIds.length > 0 ? reservationIds.join(',') : null;
 
-  const sessionResponse = await fetch(
-    `${config.url}/rest/v1/parking_sessions?select=status,billed_amount,slot_id&status=in.(active,completed)&order=started_at.desc`,
-    {
-      headers,
-      cache: 'no-store',
-    },
-  );
-
-  const sessionRows = await readRestList<{
+  const sessionRows = slotIdFilter
+    ? await readRestList<{
     status: string;
     billed_amount: number | null;
     slot_id: string;
-  }>(sessionResponse);
+      }>(
+        await fetch(
+          `${config.url}/rest/v1/parking_sessions?select=status,billed_amount,slot_id,reservation_id&slot_id=in.(${slotIdFilter})&status=in.(active,completed)&order=started_at.desc`,
+          {
+            headers,
+            cache: 'no-store',
+          },
+        ),
+      )
+    : [];
 
   const activeSessionRows = sessionRows.filter((session) => session.status === 'active');
   const completedSessionCount = sessionRows.filter((session) => session.status === 'completed').length;
 
-  const paymentResponse = await fetch(
-    `${config.url}/rest/v1/payments?select=amount,status&status=eq.paid&order=paid_at.desc`,
-    {
-      headers,
-      cache: 'no-store',
-    },
-  );
-
-  const paymentRows = await readRestList<{
+  const paymentRows = reservationIdFilter
+    ? await readRestList<{
     amount: number;
     status: 'paid';
-  }>(paymentResponse);
-
-  const auditResponse = await fetch(
-    `${config.url}/rest/v1/admin_audit_log?select=id,table_name,record_id,action,actor_user_id,created_at&order=created_at.desc&limit=10`,
-    {
-      headers,
-      cache: 'no-store',
-    },
-  );
+      }>(
+        await fetch(
+          `${config.url}/rest/v1/payments?select=amount,status,reservation_id&reservation_id=in.(${reservationIdFilter})&status=eq.paid&order=paid_at.desc`,
+          {
+            headers,
+            cache: 'no-store',
+          },
+        ),
+      )
+    : [];
 
   const auditRows = await readRestList<{
     id: string;
@@ -278,14 +273,14 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     action: AdminAuditEvent['action'];
     actor_user_id: string | null;
     created_at: string;
-  }>(auditResponse);
-
-  const reconciliationResponse = await fetch(
-    `${config.url}/rest/v1/reconciliation_runs?select=id,run_status,mismatch_count,fixed_count,message,started_at,completed_at&order=started_at.desc&limit=5`,
-    {
-      headers,
-      cache: 'no-store',
-    },
+  }>(
+    await fetch(
+      `${config.url}/rest/v1/admin_audit_log?select=id,table_name,record_id,action,actor_user_id,created_at&order=created_at.desc&limit=50`,
+      {
+        headers,
+        cache: 'no-store',
+      },
+    ),
   );
 
   const reconciliationRows = await readRestList<{
@@ -296,7 +291,15 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     message: string | null;
     started_at: string;
     completed_at: string | null;
-  }>(reconciliationResponse);
+  }>(
+    await fetch(
+      `${config.url}/rest/v1/reconciliation_runs?select=id,run_status,mismatch_count,fixed_count,message,started_at,completed_at&order=started_at.desc&limit=5`,
+      {
+        headers,
+        cache: 'no-store',
+      },
+    ),
+  );
 
   const activeSessionSlotIds = new Set(activeSessionRows.map((session) => session.slot_id));
   const confirmedReservationSlotIds = new Set(reservationRows.map((reservation) => reservation.slot_id));
@@ -355,14 +358,26 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
       revenue,
       dataIntegrityMismatches,
     },
-    auditEvents: auditRows.map((event) => ({
-      id: event.id,
-      tableName: event.table_name,
-      recordId: event.record_id,
-      action: event.action,
-      actorUserId: event.actor_user_id,
-      createdAt: event.created_at,
-    })),
+    auditEvents: auditRows
+      .filter((event) => {
+        if (event.table_name === 'parking_slots' && event.record_id) {
+          return slotIds.includes(event.record_id);
+        }
+
+        if (event.table_name === 'reservations' && event.record_id) {
+          return reservationIds.includes(event.record_id);
+        }
+
+        return false;
+      })
+      .map((event) => ({
+        id: event.id,
+        tableName: event.table_name,
+        recordId: event.record_id,
+        action: event.action,
+        actorUserId: event.actor_user_id,
+        createdAt: event.created_at,
+      })),
     reconciliationRuns: reconciliationRows.map((run) => ({
       id: run.id,
       runStatus: run.run_status,

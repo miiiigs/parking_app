@@ -9,6 +9,7 @@ import {
 } from '@/lib/operatorLocation';
 import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 
 function getHeaders(serviceRoleKey: string) {
@@ -64,6 +65,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing admin tool action.' }, { status: 400 });
   }
 
+  const requiredCapability =
+    action === 'reconcile'
+      ? 'run-reconciliation'
+      : action === 'reset-slots'
+        ? 'reset-slot-statuses'
+        : action === 'reset-demo'
+          ? 'reset-demo-data'
+          : null;
+
+  if (!requiredCapability || !hasOperatorCapability(operatorUser.role, requiredCapability)) {
+    return NextResponse.json({ error: 'Insufficient permissions for admin tool action.' }, { status: 403 });
+  }
+
   const headers = getHeaders(config.serviceRoleKey);
 
   try {
@@ -75,10 +89,6 @@ export async function POST(request: Request) {
     }
 
     if (action === 'reconcile') {
-      if (!['admin', 'operator'].includes(operatorUser.role)) {
-        return NextResponse.json({ error: 'Insufficient permissions for reconciliation.' }, { status: 403 });
-      }
-
       const slotRows = await readRestList<{
         id: string;
         slot_label: string;
@@ -186,10 +196,6 @@ export async function POST(request: Request) {
     }
 
     if (action === 'reset-slots') {
-      if (!['admin', 'operator'].includes(operatorUser.role)) {
-        return NextResponse.json({ error: 'Insufficient permissions for slot reset.' }, { status: 403 });
-      }
-
       const slotRows = await readRestList<{ status: string }>(
         await fetch(
           `${config.url}/rest/v1/parking_slots?select=status&location_id=eq.${location.id}`,
@@ -247,10 +253,6 @@ export async function POST(request: Request) {
     }
 
     if (action === 'reset-demo') {
-      if (operatorUser.role !== 'admin') {
-        return NextResponse.json({ error: 'Only admin users can run a full demo reset.' }, { status: 403 });
-      }
-
       const slotRows = await readRestList<{ id: string }>(
         await fetch(
           `${config.url}/rest/v1/parking_slots?select=id&location_id=eq.${location.id}&order=display_order.asc`,

@@ -5,12 +5,17 @@ import { buildLayoutApplyImpactSummary, summarizeLayout } from '@/lib/operatorLa
 import { assertOperatorLocationRequest } from '@/lib/operatorLocation';
 import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 
 export async function GET() {
   const operatorUser = await getCurrentOperatorUser();
 
   if (!operatorUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!hasOperatorCapability(operatorUser.role, 'edit-map-layout')) {
+    return NextResponse.json({ error: 'Insufficient permissions for map layout changes.' }, { status: 403 });
   }
 
   try {

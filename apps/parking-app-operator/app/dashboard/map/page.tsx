@@ -18,20 +18,22 @@ import {
   ZoomOut,
 } from 'lucide-react';
 
+import { SessionDetailSheet } from '@/components/dashboard/operation-detail-sheet';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { applyOptimisticSlotStatus } from '@/lib/operatorDataStore';
-import { refreshOperatorData } from '@/lib/operatorDataStore';
+import { applyOptimisticSlotStatus, recordOperatorActionFailure, recordOperatorActionSuccess, refreshOperatorData } from '@/lib/operatorDataStore';
 import {
   buildRoadShape,
   type ParkingLotDefinition,
   type ParkingMapRoad,
   type ParkingSlotStatus,
 } from '@/lib/parkingMap';
+import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import type { ParkingSlot } from '@/lib/types';
 import { useOperatorData } from '@/lib/useOperatorData';
+import { useAuth } from '@/lib/auth-context';
 
 const NODE_WIDTH = 152;
 const NODE_HEIGHT = 40;
@@ -164,10 +166,14 @@ export default function ParkingMapPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<ParkingSlot['status'] | null>(null);
   const [updatingSlotId, setUpdatingSlotId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<'success' | 'error'>('success');
 
   const { data, loading, refresh } = useOperatorData();
+  const { user } = useAuth();
+  const canEditSlotStatus = hasOperatorCapability(user?.role, 'edit-slot-status');
+  const canEditLayout = hasOperatorCapability(user?.role, 'edit-map-layout');
   const map = data?.parkingMap ?? {
     id: 'map-empty',
     name: 'Parking Lot',
@@ -175,6 +181,10 @@ export default function ParkingMapPage() {
     slots: [] as ParkingSlot[],
     layout: null,
   };
+  const sessions = data?.sessions ?? [];
+  const payments = data?.payments ?? [];
+  const auditLogs = data?.auditLogs ?? [];
+  const reservations = data?.reservations ?? [];
 
   const stats = useMemo(
     () => ({
@@ -189,6 +199,19 @@ export default function ParkingMapPage() {
   const selectedSlotData = useMemo(
     () => map.slots.find((slot: ParkingSlot) => slot.id === selectedSlot) ?? null,
     [map.slots, selectedSlot],
+  );
+
+  const activeSessionForSelectedSlot = useMemo(
+    () =>
+      selectedSlotData
+        ? sessions.find((session) => session.slotId === selectedSlotData.id && session.status === 'active') ?? null
+        : null,
+    [selectedSlotData, sessions],
+  );
+
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sessions],
   );
 
   const layout = useMemo(() => {
@@ -234,6 +257,12 @@ export default function ParkingMapPage() {
   }, [filterStatus, map.slots]);
 
   const handleSlotStatusChange = async (slotId: string, newStatus: ParkingSlot['status']) => {
+    if (!canEditSlotStatus) {
+      setMessage('Your role is read-only for slot status updates.');
+      setMessageTone('error');
+      return;
+    }
+
     const previousSlot = map.slots.find((slot: ParkingSlot) => slot.id === slotId);
 
     if (!previousSlot || previousSlot.status === newStatus) {
@@ -256,10 +285,12 @@ export default function ParkingMapPage() {
         throw new Error(json?.error || 'Failed to update slot status.');
       }
 
+      recordOperatorActionSuccess();
       setMessage(`Updated ${previousSlot.slotNumber} to ${newStatus}.`);
       setMessageTone('success');
       await refresh({ silent: true });
     } catch (error) {
+      recordOperatorActionFailure();
       applyOptimisticSlotStatus(slotId, previousSlot.status);
       setMessage(error instanceof Error ? error.message : 'Failed to update slot status.');
       setMessageTone('error');
@@ -292,12 +323,16 @@ export default function ParkingMapPage() {
               <ZoomIn className="h-4 w-4" />
               Zoom In
             </Button>
-            <Button asChild>
-              <Link href="/dashboard/map-builder">
-                <Settings2 className="h-4 w-4" />
-                Edit Map
-              </Link>
-            </Button>
+            {canEditLayout ? (
+              <Button asChild>
+                <Link href="/dashboard/map-builder">
+                  <Settings2 className="h-4 w-4" />
+                  Edit Map
+                </Link>
+              </Button>
+            ) : (
+              <Badge className="border-border bg-secondary/60 text-muted-foreground">Read only</Badge>
+            )}
           </div>
         </div>
 
@@ -593,9 +628,30 @@ export default function ParkingMapPage() {
                     </div>
                   </div>
 
+                  {activeSessionForSelectedSlot ? (
+                    <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Active Session</div>
+                          <div className="mt-1 font-mono text-sm text-foreground">
+                            {activeSessionForSelectedSlot.sessionId}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-border"
+                          onClick={() => setSelectedSessionId(activeSessionForSelectedSlot.id)}
+                        >
+                          View Session
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div>
                     <div className="mb-3 text-xs text-muted-foreground">Change Status</div>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                       {([
                         { status: 'available' as const, icon: CheckCircle },
                         { status: 'occupied' as const, icon: ParkingCircle },
@@ -611,7 +667,7 @@ export default function ParkingMapPage() {
                             size="sm"
                             variant={isCurrent ? 'default' : 'outline'}
                             className={isCurrent ? '' : 'border-border'}
-                            disabled={isUpdating}
+                            disabled={isUpdating || !canEditSlotStatus}
                             onClick={() => void handleSlotStatusChange(selectedSlotData.id, status)}
                           >
                             {isUpdating && !isCurrent ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
@@ -621,6 +677,9 @@ export default function ParkingMapPage() {
                       })}
                     </div>
                   </div>
+                  {!canEditSlotStatus ? (
+                    <p className="text-xs text-muted-foreground">Read-only access for your role.</p>
+                  ) : null}
                 </CardContent>
               </Card>
             ) : (
@@ -635,6 +694,23 @@ export default function ParkingMapPage() {
             )}
           </div>
         </div>
+
+        <SessionDetailSheet
+          open={Boolean(selectedSession)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedSessionId(null);
+            }
+          }}
+          session={selectedSession}
+          reservation={
+            selectedSession?.reservationId
+              ? reservations.find((reservation) => reservation.id === selectedSession.reservationId) ?? null
+              : null
+          }
+          payments={payments}
+          auditLogs={auditLogs}
+        />
       </div>
     </DashboardLayout>
   );

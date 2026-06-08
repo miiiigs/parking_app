@@ -6,7 +6,13 @@ import { redirect } from 'next/navigation';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 import { getAdminServiceConfig } from '../lib/adminService';
-import { ADMIN_ROLES } from '../lib/adminAuth';
+import { ADMIN_ROLES, getCurrentAdminUser } from '../lib/adminAuth';
+import {
+  clearAdminLocationSelection,
+  ensureDefaultAdminLocationSelection,
+  resolveAdminLocationContext,
+} from '../lib/adminLocationServer';
+import { hasAdminCapability, type AdminCapability } from '../lib/adminPermissions';
 import { fetchLotBuilderPersistedState, persistParkingLotLayout } from '../lib/parkingLotLayout';
 import type { ParkingLotDefinition } from '../lib/parkingMap';
 import { getAdminSupabaseConfig } from '../lib/supabase';
@@ -32,6 +38,20 @@ async function createAdminAuthClient() {
       },
     },
   });
+}
+
+async function requireAdminCapability(capability: AdminCapability) {
+  const adminUser = await getCurrentAdminUser();
+
+  if (!adminUser) {
+    throw new Error('Unauthorized');
+  }
+
+  if (!hasAdminCapability(adminUser.role, capability)) {
+    throw new Error('Insufficient permissions for this admin action.');
+  }
+
+  return adminUser;
 }
 
 export async function signInAdmin(formData: FormData) {
@@ -78,16 +98,19 @@ export async function signInAdmin(formData: FormData) {
     redirect('/login?error=Access%20denied.%20This%20account%20is%20not%20allowed%20to%20use%20the%20admin%20dashboard.');
   }
 
+  await ensureDefaultAdminLocationSelection();
   redirect('/');
 }
 
 export async function signOutAdmin() {
   const supabase = await createAdminAuthClient();
   await supabase.auth.signOut();
+  await clearAdminLocationSelection();
   redirect('/login');
 }
 
 export async function runParkingReconciliation(formData: FormData) {
+  await requireAdminCapability('run-reconciliation');
   const redirectTo = String(formData.get('redirectTo') ?? '/').trim() || '/';
   const config = getAdminServiceConfig();
 
@@ -116,6 +139,7 @@ export async function runParkingReconciliation(formData: FormData) {
 }
 
 export async function updateSlotStatus(formData: FormData) {
+  await requireAdminCapability('edit-slot-status');
   const slotId = String(formData.get('slotId') ?? '').trim();
   const status = String(formData.get('status') ?? '').trim();
   const redirectTo = String(formData.get('redirectTo') ?? '/').trim() || '/';
@@ -175,6 +199,7 @@ export async function updateSlotStatus(formData: FormData) {
 }
 
 export async function resetParkingSlots(formData: FormData) {
+  const adminUser = await requireAdminCapability('reset-slot-statuses');
   const redirectTo = String(formData.get('redirectTo') ?? '/').trim() || '/';
   const config = getAdminServiceConfig();
 
@@ -184,8 +209,15 @@ export async function resetParkingSlots(formData: FormData) {
 
   const serviceRoleKey = config.serviceRoleKey;
 
+  const locationContext = await resolveAdminLocationContext();
+  const activeLocation = locationContext.activeLocation;
+
+  if (!activeLocation) {
+    throw new Error('No active admin location found.');
+  }
+
   const slotListResponse = await fetch(
-    `${config.url}/rest/v1/parking_slots?select=id`,
+    `${config.url}/rest/v1/parking_slots?select=id&location_id=eq.${activeLocation.id}`,
     {
       headers: {
         apikey: serviceRoleKey,
@@ -234,7 +266,14 @@ export async function resetParkingSlots(formData: FormData) {
     },
     body: JSON.stringify({
       event_type: 'parking_slots_reset',
-      payload: { status: 'available', slot_count: slotRows.length },
+      payload: {
+        status: 'available',
+        slot_count: slotRows.length,
+        location_id: activeLocation.id,
+        location_name: activeLocation.name,
+        actor_user_id: adminUser.id,
+        actor_role: adminUser.role,
+      },
     }),
   });
 
@@ -244,6 +283,7 @@ export async function resetParkingSlots(formData: FormData) {
 }
 
 export async function resetDemoData(formData: FormData) {
+  const adminUser = await requireAdminCapability('reset-demo-data');
   const redirectTo = String(formData.get('redirectTo') ?? '/').trim() || '/';
   const config = getAdminServiceConfig();
 
@@ -257,8 +297,82 @@ export async function resetDemoData(formData: FormData) {
     'Content-Type': 'application/json',
   };
 
-  const deleteAllRows = async (tableName: string) => {
-    const response = await fetch(`${config.url}/rest/v1/${tableName}?id=not.is.null`, {
+  const locationContext = await resolveAdminLocationContext();
+  const activeLocation = locationContext.activeLocation;
+
+  if (!activeLocation) {
+    throw new Error('No active admin location found.');
+  }
+
+  const slotRowsResponse = await fetch(
+    `${config.url}/rest/v1/parking_slots?select=id&location_id=eq.${activeLocation.id}`,
+    {
+      headers: authHeaders,
+      cache: 'no-store',
+    },
+  );
+
+  if (!slotRowsResponse.ok) {
+    throw new Error(await slotRowsResponse.text());
+  }
+
+  const slotRows = (await slotRowsResponse.json()) as Array<{ id: string }>;
+  const slotIds = slotRows.map((slot) => slot.id);
+
+  const reservationResponse = await fetch(
+    `${config.url}/rest/v1/reservations?select=id,slot_id`,
+    { headers: authHeaders, cache: 'no-store' },
+  );
+  const sessionResponse = await fetch(
+    `${config.url}/rest/v1/parking_sessions?select=id,reservation_id,slot_id`,
+    { headers: authHeaders, cache: 'no-store' },
+  );
+  const paymentResponse = await fetch(
+    `${config.url}/rest/v1/payments?select=id,reservation_id,session_id`,
+    { headers: authHeaders, cache: 'no-store' },
+  );
+  const operatorEventResponse = await fetch(
+    `${config.url}/rest/v1/operator_events?select=id,slot_id,reservation_id,session_id,payload`,
+    { headers: authHeaders, cache: 'no-store' },
+  );
+
+  if (!reservationResponse.ok || !sessionResponse.ok || !paymentResponse.ok || !operatorEventResponse.ok) {
+    throw new Error('Failed to load scoped admin reset data.');
+  }
+
+  const reservations = (await reservationResponse.json()) as Array<{ id: string; slot_id: string | null }>;
+  const sessions = (await sessionResponse.json()) as Array<{ id: string; reservation_id: string | null; slot_id: string | null }>;
+  const payments = (await paymentResponse.json()) as Array<{ id: string; reservation_id: string | null; session_id: string | null }>;
+  const operatorEvents = (await operatorEventResponse.json()) as Array<{
+    id: string;
+    slot_id: string | null;
+    reservation_id: string | null;
+    session_id: string | null;
+    payload: Record<string, unknown> | null;
+  }>;
+
+  const reservationIds = reservations.filter((reservation) => reservation.slot_id && slotIds.includes(reservation.slot_id)).map((reservation) => reservation.id);
+  const sessionIds = sessions
+    .filter((session) => (session.slot_id && slotIds.includes(session.slot_id)) || (session.reservation_id && reservationIds.includes(session.reservation_id)))
+    .map((session) => session.id);
+  const paymentIds = payments
+    .filter((payment) => (payment.reservation_id && reservationIds.includes(payment.reservation_id)) || (payment.session_id && sessionIds.includes(payment.session_id)))
+    .map((payment) => payment.id);
+  const operatorEventIds = operatorEvents
+    .filter((event) =>
+      (event.slot_id && slotIds.includes(event.slot_id)) ||
+      (event.reservation_id && reservationIds.includes(event.reservation_id)) ||
+      (event.session_id && sessionIds.includes(event.session_id)) ||
+      (typeof event.payload?.location_id === 'string' && event.payload.location_id === activeLocation.id),
+    )
+    .map((event) => event.id);
+
+  const deleteRowsByIds = async (tableName: string, ids: string[]) => {
+    if (ids.length === 0) {
+      return;
+    }
+
+    const response = await fetch(`${config.url}/rest/v1/${tableName}?id=in.(${ids.join(',')})`, {
       method: 'DELETE',
       headers: authHeaders,
     });
@@ -268,13 +382,13 @@ export async function resetDemoData(formData: FormData) {
     }
   };
 
-  await deleteAllRows('operator_events');
-  await deleteAllRows('payments');
-  await deleteAllRows('parking_sessions');
-  await deleteAllRows('reservations');
+  await deleteRowsByIds('operator_events', operatorEventIds);
+  await deleteRowsByIds('payments', paymentIds);
+  await deleteRowsByIds('parking_sessions', sessionIds);
+  await deleteRowsByIds('reservations', reservationIds);
 
   const slotResetResponse = await fetch(
-    `${config.url}/rest/v1/parking_slots?id=not.is.null`,
+    `${config.url}/rest/v1/parking_slots?location_id=eq.${activeLocation.id}`,
     {
       method: 'PATCH',
       headers: {
@@ -297,7 +411,14 @@ export async function resetDemoData(formData: FormData) {
     },
     body: JSON.stringify({
       event_type: 'demo_state_reset',
-      payload: { status: 'available', tables_cleared: ['operator_events', 'payments', 'parking_sessions', 'reservations', 'parking_slots'] },
+      payload: {
+        status: 'available',
+        location_id: activeLocation.id,
+        location_name: activeLocation.name,
+        tables_cleared: ['operator_events', 'payments', 'parking_sessions', 'reservations', 'parking_slots'],
+        actor_user_id: adminUser.id,
+        actor_role: adminUser.role,
+      },
     }),
   });
 
@@ -307,12 +428,15 @@ export async function resetDemoData(formData: FormData) {
 }
 
 export async function loadLotBuilderState() {
-  return fetchLotBuilderPersistedState();
+  const locationContext = await resolveAdminLocationContext();
+  return fetchLotBuilderPersistedState(locationContext.activeLocation?.id ?? null);
 }
 
 export async function saveLotBuilderLayout(layoutJson: string) {
+  await requireAdminCapability('edit-map-layout');
   const lot = JSON.parse(layoutJson) as ParkingLotDefinition;
-  const state = await fetchLotBuilderPersistedState();
+  const locationContext = await resolveAdminLocationContext();
+  const state = await fetchLotBuilderPersistedState(locationContext.activeLocation?.id ?? null);
 
   if (!state?.locationId) {
     throw new Error('No active parking location found. Seed Supabase locations first.');

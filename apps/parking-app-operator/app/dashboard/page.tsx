@@ -3,6 +3,7 @@
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { DashboardMetrics } from '@/components/dashboard/metrics';
 import { RecentReservations } from '@/components/dashboard/recent-reservations';
+import { SystemHealth } from '@/components/dashboard/system-health';
 
 export default function DashboardPage() {
   return (
@@ -16,6 +17,7 @@ export default function DashboardPage() {
         </div>
 
         <DashboardMetrics />
+        <SystemHealth />
         <RecentReservations />
       </div>
     </DashboardLayout>
