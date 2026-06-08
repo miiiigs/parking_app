@@ -39,6 +39,8 @@ export type ParkingMapSlot = {
   x: number;
   y: number;
   rotation: number;
+  width?: number;
+  height?: number;
 };
 
 export type ParkingMapNode = {
@@ -223,6 +225,8 @@ export function buildParkingLotDefinitionFromSlots(slots: ParkingSlotSource[], n
       x,
       y,
       rotation: isLeftSide ? -7 : 7,
+      width: SLOT_WIDTH,
+      height: SLOT_HEIGHT,
     };
   });
 
@@ -304,6 +308,8 @@ export function applyLiveSlotStatuses(
       x: 120 + (index % 4) * 110,
       y: 180 + Math.floor(index / 4) * 100,
       rotation: 0,
+      width: SLOT_WIDTH,
+      height: SLOT_HEIGHT,
     }));
 
   return {

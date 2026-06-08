@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Button } from '../../components/ui/button';
 
 import {
   buildRoadShape,
@@ -692,43 +693,12 @@ export default function LotBuilderPage() {
           ) : null}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            type="button"
-            disabled={isSaving || isLoadingLayout}
-            onClick={handleSaveLayout}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '14px 20px',
-              borderRadius: 12,
-              background: isSaving || isLoadingLayout ? '#26405f' : '#3dd6a5',
-              color: '#071018',
-              fontWeight: 900,
-              fontSize: 15,
-              border: 'none',
-              cursor: isSaving || isLoadingLayout ? 'not-allowed' : 'pointer',
-              boxShadow: '0 8px 24px rgba(61,214,165,0.25)',
-            }}
-          >
+          <Button variant="default" disabled={isSaving || isLoadingLayout} onClick={handleSaveLayout} className="px-5 py-3">
             {isSaving ? 'Saving map…' : 'Save map to Supabase'}
-          </button>
-          <Link
-            href="/parking-map"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '12px 16px',
-              borderRadius: 12,
-              background: '#1a2e49',
-              color: '#f4f7fb',
-              fontWeight: 800,
-              textDecoration: 'none',
-            }}
-          >
-            View Parking Map
-          </Link>
+          </Button>
+          <Button asChild variant="ghost" className="px-4 py-3">
+            <Link href="/parking-map">View Parking Map</Link>
+          </Button>
         </div>
       </section>
 
@@ -764,26 +734,12 @@ export default function LotBuilderPage() {
             </div>
           </div>
           <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-            <button
-              type="button"
-              disabled={isSaving || isLoadingLayout}
-              onClick={handleSaveLayout}
-              style={{
-                ...paletteButtonStyle,
-                width: '100%',
-                padding: '12px 14px',
-                background: isSaving || isLoadingLayout ? '#26405f' : '#3dd6a5',
-                color: '#071018',
-                fontWeight: 900,
-                cursor: isSaving || isLoadingLayout ? 'not-allowed' : 'pointer',
-                textAlign: 'center',
-              }}
-            >
+            <Button variant="default" disabled={isSaving || isLoadingLayout} onClick={handleSaveLayout} className="w-full text-center">
               {isSaving ? 'Saving…' : 'Save map to Supabase'}
-            </button>
-            <button type="button" onClick={openResetModal} style={{ ...paletteButtonStyle, width: '100%', padding: '10px 12px', background: '#07101a' }}>
+            </Button>
+            <Button variant="ghost" onClick={openResetModal} className="w-full">
               Reset to entry gate
-            </button>
+            </Button>
             {locationId ? <p style={{ color: '#7f94ad', fontSize: 11, margin: 0 }}>Location: {locationId.slice(0, 8)}…</p> : null}
           </div>
         </aside>

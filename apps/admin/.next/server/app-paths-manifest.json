@@ -1,5 +1,8 @@
 {
-  "/page": "app/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/login/page": "app/login/page.js",
+  "/lot-builder/page": "app/lot-builder/page.js",
   "/parking-map/page": "app/parking-map/page.js",
-  "/lot-builder/page": "app/lot-builder/page.js"
+  "/qr/page": "app/qr/page.js",
+  "/page": "app/page.js"
 }
