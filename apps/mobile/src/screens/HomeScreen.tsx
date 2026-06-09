@@ -6,6 +6,7 @@ type Props = {
   locationAddress: string;
   slotCountLabel: string;
   isLoading: boolean;
+  isGuest: boolean;
   notificationLabel: string;
   notificationMessage: string;
   isRefreshingNotifications: boolean;
@@ -19,6 +20,7 @@ export function HomeScreen({
   locationAddress,
   slotCountLabel,
   isLoading,
+  isGuest,
   notificationLabel,
   notificationMessage,
   isRefreshingNotifications,
@@ -33,6 +35,12 @@ export function HomeScreen({
       <Text style={styles.subtitle}>
         Reserve a specific slot, validate on site, and pay only for the time you actually use.
       </Text>
+      {isGuest ? (
+        <View style={styles.guestCard}>
+          <Text style={styles.guestLabel}>Guest mode</Text>
+          <Text style={styles.guestText}>Browse the app freely, but sign in to reserve a slot.</Text>
+        </View>
+      ) : null}
       <View style={styles.liveCard}>
         <Text style={styles.liveLabel}>Live Location</Text>
         <Text style={styles.liveValue}>{locationName}</Text>
@@ -52,7 +60,7 @@ export function HomeScreen({
       </View>
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.primaryButton} onPress={onStartReservation}>
-          <Text style={styles.primaryButtonText}>Reserve a Slot</Text>
+          <Text style={styles.primaryButtonText}>{isGuest ? 'Sign in to Reserve' : 'Reserve a Slot'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton} onPress={onViewSession}>
           <Text style={styles.secondaryButtonText}>View Session</Text>
@@ -181,5 +189,25 @@ const styles = StyleSheet.create({
     color: '#f4f7fb',
     fontWeight: '700',
     fontSize: 16,
+  },
+  guestCard: {
+    backgroundColor: '#0d1726',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#26405f',
+    gap: 6,
+  },
+  guestLabel: {
+    color: '#7bd3ff',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+  },
+  guestText: {
+    color: '#b8c7da',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

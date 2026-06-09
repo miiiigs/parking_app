@@ -11,7 +11,7 @@ import {
   ARRIVAL_WINDOW_OPTIONS,
   type ArrivalWindowOption,
 } from '../lib/reservationOptions';
-import type { ParkingLotDefinition } from '@parking/shared/parkingMap';
+import type { ParkingLotDefinition } from '@parking/shared';
 
 import { ParkingLotLayoutMap } from '../components/parking-map/ParkingLotLayoutMap';
 import { ParkingLotMap } from '../components/parking-map/ParkingLotMap';

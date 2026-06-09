@@ -1035,6 +1035,7 @@ export default function App() {
         locationAddress={activeLocation?.address ?? 'Bonifacio Global City, Taguig'}
         slotCountLabel={slotCountLabel}
         isLoading={workflow.connectionState === 'booting'}
+        isGuest={false}
         notificationLabel={notificationReadiness.label}
         notificationMessage={notificationReadiness.message}
         isRefreshingNotifications={isCheckingNotifications}

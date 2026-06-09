@@ -1,4 +1,4 @@
-import type { ParkingLotDefinition } from '@parking/shared/parkingMap';
+import type { ParkingLotDefinition } from '@parking/shared';
 
 import { getSupabaseClient } from './supabaseClient';
 
@@ -101,7 +101,7 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
 
         return {
           location: loc ? { id: loc.id, name: loc.name, address: loc.address, city: loc.city } : null,
-          slots: (slots || []).map((s: any) => ({ id: s.id, label: s.label, status: s.status, displayOrder: s.displayOrder, qrToken: s.qrToken })),
+          slots: (slots || []).map((slot: any) => ({ id: slot.id, label: slot.label, status: slot.status, displayOrder: slot.displayOrder, qrToken: slot.qrToken })),
           lotLayout: parseLotLayout(snapshot.lotLayout),
           isLiveData: true,
         };
@@ -143,7 +143,7 @@ export async function loadParkingDashboardData(): Promise<ParkingDashboardData> 
 
   return {
     location: activeLocation,
-    slots: slots.map((slot) => ({
+    slots: slots.map((slot: { id: string; slot_label: string; status: ParkingSlot['status']; display_order: number; qr_token: string }) => ({
       id: slot.id,
       label: slot.slot_label,
       status: slot.status,
