@@ -94,10 +94,10 @@ function buildBaseContent(title: string, body: string) {
   };
 }
 
-function asTriggerDate(dateValue: string | Date | number) {
+function asTriggerDate(dateValue: string | Date | number): Notifications.DateTriggerInput | null {
   const triggerDate = typeof dateValue === 'number' ? new Date(dateValue) : typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
   return triggerDate.getTime() > Date.now() + 5000
-    ? { type: 'date' as const, timestamp: triggerDate.getTime() }
+    ? { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate }
     : null;
 }
 

@@ -15,7 +15,7 @@ import {
   buildRoadShape,
   type ParkingLotDefinition,
   type ParkingSlotStatus,
-} from '@parking/shared/parkingMap';
+} from '@parking/shared';
 
 type LiveSlot = {
   id: string;

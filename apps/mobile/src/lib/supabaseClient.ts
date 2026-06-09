@@ -1,4 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import {
+  createClient,
+  type AuthChangeEvent,
+  type Session,
+  type User,
+} from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
 // @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
@@ -9,7 +14,8 @@ function getEnv() {
 }
 
 let cachedClient: any = null;
-let cachedUser: any = null;
+let cachedUser: User | null = null;
+const guestModeStorageKey = 'parking_mobile_guest_mode';
 
 const authStorageCache = new Map<string, string>();
 
@@ -42,6 +48,27 @@ const supabaseAuthStorage = {
   },
 };
 
+async function getGuestModeEnabled() {
+  try {
+    return (await SecureStore.getItemAsync(guestModeStorageKey)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+async function setGuestModeEnabled(enabled: boolean) {
+  try {
+    if (enabled) {
+      await SecureStore.setItemAsync(guestModeStorageKey, '1');
+      return;
+    }
+
+    await SecureStore.deleteItemAsync(guestModeStorageKey);
+  } catch {
+    // Guest mode is a convenience flag only; ignore storage failures.
+  }
+}
+
 export function getSupabaseClient(): any {
   if (cachedClient) {
     return cachedClient;
@@ -69,33 +96,239 @@ export function getSupabaseClient(): any {
   return cachedClient;
 }
 
-export async function ensureMobileAuthSession() {
+export async function getCurrentMobileSession(): Promise<Session | null> {
   const supabase = getSupabaseClient();
 
   if (!supabase) {
     return null;
   }
 
-  // Return cached user when available to avoid repeated network auth calls.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session ?? null;
+  cachedUser = session?.user ?? null;
+  return session;
+}
+
+export async function getCurrentMobileAuthUser(): Promise<User | null> {
   if (cachedUser) {
     return cachedUser;
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
+  const session = await getCurrentMobileSession();
+  return session?.user ?? null;
+}
 
-  if (sessionData.session?.user) {
-    cachedUser = sessionData.session.user;
-    return sessionData.session.user;
+export async function getCurrentGuestMode(): Promise<boolean> {
+  return getGuestModeEnabled();
+}
+
+export async function setCurrentGuestMode(enabled: boolean) {
+  await setGuestModeEnabled(enabled);
+}
+
+export async function ensureMobileAuthSession(): Promise<User | null> {
+  const user = await getCurrentMobileAuthUser();
+
+  if (!user) {
+    throw new Error('Sign in is required before you can reserve or manage parking sessions.');
   }
 
-  const { data, error } = await supabase.auth.signInAnonymously();
+  return user;
+}
+
+function normalizePhoneNumber(phone: string) {
+  return phone.trim().replace(/[\s()-]/g, '');
+}
+
+export async function sendPhoneVerificationCode(phone: string): Promise<string> {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  }
+
+  const normalizedPhone = normalizePhoneNumber(phone);
+
+  if (!normalizedPhone) {
+    throw new Error('Enter your phone number.');
+  }
+
+  const { error } = await supabase.auth.signInWithOtp({
+    phone: normalizedPhone,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return normalizedPhone;
+}
+
+export async function verifyPhoneVerificationCode({
+  phone,
+  token,
+}: {
+  phone: string;
+  token: string;
+}) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  }
+
+  const normalizedPhone = normalizePhoneNumber(phone);
+  const trimmedToken = token.trim();
+
+  if (!normalizedPhone || !trimmedToken) {
+    throw new Error('Enter your phone number and verification code.');
+  }
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: normalizedPhone,
+    token: trimmedToken,
+    type: 'sms',
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
   cachedUser = data.user ?? null;
-  return cachedUser;
+
+  if (!data.user) {
+    throw new Error('Unable to confirm the customer session.');
+  }
+
+  return data.user;
+}
+
+export async function signInMobileUser(email: string, password: string): Promise<User> {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const trimmedPassword = password.trim();
+
+  if (!normalizedEmail || !trimmedPassword) {
+    throw new Error('Enter your email and password.');
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password: trimmedPassword,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  cachedUser = data.user ?? null;
+
+  if (!data.user) {
+    throw new Error('Unable to confirm the customer session.');
+  }
+
+  return data.user;
+}
+
+export async function signUpMobileUser({
+  email,
+  password,
+  displayName,
+}: {
+  email: string;
+  password: string;
+  displayName?: string;
+}) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const trimmedPassword = password.trim();
+  const trimmedDisplayName = displayName?.trim() ?? '';
+
+  if (!normalizedEmail || !trimmedPassword) {
+    throw new Error('Enter your email and password.');
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password: trimmedPassword,
+    options: {
+      data: trimmedDisplayName
+        ? {
+            display_name: trimmedDisplayName,
+          }
+        : undefined,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  cachedUser = data.user ?? null;
+
+  return {
+    user: data.user ?? null,
+    session: data.session ?? null,
+    requiresEmailConfirmation: !data.session,
+  };
+}
+
+export async function signOutMobileUser() {
+  await setGuestModeEnabled(false);
+
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    cachedUser = null;
+    return;
+  }
+
+  const { error } = await supabase.auth.signOut();
+
+  cachedUser = null;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export function subscribeToMobileAuthChanges(
+  callback: (params: {
+    event: AuthChangeEvent;
+    session: Session | null;
+    user: User | null;
+  }) => void,
+) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    return () => {};
+  }
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    cachedUser = session?.user ?? null;
+    callback({
+      event,
+      session,
+      user: session?.user ?? null,
+    });
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
 }
 
 // Expose a helper to reset cached user (useful for tests or sign-out flows)

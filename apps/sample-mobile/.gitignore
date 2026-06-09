@@ -1,0 +1,13 @@
+.expo/
+.expo-shared/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+coverage/
+dist/
+node_modules/
+web-build/
+ios/build/
+ios/Pods/
+*.log

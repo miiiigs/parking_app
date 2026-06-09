@@ -15,7 +15,7 @@ This project should be tested on a real Android device or emulator using the Exp
    - scan the QR code
    - start the parking session
    - end the session
-   - restart the app and confirm recovery
+   - restart the app and confirm recoverya
    - confirm notification behavior in the build
 
 ## Development Commands
