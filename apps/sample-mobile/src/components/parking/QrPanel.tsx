@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Rect } from 'react-native-svg';
+import QRCode from 'react-native-qrcode-svg';
 
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import { SurfaceCard } from '../ui/SurfaceCard';
@@ -8,23 +8,24 @@ interface QrPanelProps {
   title: string;
   caption: string;
   code: string;
+  qrRef?: { current: any };
 }
 
-export function QrPanel({ title, caption, code }: QrPanelProps) {
+export function QrPanel({ title, caption, code, qrRef }: QrPanelProps) {
   return (
     <SurfaceCard>
       <View style={styles.codeFrame}>
-        <Svg width="100%" height="100%" viewBox="0 0 200 200">
-          <Rect x="0" y="0" width="200" height="200" fill="#FFFFFF" />
-          <Rect x="10" y="10" width="42" height="42" fill="#0F172A" />
-          <Rect x="148" y="10" width="42" height="42" fill="#0F172A" />
-          <Rect x="10" y="148" width="42" height="42" fill="#0F172A" />
-          <Rect x="72" y="72" width="56" height="56" fill="#0F172A" />
-          <Rect x="34" y="78" width="16" height="16" fill="#0F172A" />
-          <Rect x="150" y="92" width="14" height="14" fill="#0F172A" />
-          <Rect x="92" y="28" width="14" height="14" fill="#0F172A" />
-          <Rect x="94" y="156" width="18" height="18" fill="#0F172A" />
-        </Svg>
+        <QRCode
+          getRef={(ref: any) => {
+            if (qrRef) {
+              qrRef.current = ref;
+            }
+          }}
+          value={code || 'parking-qrcode-unavailable'}
+          size={200}
+          color="#0F172A"
+          backgroundColor="#FFFFFF"
+        />
       </View>
       <View style={styles.copyBlock}>
         <Text style={styles.title}>{title}</Text>
@@ -47,6 +48,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     overflow: 'hidden',
     padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   copyBlock: {
     alignItems: 'center',

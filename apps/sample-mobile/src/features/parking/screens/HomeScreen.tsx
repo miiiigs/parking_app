@@ -8,27 +8,29 @@ import { ParkingLotCard } from '../../../components/parking/ParkingLotCard';
 import { AppButton } from '../../../components/ui/AppButton';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { SurfaceCard } from '../../../components/ui/SurfaceCard';
-import { parkingLots } from '../data/parkingLots';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { colors, radius, spacing, typography } from '../../../theme/tokens';
+import { useMobileAuth } from '../../../providers/MobileAuthProvider';
+import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const auth = useMobileAuth();
   const [query, setQuery] = useState('');
-  const { booking, session, completedSession } = useParkingFlowStore((state) => ({
-    booking: state.booking,
-    session: state.session,
-    completedSession: state.completedSession,
-  }));
+  const { lots, isLiveData, isLoading } = useMobileParkingData();
+  const booking = useParkingFlowStore((state) => state.booking);
+  const session = useParkingFlowStore((state) => state.session);
+  const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const isRestoring = useParkingFlowStore((state) => state.isRestoring);
 
   const filteredLots = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
-      return parkingLots;
+      return lots;
     }
 
-    return parkingLots.filter((lot) => `${lot.name} ${lot.address} ${lot.features.join(' ')}`.toLowerCase().includes(normalizedQuery));
-  }, [query]);
+    return lots.filter((lot) => `${lot.name} ${lot.address} ${lot.features.join(' ')}`.toLowerCase().includes(normalizedQuery));
+  }, [lots, query]);
 
   const quickAction = session
     ? {
@@ -42,8 +44,8 @@ export default function HomeScreen() {
       ? {
           tone: 'warning' as const,
           label: 'Reservation saved',
-          copy: `Proceed to arrival for slot ${booking.slot.number}`,
-          buttonLabel: 'Continue reservation',
+          copy: `Open the entry pass for slot ${booking.slot.number}`,
+          buttonLabel: 'Open entry pass',
           onPress: () => router.push('/arrival'),
         }
       : completedSession
@@ -58,8 +60,26 @@ export default function HomeScreen() {
 
   return (
     <Screen>
+      {!auth.user && !auth.isGuest ? (
+        <SurfaceCard>
+          <StatusBadge label="Account required for live backend" tone="warning" />
+          <Text style={styles.authTitle}>Connect your account</Text>
+          <Text style={styles.authCopy}>Sign in to write reservations, sessions, and payments to Supabase. Guest mode keeps the flow local only.</Text>
+          <View style={styles.authActions}>
+            <AppButton label="Sign in" onPress={() => router.push('/login')} />
+            <AppButton label="Continue as guest" variant="secondary" onPress={auth.continueAsGuest} />
+          </View>
+        </SurfaceCard>
+      ) : (
+        <SurfaceCard>
+          <StatusBadge label={isRestoring || isLoading ? 'Restoring workflow' : auth.user ? 'Signed in' : 'Guest mode'} tone={auth.user ? 'success' : 'warning'} />
+          <Text style={styles.authTitle}>{auth.user ? 'Live customer access enabled' : 'Local flow ready'}</Text>
+          <Text style={styles.authCopy}>{auth.user ? 'Reservation, session, and payment actions will write to Supabase.' : 'Guest mode keeps reservation, session, and payment writes local only.'}</Text>
+        </SurfaceCard>
+      )}
+
       <SurfaceCard style={styles.heroCard}>
-        <StatusBadge label="Production-leaning native sample" tone="success" />
+        <StatusBadge label={isLiveData ? 'Live backend data' : 'Sample fallback data'} tone={isLiveData ? 'success' : 'warning'} />
         <Text style={styles.heroTitle}>ParkEasy</Text>
         <Text style={styles.heroCopy}>Native Android and iOS flow for finding, reserving, entering, and closing a parking session.</Text>
       </SurfaceCard>
@@ -107,6 +127,19 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: colors.primaryDark,
     borderColor: colors.primaryDark,
+  },
+  authTitle: {
+    color: colors.text,
+    fontSize: typography.section,
+    fontWeight: '700',
+  },
+  authCopy: {
+    color: colors.muted,
+    fontSize: typography.body,
+    lineHeight: 22,
+  },
+  authActions: {
+    gap: spacing.sm,
   },
   heroTitle: {
     color: colors.surface,

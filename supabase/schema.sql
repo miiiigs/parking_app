@@ -30,6 +30,7 @@ create table if not exists reservations (
   plate_number text not null,
   arrival_window_minutes integer not null,
   reservation_fee numeric(10,2) not null,
+  parking_rate numeric(10,2) not null default 50,
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'completed', 'expired', 'cancelled', 'no_show')),
   reserved_at timestamptz not null default now(),
   expires_at timestamptz not null,
@@ -96,6 +97,22 @@ for each row execute function set_updated_at();
 create trigger set_reservations_updated_at
 before update on reservations
 for each row execute function set_updated_at();
+
+create or replace function calculate_parking_fee(
+  p_elapsed_minutes integer,
+  p_parking_rate numeric
+)
+returns numeric(10,2)
+language plpgsql
+immutable
+as $$
+declare
+  v_rate numeric(10,2) := coalesce(p_parking_rate, 50);
+  v_elapsed_minutes integer := greatest(0, coalesce(p_elapsed_minutes, 0));
+begin
+  return round(greatest((v_elapsed_minutes / 60.0) * v_rate, v_rate * 0.25)::numeric, 2);
+end;
+$$;
 
 create trigger set_parking_sessions_updated_at
 before update on parking_sessions

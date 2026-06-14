@@ -1,29 +1,83 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Clock3 } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Screen } from '../../../components/layout/Screen';
+import { ParkingLotLayoutMap } from '../../../components/parking/ParkingLotLayoutMap';
 import { ParkingMap } from '../../../components/parking/ParkingMap';
 import { AppButton } from '../../../components/ui/AppButton';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { SurfaceCard } from '../../../components/ui/SurfaceCard';
-import { getParkingLotById } from '../data/parkingLots';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import type { ParkingSlot } from '../types';
 import { colors, radius, spacing, typography } from '../../../theme/tokens';
+import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
+import { useMobileAuth } from '../../../providers/MobileAuthProvider';
 
 const arrivalWindows = [30, 60, 120];
 
 export default function ReservationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string }>();
+  const auth = useMobileAuth();
+  const { lots, isLoading } = useMobileParkingData();
   const reserveSlot = useParkingFlowStore((state) => state.reserveSlot);
+  const reservationDraft = useParkingFlowStore((state) => state.reservationDraft);
+  const setReservationDraft = useParkingFlowStore((state) => state.setReservationDraft);
+  const clearReservationDraft = useParkingFlowStore((state) => state.clearReservationDraft);
   const [selectedSlot, setSelectedSlot] = useState<ParkingSlot | null>(null);
   const [arrivalWindowMinutes, setArrivalWindowMinutes] = useState(30);
   const [plateNumber, setPlateNumber] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const lot = lots.find((entry) => entry.id === String(params.lotId ?? '')) ?? lots[0] ?? null;
+  const normalizedPlateNumber = plateNumber.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  const selectedSlotId = selectedSlot?.id ?? null;
+  const requiresAuth = !auth.user || auth.isGuest;
 
-  const lot = useMemo(() => getParkingLotById(String(params.lotId ?? '')), [params.lotId]);
+  useEffect(() => {
+    if (reservationDraft?.lotId === lot?.id) {
+      setArrivalWindowMinutes(reservationDraft.arrivalWindowMinutes);
+      setPlateNumber(reservationDraft.plateNumber);
+
+      if (reservationDraft.slotId) {
+        setSelectedSlot(lot?.slots.find((slot) => slot.id === reservationDraft.slotId) ?? null);
+      } else {
+        setSelectedSlot(null);
+      }
+
+      return;
+    }
+
+    setSelectedSlot(null);
+    setArrivalWindowMinutes(30);
+    setPlateNumber('');
+  }, [lot?.id, reservationDraft]);
+
+  useEffect(() => {
+    if (!lot) {
+      return;
+    }
+
+    setReservationDraft({
+      lotId: lot.id,
+      slotId: selectedSlot?.id ?? null,
+      arrivalWindowMinutes,
+      plateNumber: normalizedPlateNumber,
+    });
+  }, [arrivalWindowMinutes, lot, normalizedPlateNumber, selectedSlot, setReservationDraft]);
+
+  if (!lot && isLoading) {
+    return (
+      <Screen>
+        <SurfaceCard>
+          <StatusBadge label="Loading parking lot" tone="info" />
+          <Text style={styles.title}>Loading live slot map...</Text>
+        </SurfaceCard>
+      </Screen>
+    );
+  }
 
   if (!lot) {
     return (
@@ -36,15 +90,22 @@ export default function ReservationScreen() {
     );
   }
 
-  const normalizedPlateNumber = plateNumber.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedSlot || normalizedPlateNumber.length < 5) {
       return;
     }
 
-    reserveSlot({ lot, slot: selectedSlot, arrivalWindowMinutes, plateNumber: normalizedPlateNumber });
-    router.replace('/arrival');
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await reserveSlot({ lot, slot: selectedSlot, arrivalWindowMinutes, plateNumber: normalizedPlateNumber });
+      await clearReservationDraft();
+      router.replace('/arrival');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to create the reservation.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -61,7 +122,24 @@ export default function ReservationScreen() {
 
       <SurfaceCard>
         <StatusBadge label={`${lot.availableSlots} live slots available`} tone="success" />
-        <ParkingMap slots={lot.slots} selectedSlotId={selectedSlot?.id} onSelectSlot={setSelectedSlot} />
+        {lot.lotLayout ? (
+          <ParkingLotLayoutMap
+            lot={lot.lotLayout}
+            slots={lot.slots.map((slot, index) => ({
+              id: slot.id,
+              label: slot.number,
+              status: slot.status ?? (slot.isAvailable ? 'available' : 'occupied'),
+              displayOrder: index + 1,
+            }))}
+            selectedSlotId={selectedSlotId}
+            onSelectSlot={(slotId) => {
+              const nextSlot = lot.slots.find((slot) => slot.id === slotId) ?? null;
+              setSelectedSlot(nextSlot && nextSlot.isAvailable ? nextSlot : null);
+            }}
+          />
+        ) : (
+          <ParkingMap slots={lot.slots} selectedSlotId={selectedSlotId ?? undefined} onSelectSlot={setSelectedSlot} />
+        )}
       </SurfaceCard>
 
       <SurfaceCard>
@@ -105,7 +183,21 @@ export default function ReservationScreen() {
           </View>
         )}
 
-        <AppButton label="Confirm booking" onPress={handleConfirm} disabled={!selectedSlot || normalizedPlateNumber.length < 5} />
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+        {requiresAuth ? (
+          <>
+            <AppButton
+              label="Log in or sign up"
+              onPress={() => router.push({ pathname: '/login', params: { returnTo: `/reservation/${lot.id}` } })}
+            />
+            <Text style={styles.guestNotice}>
+              Guest mode is available for testing, but booking requires a signed-in customer account.
+            </Text>
+          </>
+        ) : (
+          <AppButton label="Confirm booking" onPress={handleConfirm} disabled={!selectedSlot || normalizedPlateNumber.length < 5} loading={isSubmitting} />
+        )}
       </SurfaceCard>
     </Screen>
   );
@@ -223,6 +315,17 @@ const styles = StyleSheet.create({
   noticeCopy: {
     color: colors.muted,
     fontSize: typography.body,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: typography.body,
+    lineHeight: 20,
+  },
+  guestNotice: {
+    color: colors.muted,
+    fontSize: typography.caption,
+    lineHeight: 18,
+    textAlign: 'center',
   },
 });
 

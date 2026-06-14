@@ -1,7 +1,8 @@
 create or replace function reserve_parking_slot(
   p_slot_id uuid,
   p_plate_number text,
-  p_arrival_window_minutes integer
+  p_arrival_window_minutes integer,
+  p_parking_rate numeric default null
 )
 returns table (
   reservation_id uuid,
@@ -68,6 +69,7 @@ begin
     plate_number,
     arrival_window_minutes,
     reservation_fee,
+    parking_rate,
     status,
     reserved_at,
     expires_at
@@ -78,6 +80,7 @@ begin
     p_plate_number,
     p_arrival_window_minutes,
     v_reservation_fee,
+    coalesce(p_parking_rate, 50),
     'confirmed',
     v_reserved_at,
     v_expires_at
@@ -115,4 +118,4 @@ begin
 end;
 $$;
 
-grant execute on function reserve_parking_slot(uuid, text, integer) to anon, authenticated;
+grant execute on function reserve_parking_slot(uuid, text, integer, numeric) to anon, authenticated;

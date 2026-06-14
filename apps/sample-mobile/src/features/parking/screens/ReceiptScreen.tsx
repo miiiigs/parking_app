@@ -1,8 +1,12 @@
-import { Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CheckCircle2, Clock3, Download, Home, MapPin } from 'lucide-react-native';
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
+import { CheckCircle2, Clock3, Download, Home, MapPin, QrCode } from 'lucide-react-native';
 
 import { Screen } from '../../../components/layout/Screen';
+import { QrPanel } from '../../../components/parking/QrPanel';
 import { AppButton } from '../../../components/ui/AppButton';
 import { DetailRow } from '../../../components/ui/DetailRow';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -13,32 +17,85 @@ import { formatDateTime, formatDuration } from '../../../utils/format';
 
 export default function ReceiptScreen() {
   const router = useRouter();
-  const { completedSession, resetFlow } = useParkingFlowStore((state) => ({
-    completedSession: state.completedSession,
-    resetFlow: state.resetFlow,
-  }));
+  const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const resetFlow = useParkingFlowStore((state) => state.resetFlow);
+  const receiptRef = useRef<View>(null);
+  const qrRef = useRef<any>(null);
+  const [isWorking, setIsWorking] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!completedSession) {
+      router.replace('/');
+    }
+  }, [completedSession, router]);
+
+  const receiptQrValue = useMemo(() => {
+    if (!completedSession) {
+      return '';
+    }
+
+    const referenceId = completedSession.sessionId ?? completedSession.reservationId ?? completedSession.reservationCode;
+
+    return [
+      'parking-receipt',
+      referenceId,
+      completedSession.reservationId ?? completedSession.reservationCode,
+      completedSession.slot.id,
+      String(completedSession.totalBill ?? 0),
+    ].join('|');
+  }, [completedSession]);
 
   if (!completedSession) {
-    router.replace('/');
     return null;
   }
 
-  const handleShare = async () => {
-    await Share.share({
-      title: `Receipt ${completedSession.receiptNumber}`,
-      message: [
-        `Receipt ${completedSession.receiptNumber}`,
-        completedSession.lotName,
-        `Slot ${completedSession.slot.number}`,
-        `Paid $${completedSession.totalBill.toFixed(2)}`,
-        `Transaction ${completedSession.transactionId}`,
-      ].join('\n'),
-    });
-  };
+  const session = completedSession;
 
-  const handleBackHome = () => {
-    resetFlow();
-    router.replace('/');
+  async function saveReceipt() {
+    if (isWorking) {
+      return;
+    }
+
+    setIsWorking(true);
+    setActionMessage(null);
+
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      const granted = permission.granted || permission.status === 'granted';
+
+      if (!granted) {
+        setActionMessage('Permission to save to photos was denied.');
+        return;
+      }
+
+      const uri = await captureRef(receiptRef, {
+        format: 'png',
+        quality: 0.95,
+        result: 'tmpfile',
+      });
+
+      const asset = await MediaLibrary.createAssetAsync(uri);
+
+      try {
+        await MediaLibrary.createAlbumAsync('ParkingReceipts', asset, false);
+      } catch {
+        // album may already exist
+      }
+
+      setActionMessage('Receipt saved to your photos.');
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : 'Unable to save receipt right now.');
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  const handleBackHome = async () => {
+    await resetFlow();
+    setTimeout(() => {
+      router.replace('/');
+    }, 300);
   };
 
   return (
@@ -48,28 +105,43 @@ export default function ReceiptScreen() {
         <View style={styles.headerBlock}>
           <CheckCircle2 stroke={colors.primary} size={42} />
           <Text style={styles.title}>Thank you for using ParkEasy.</Text>
-          <Text style={styles.copy}>The payment record is persisted locally and ready to share.</Text>
+          <Text style={styles.copy}>The receipt is ready to share, export, or save locally.</Text>
         </View>
       </SurfaceCard>
 
-      <SurfaceCard>
-        <Text style={styles.sectionTitle}>Official receipt</Text>
-        <Text style={styles.receiptNumber}>#{completedSession.receiptNumber}</Text>
-        <DetailRow label="Location" value={completedSession.lotName} icon={<MapPin stroke={colors.muted} size={16} />} />
-        <DetailRow label="Address" value={completedSession.address} icon={<MapPin stroke={colors.muted} size={16} />} />
-        <DetailRow label="Slot" value={completedSession.slot.number} icon={<MapPin stroke={colors.muted} size={16} />} />
-        <DetailRow label="Plate" value={completedSession.plateNumber} icon={<MapPin stroke={colors.muted} size={16} />} />
-        <DetailRow label="Entry" value={formatDateTime(completedSession.startTime)} icon={<Clock3 stroke={colors.muted} size={16} />} />
-        <DetailRow label="Exit" value={formatDateTime(completedSession.endTime)} icon={<Clock3 stroke={colors.muted} size={16} />} />
-        <DetailRow label="Duration" value={formatDuration(completedSession.durationSeconds)} icon={<Clock3 stroke={colors.muted} size={16} />} />
-        <DetailRow label="Transaction" value={completedSession.transactionId} icon={<Download stroke={colors.muted} size={16} />} />
-        <DetailRow label="Total paid" value={`$${completedSession.totalBill.toFixed(2)}`} icon={<Download stroke={colors.muted} size={16} />} />
-      </SurfaceCard>
+      <View ref={receiptRef} collapsable={false}>
+        <QrPanel
+          title="Receipt QR"
+          caption="Scan this QR for verification and receipt tracking."
+          code={receiptQrValue}
+          qrRef={qrRef}
+        />
+
+        <SurfaceCard>
+          <Text style={styles.sectionTitle}>Official receipt</Text>
+          <Text style={styles.receiptNumber}>#{session.receiptNumber}</Text>
+          <DetailRow label="Location" value={session.lotName} icon={<MapPin stroke={colors.muted} size={16} />} />
+          <DetailRow label="Address" value={session.address} icon={<MapPin stroke={colors.muted} size={16} />} />
+          <DetailRow label="Slot" value={session.slot.number} icon={<MapPin stroke={colors.muted} size={16} />} />
+          <DetailRow label="Plate" value={session.plateNumber} icon={<MapPin stroke={colors.muted} size={16} />} />
+          <DetailRow label="Entry" value={formatDateTime(session.startTime)} icon={<Clock3 stroke={colors.muted} size={16} />} />
+          <DetailRow label="Exit" value={formatDateTime(session.endTime)} icon={<Clock3 stroke={colors.muted} size={16} />} />
+          <DetailRow label="Duration" value={formatDuration(session.durationSeconds)} icon={<Clock3 stroke={colors.muted} size={16} />} />
+          <DetailRow label="Transaction" value={session.transactionId} icon={<Download stroke={colors.muted} size={16} />} />
+          <DetailRow label="Total paid" value={`PHP ${session.totalBill.toFixed(2)}`} icon={<Download stroke={colors.muted} size={16} />} />
+        </SurfaceCard>
+      </View>
 
       <View style={styles.actionGroup}>
-        <AppButton label="Share receipt" onPress={handleShare} variant="secondary" />
-        <AppButton label="Back home" onPress={handleBackHome} />
+        <AppButton label={isWorking ? 'Saving...' : 'Save image'} onPress={() => void saveReceipt()} variant="secondary" loading={isWorking} />
+        <AppButton label="Back home" onPress={() => void handleBackHome()} />
       </View>
+
+      {actionMessage ? (
+        <SurfaceCard>
+          <Text style={styles.noteCopy}>{actionMessage}</Text>
+        </SurfaceCard>
+      ) : null}
 
       <SurfaceCard>
         <View style={styles.noteRow}>
@@ -124,4 +196,3 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
-

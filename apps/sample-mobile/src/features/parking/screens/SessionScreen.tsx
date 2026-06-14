@@ -15,11 +15,11 @@ import { formatTime, formatTimer } from '../../../utils/format';
 
 export default function SessionScreen() {
   const router = useRouter();
-  const { session, finishSession } = useParkingFlowStore((state) => ({
-    session: state.session,
-    finishSession: state.finishSession,
-  }));
+  const session = useParkingFlowStore((state) => state.session);
+  const finishSession = useParkingFlowStore((state) => state.finishSession);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -50,9 +50,17 @@ export default function SessionScreen() {
     return null;
   }
 
-  const handleEndSession = () => {
-    finishSession(elapsedSeconds);
-    router.replace('/exit');
+  const handleEndSession = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await finishSession(elapsedSeconds);
+      router.replace('/exit');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to settle the session right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -72,6 +80,7 @@ export default function SessionScreen() {
           <Text style={styles.billValue}>${currentBill.toFixed(2)}</Text>
           <Text style={styles.billCaption}>Minimum 15-minute charge applies.</Text>
         </View>
+        <Text style={styles.settlementCopy}>The backend records the final settlement when you end the session.</Text>
         <DetailRow label="Rate" value={`$${session.pricePerHour}/hour`} icon={<CreditCard stroke={colors.muted} size={16} />} />
         <DetailRow label="Slot" value={session.slot.number} icon={<MapPin stroke={colors.muted} size={16} />} />
         <DetailRow label="Plate" value={session.plateNumber} icon={<MapPin stroke={colors.muted} size={16} />} />
@@ -83,7 +92,8 @@ export default function SessionScreen() {
         <Text style={styles.locationCopy}>{session.address}</Text>
       </SurfaceCard>
 
-      <AppButton label="End session and review payment" onPress={handleEndSession} variant="danger" />
+      <AppButton label="Settle payment & end session" onPress={handleEndSession} variant="danger" loading={isSubmitting} />
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
     </Screen>
   );
 }
@@ -128,6 +138,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typography.caption,
   },
+  settlementCopy: {
+    color: colors.muted,
+    fontSize: typography.caption,
+    lineHeight: 18,
+  },
   locationTitle: {
     color: colors.text,
     fontSize: typography.section,
@@ -137,6 +152,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typography.body,
     lineHeight: 22,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: typography.body,
+    lineHeight: 20,
   },
 });
 

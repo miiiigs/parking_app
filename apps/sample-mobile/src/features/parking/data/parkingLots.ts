@@ -1,18 +1,18 @@
 import type { ParkingLot } from '../types';
 
-const sharedSlots = [
-  { id: 'A1', number: 'A1', isAvailable: true, x: 20, y: 20 },
-  { id: 'A2', number: 'A2', isAvailable: false, x: 80, y: 20 },
-  { id: 'A3', number: 'A3', isAvailable: true, x: 140, y: 20 },
-  { id: 'A4', number: 'A4', isAvailable: true, x: 200, y: 20 },
-  { id: 'B1', number: 'B1', isAvailable: true, x: 20, y: 80 },
-  { id: 'B2', number: 'B2', isAvailable: true, x: 80, y: 80 },
-  { id: 'B3', number: 'B3', isAvailable: false, x: 140, y: 80 },
-  { id: 'B4', number: 'B4', isAvailable: true, x: 200, y: 80 },
-  { id: 'C1', number: 'C1', isAvailable: true, x: 20, y: 140 },
-  { id: 'C2', number: 'C2', isAvailable: true, x: 80, y: 140 },
-  { id: 'C3', number: 'C3', isAvailable: true, x: 140, y: 140 },
-  { id: 'C4', number: 'C4', isAvailable: false, x: 200, y: 140 },
+const sharedSlots: ParkingLot['slots'] = [
+  { id: 'A1', number: 'A1', isAvailable: true, status: 'available', x: 20, y: 20 },
+  { id: 'A2', number: 'A2', isAvailable: false, status: 'occupied', x: 80, y: 20 },
+  { id: 'A3', number: 'A3', isAvailable: true, status: 'available', x: 140, y: 20 },
+  { id: 'A4', number: 'A4', isAvailable: true, status: 'available', x: 200, y: 20 },
+  { id: 'B1', number: 'B1', isAvailable: true, status: 'available', x: 20, y: 80 },
+  { id: 'B2', number: 'B2', isAvailable: true, status: 'available', x: 80, y: 80 },
+  { id: 'B3', number: 'B3', isAvailable: false, status: 'occupied', x: 140, y: 80 },
+  { id: 'B4', number: 'B4', isAvailable: true, status: 'available', x: 200, y: 80 },
+  { id: 'C1', number: 'C1', isAvailable: true, status: 'available', x: 20, y: 140 },
+  { id: 'C2', number: 'C2', isAvailable: true, status: 'available', x: 80, y: 140 },
+  { id: 'C3', number: 'C3', isAvailable: true, status: 'available', x: 140, y: 140 },
+  { id: 'C4', number: 'C4', isAvailable: false, status: 'occupied', x: 200, y: 140 },
 ];
 
 export const parkingLots: ParkingLot[] = [
@@ -41,6 +41,7 @@ export const parkingLots: ParkingLot[] = [
       id: `M-${slot.id}`,
       number: `M${index + 1}`,
       isAvailable: index % 4 !== 1,
+      status: index % 4 !== 1 ? 'available' : 'occupied',
     })),
   },
   {
@@ -57,6 +58,7 @@ export const parkingLots: ParkingLot[] = [
       id: `R-${slot.id}`,
       number: `R${index + 1}`,
       isAvailable: index % 3 !== 0,
+      status: index % 3 !== 0 ? 'available' : 'occupied',
     })),
   },
   {
@@ -73,6 +75,7 @@ export const parkingLots: ParkingLot[] = [
       id: `B-${slot.id}`,
       number: `B${index + 1}`,
       isAvailable: index !== 2 && index !== 8,
+      status: index !== 2 && index !== 8 ? 'available' : 'occupied',
     })),
   },
 ];

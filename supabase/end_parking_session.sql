@@ -32,6 +32,7 @@ declare
   v_ended_at timestamptz := now();
   v_billed_minutes integer;
   v_billed_amount numeric(10,2);
+  v_parking_rate numeric(10,2);
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -71,6 +72,8 @@ begin
     raise exception 'Slot not found';
   end if;
 
+  v_parking_rate := coalesce(v_reservation.parking_rate, 50);
+
   if v_session.status = 'completed' then
     return query
       select
@@ -98,7 +101,10 @@ begin
   end if;
 
   v_billed_minutes := greatest(1, ceil(extract(epoch from (v_ended_at - v_session.started_at)) / 60.0)::integer);
-  v_billed_amount := coalesce(p_billed_amount, v_reservation.reservation_fee);
+  v_billed_amount := coalesce(
+    p_billed_amount,
+    calculate_parking_fee(v_billed_minutes, v_parking_rate)
+  );
 
   update parking_sessions
     set status = 'completed',
