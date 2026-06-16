@@ -1,3 +1,5 @@
+drop function if exists reserve_parking_slot(uuid, text, integer, numeric);
+
 create or replace function reserve_parking_slot(
   p_slot_id uuid,
   p_plate_number text,

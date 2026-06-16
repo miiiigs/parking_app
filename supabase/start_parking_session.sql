@@ -1,3 +1,5 @@
+drop function if exists start_parking_session(uuid, text);
+
 create or replace function start_parking_session(
   p_reservation_id uuid,
   p_slot_qr_token text default null
