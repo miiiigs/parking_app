@@ -1,4 +1,5 @@
 import type { ParkingLotDefinition } from './parkingMap';
+import type { ParkingPricingConfig } from '../../../packages/shared/src/parkingPricing';
 
 export interface OperatorLocation {
   id: string;
@@ -131,6 +132,7 @@ export interface ParkingMap {
 
 export interface OperatorDashboardData {
   location: OperatorLocation | null;
+  locationPricing: ParkingPricingConfig | null;
   parkingMap: ParkingMap;
   reservations: Reservation[];
   sessions: ParkingSessionRecord[];

@@ -1,22 +1,15 @@
-import {
-  createClient,
-  type AuthChangeEvent,
-  type Session,
-  type User,
-} from '@supabase/supabase-js';
+import { createClient, type AuthChangeEvent, type Session, type SupabaseClient, type User } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-// @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
 import { getSupabaseConfigStatus } from './supabaseConfig';
 
 function getEnv() {
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 }
 
-let cachedClient: any = null;
+let cachedClient: SupabaseClient | null = null;
 let cachedUser: User | null = null;
 const guestModeStorageKey = 'parking_mobile_guest_mode';
-
 const authStorageCache = new Map<string, string>();
 
 const supabaseAuthStorage = {
@@ -69,7 +62,7 @@ async function setGuestModeEnabled(enabled: boolean) {
   }
 }
 
-export function getSupabaseClient(): any {
+export function getSupabaseClient(): SupabaseClient | null {
   if (cachedClient) {
     return cachedClient;
   }
@@ -331,7 +324,6 @@ export function subscribeToMobileAuthChanges(
   };
 }
 
-// Expose a helper to reset cached user (useful for tests or sign-out flows)
 export function clearCachedAuthUser() {
   cachedUser = null;
 }

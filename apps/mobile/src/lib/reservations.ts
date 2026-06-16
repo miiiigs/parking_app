@@ -1,4 +1,7 @@
-import { ensureMobileAuthSession, getSupabaseClient } from './supabaseClient';
+import { calculateBill, createExitCode, createReceiptNumber, createReservationCode, createTransactionId } from '../features/parking/lib/flow';
+import { ensureMobileAuthSession, getCurrentGuestMode, getSupabaseClient } from './supabaseClient';
+import type { Booking, CompletedSession, ParkingLot, ParkingSession, ParkingSlot } from '../features/parking/types';
+import { DEFAULT_PARKING_PRICING, normalizeParkingPricingConfig, type ParkingPricingConfig } from '@parking/shared';
 
 export type ReservationResult = {
   reservation_id: string;
@@ -8,6 +11,10 @@ export type ReservationResult = {
   reservation_status: string;
   reserved_at: string;
   expires_at: string;
+  arrival_window_minutes?: number | null;
+  plate_number?: string | null;
+  parking_rate?: number | null;
+  pricing_config?: ParkingPricingConfig | null;
 };
 
 export type ParkingSessionResult = {
@@ -26,6 +33,7 @@ export type ParkingSessionResult = {
   billed_minutes: number | null;
   billed_amount: number | null;
   payment_status: string | null;
+  pricing_config?: ParkingPricingConfig | null;
 };
 
 export type MobileWorkflowState = {
@@ -34,7 +42,8 @@ export type MobileWorkflowState = {
 };
 
 export type ReservationRequest = {
-  slotId: string;
+  lot: ParkingLot;
+  slot: ParkingSlot;
   arrivalWindowMinutes: number;
   plateNumber: string;
 };
@@ -43,30 +52,153 @@ function isUuidLike(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-export async function createParkingReservation(request: ReservationRequest) {
+async function shouldUseLocalFlow() {
   const supabase = getSupabaseClient() as any;
 
   if (!supabase) {
-    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+    return true;
   }
 
-  if (!isUuidLike(request.slotId)) {
-    throw new Error('Please reconnect to live backend data before reserving. The current slot list is only fallback data.');
+  return getCurrentGuestMode();
+}
+
+function isMissingReserveParkingRateSignature(message: string | undefined) {
+  if (!message) {
+    return false;
   }
 
-  await ensureMobileAuthSession();
+  return (
+    message.includes('Could not find the function public.reserve_parking_slot') &&
+    message.includes('p_parking_rate')
+  );
+}
 
-  const { data, error } = await supabase.rpc('reserve_parking_slot', {
-    p_slot_id: request.slotId,
+function isMissingParkingRateColumn(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return message.toLowerCase().includes("column 'parking_rate' does not exist")
+    || message.toLowerCase().includes('column "parking_rate" does not exist');
+}
+
+function isMissingPricingConfigColumn(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return message.toLowerCase().includes("column 'pricing_config' does not exist")
+    || message.toLowerCase().includes('column "pricing_config" does not exist');
+}
+
+function buildExitGraceEndsAt(endTime: string, pricingConfig: ParkingPricingConfig) {
+  const durationMs = Math.max(0, pricingConfig.exitGraceMinutes) * 60 * 1000;
+  return new Date(new Date(endTime).getTime() + durationMs).toISOString();
+}
+
+function toBookingFromReservation({
+  lot,
+  slot,
+  request,
+  reservationId,
+  expiresAt,
+  reservationStatus,
+  parkingRate,
+  pricingConfig,
+}: {
+  lot: ParkingLot;
+  slot: ParkingSlot;
+  request: ReservationRequest;
+  reservationId?: string | null;
+  expiresAt?: string | null;
+  reservationStatus?: string;
+  parkingRate?: number | null;
+  pricingConfig?: ParkingPricingConfig | null;
+}): Booking {
+  const normalizedPricingConfig = normalizeParkingPricingConfig(
+    pricingConfig ?? {
+      fixedHourlyRate: parkingRate ?? lot.pricePerHour,
+      flatRateAmount: parkingRate ?? lot.pricePerHour,
+      firstPeriodRate: parkingRate ?? lot.pricePerHour,
+    },
+  );
+
+  return {
+    reservationId: reservationId ?? undefined,
+    reservationCode: reservationId ?? createReservationCode(slot.id),
+    lotId: lot.id,
+    lotName: lot.name,
+    address: lot.address,
+    slotId: slot.id,
+    slotLabel: slot.number,
+    slot,
+    arrivalWindowMinutes: request.arrivalWindowMinutes,
+    plateNumber: request.plateNumber,
+    pricePerHour: parkingRate ?? lot.pricePerHour,
+    pricingConfig: normalizedPricingConfig,
+    reservationStatus: reservationStatus ?? (reservationId ? 'confirmed' : 'local'),
+    expiresAt: expiresAt ?? null,
+    qrToken: slot.qrToken ?? null,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export async function createParkingReservation(request: ReservationRequest) {
+  const supabase = getSupabaseClient() as any;
+  const useLocalFlow = await shouldUseLocalFlow();
+
+  if (!supabase || useLocalFlow) {
+    return toBookingFromReservation({ lot: request.lot, slot: request.slot, request });
+  }
+
+  if (!isUuidLike(request.slot.id)) {
+    throw new Error('Live parking data is required for reservations. Reload the lot map or switch to guest mode for local testing.');
+  }
+
+  try {
+    await ensureMobileAuthSession();
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can reserve parking.');
+  }
+
+  let { data, error } = await supabase.rpc('reserve_parking_slot', {
+    p_slot_id: request.slot.id,
     p_plate_number: request.plateNumber,
     p_arrival_window_minutes: request.arrivalWindowMinutes,
+    p_parking_rate: request.lot.pricePerHour,
   });
 
-  if (error) {
-    throw new Error(error.message);
+  if (error && isMissingReserveParkingRateSignature(error.message)) {
+    const fallbackResult = await supabase.rpc('reserve_parking_slot', {
+      p_slot_id: request.slot.id,
+      p_plate_number: request.plateNumber,
+      p_arrival_window_minutes: request.arrivalWindowMinutes,
+    });
+
+    data = fallbackResult.data;
+    error = fallbackResult.error;
   }
 
-  return data as ReservationResult[];
+  if (error || !data) {
+    throw new Error(error?.message ?? 'Unable to create the reservation in Supabase.');
+  }
+
+  const reservation = Array.isArray(data) ? data[0] ?? null : data;
+
+  if (!reservation) {
+    throw new Error('Supabase did not return a reservation row.');
+  }
+
+  return toBookingFromReservation({
+    lot: request.lot,
+    slot: request.slot,
+    request,
+    reservationId: reservation.reservation_id,
+    expiresAt: reservation.expires_at,
+    reservationStatus: reservation.reservation_status,
+    parkingRate: reservation.parking_rate,
+    pricingConfig: reservation.pricing_config ?? request.lot.pricingConfig,
+  });
 }
 
 export async function getParkingReservationById(reservationId: string) {
@@ -76,7 +208,7 @@ export async function getParkingReservationById(reservationId: string) {
     return null;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('reservations')
     .select(`
       id,
@@ -84,6 +216,10 @@ export async function getParkingReservationById(reservationId: string) {
       status,
       reserved_at,
       expires_at,
+      arrival_window_minutes,
+      plate_number,
+      parking_rate,
+      pricing_config,
       parking_slots!inner (
         slot_label,
         status
@@ -91,6 +227,29 @@ export async function getParkingReservationById(reservationId: string) {
     `)
     .eq('id', reservationId)
     .maybeSingle();
+
+  let { data, error } = await query;
+
+  if (error && (isMissingParkingRateColumn(error.message) || isMissingPricingConfigColumn(error.message))) {
+    query = supabase
+      .from('reservations')
+      .select(`
+        id,
+        slot_id,
+        status,
+        reserved_at,
+        expires_at,
+        plate_number,
+        parking_slots!inner (
+          slot_label,
+          status
+        )
+      `)
+      .eq('id', reservationId)
+      .maybeSingle();
+
+    ({ data, error } = await query);
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -110,6 +269,10 @@ export async function getParkingReservationById(reservationId: string) {
     reservation_status: data.status,
     reserved_at: data.reserved_at,
     expires_at: data.expires_at,
+    arrival_window_minutes: data.arrival_window_minutes ?? null,
+    plate_number: data.plate_number ?? null,
+    parking_rate: 'parking_rate' in data && data.parking_rate !== null && data.parking_rate !== undefined ? Number(data.parking_rate) : null,
+    pricing_config: 'pricing_config' in data ? normalizeParkingPricingConfig(data.pricing_config ?? null) : null,
   } as ReservationResult;
 }
 
@@ -120,7 +283,7 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     return null;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('parking_sessions')
     .select(`
       id,
@@ -134,6 +297,7 @@ export async function getParkingSessionByReservationId(reservationId: string) {
       reservations!inner (
         plate_number,
         reservation_fee,
+        pricing_config,
         status,
         parking_slots!inner (
           slot_label,
@@ -143,6 +307,36 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     `)
     .eq('reservation_id', reservationId)
     .maybeSingle();
+
+  let { data, error } = await query;
+
+  if (error && isMissingPricingConfigColumn(error.message)) {
+    query = supabase
+      .from('parking_sessions')
+      .select(`
+        id,
+        reservation_id,
+        slot_id,
+        started_at,
+        ended_at,
+        billed_minutes,
+        billed_amount,
+        status,
+        reservations!inner (
+          plate_number,
+          reservation_fee,
+          status,
+          parking_slots!inner (
+            slot_label,
+            status
+          )
+        )
+      `)
+      .eq('reservation_id', reservationId)
+      .maybeSingle();
+
+    ({ data, error } = await query);
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -180,6 +374,7 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     billed_minutes: data.billed_minutes ?? null,
     billed_amount: data.billed_amount !== null && data.billed_amount !== undefined ? Number(data.billed_amount) : null,
     payment_status: payment?.status ?? (data.status === 'completed' ? 'paid' : null),
+    pricing_config: normalizeParkingPricingConfig(reservation?.pricing_config ?? null),
   } as ParkingSessionResult;
 }
 
@@ -201,9 +396,7 @@ export async function getCurrentMobileWorkflowState(): Promise<MobileWorkflowSta
 
   const { data: reservations, error } = await supabase
     .from('reservations')
-    .select(`
-      id
-    `)
+    .select(`id`)
     .eq('user_id', currentUser.id)
     .eq('status', 'confirmed')
     .order('reserved_at', { ascending: false })
@@ -237,12 +430,17 @@ export async function endParkingSession(request: {
   billedMinutes?: number | null;
 }) {
   const supabase = getSupabaseClient() as any;
+  const useLocalFlow = await shouldUseLocalFlow();
 
-  if (!supabase) {
-    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  if (!supabase || useLocalFlow) {
+    return null;
   }
 
-  await ensureMobileAuthSession();
+  try {
+    await ensureMobileAuthSession();
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can end a parking session.');
+  }
 
   const { data, error } = await supabase.rpc('end_parking_session', {
     p_reservation_id: request.reservationId,
@@ -262,12 +460,17 @@ export async function startParkingSession(request: {
   slotQrToken?: string | null;
 }) {
   const supabase = getSupabaseClient() as any;
+  const useLocalFlow = await shouldUseLocalFlow();
 
-  if (!supabase) {
-    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  if (!supabase || useLocalFlow) {
+    return null;
   }
 
-  await ensureMobileAuthSession();
+  try {
+    await ensureMobileAuthSession();
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can start a parking session.');
+  }
 
   const { data, error } = await supabase.rpc('start_parking_session', {
     p_reservation_id: request.reservationId,
@@ -279,4 +482,68 @@ export async function startParkingSession(request: {
   }
 
   return data as ParkingSessionResult[];
+}
+
+export function mapReservationToBooking(
+  reservation: ReservationResult,
+  lot: ParkingLot,
+  slot: ParkingSlot,
+): Booking {
+  return {
+    reservationId: reservation.reservation_id,
+    reservationCode: reservation.reservation_id,
+    lotId: lot.id,
+    lotName: lot.name,
+    address: lot.address,
+    slotId: reservation.slot_id,
+    slotLabel: reservation.slot_label,
+    slot,
+    arrivalWindowMinutes: reservation.arrival_window_minutes ?? 0,
+    plateNumber: reservation.plate_number ?? '',
+    pricePerHour: reservation.parking_rate ?? lot.pricePerHour,
+    pricingConfig: normalizeParkingPricingConfig(reservation.pricing_config ?? lot.pricingConfig ?? DEFAULT_PARKING_PRICING),
+    reservationStatus: reservation.reservation_status,
+    expiresAt: reservation.expires_at,
+    qrToken: slot.qrToken ?? null,
+    createdAt: reservation.reserved_at,
+  };
+}
+
+export function mapSessionToParkingSession(
+  session: ParkingSessionResult,
+  booking: Booking,
+): ParkingSession {
+  return {
+    ...booking,
+    sessionId: session.session_id,
+    sessionStatus: session.session_status,
+    startTime: session.started_at,
+    startedAt: session.started_at,
+    validatedAt: session.validated_at,
+    billedMinutes: session.billed_minutes,
+    billedAmount: session.billed_amount,
+    paymentStatus: session.payment_status,
+    pricingConfig: normalizeParkingPricingConfig(session.pricing_config ?? booking.pricingConfig),
+  };
+}
+
+export function mapCompletedSession(
+  session: ParkingSessionResult,
+  booking: Booking,
+): CompletedSession {
+  const durationSeconds = Math.max(0, Math.floor((new Date(session.ended_at ?? session.started_at).getTime() - new Date(session.started_at).getTime()) / 1000));
+  const totalBill = session.billed_amount ?? calculateBill(durationSeconds, booking.pricingConfig);
+  const pricingConfig = normalizeParkingPricingConfig(session.pricing_config ?? booking.pricingConfig);
+  const endTime = session.ended_at ?? new Date().toISOString();
+
+  return {
+    ...mapSessionToParkingSession(session, booking),
+    endTime,
+    durationSeconds,
+    totalBill,
+    receiptNumber: createReceiptNumber(),
+    transactionId: createTransactionId(),
+    exitCode: createExitCode(booking.slot.id),
+    exitGraceEndsAt: buildExitGraceEndsAt(endTime, pricingConfig),
+  };
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from 'react';
-import { Loader2, RefreshCcw, RotateCcw, ShieldCheck } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CreditCard, Loader2, RefreshCcw, RotateCcw, ShieldCheck } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import {
@@ -16,19 +16,52 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/auth-context';
 import { recordOperatorActionFailure, recordOperatorActionSuccess } from '@/lib/operatorDataStore';
 import { hasOperatorCapability } from '@/lib/operatorPermissions';
+import { DEFAULT_PARKING_PRICING, formatParkingPricingSummary, type ParkingPricingConfig, type ParkingPricingMode } from '@/lib/parkingPricing';
 import type { ReconciliationRun } from '@/lib/types';
 import { useOperatorData } from '@/lib/useOperatorData';
 
-type AdminAction = 'reconcile' | 'reset-slots';
+type AdminAction = 'reconcile' | 'reset-slots' | 'update-pricing';
 type AdminActionPreview = {
   action: AdminAction;
   title: string;
   summary: string;
   counts: Record<string, number>;
 };
+
+const PRICING_MODE_OPTIONS: Array<{ value: ParkingPricingMode; label: string }> = [
+  { value: 'flat_rate', label: 'Flat rate' },
+  { value: 'fixed_rate', label: 'Fixed hourly rate' },
+  { value: 'tiered', label: 'First period + succeeding rate' },
+];
+
+function toCurrencyInput(value: number) {
+  return Number.isFinite(value) ? value.toString() : '0';
+}
+
+function toIntegerInput(value: number) {
+  return Number.isFinite(value) ? Math.round(value).toString() : '0';
+}
+
+function buildPricingDraft(config?: ParkingPricingConfig | null) {
+  const source = config ?? DEFAULT_PARKING_PRICING;
+
+  return {
+    mode: source.mode,
+    flatRateAmount: toCurrencyInput(source.flatRateAmount),
+    fixedHourlyRate: toCurrencyInput(source.fixedHourlyRate),
+    firstPeriodHours: toIntegerInput(source.firstPeriodHours),
+    firstPeriodRate: toCurrencyInput(source.firstPeriodRate),
+    succeedingHourlyRate: toCurrencyInput(source.succeedingHourlyRate),
+    entryGraceMinutes: toIntegerInput(source.entryGraceMinutes),
+    exitGraceMinutes: toIntegerInput(source.exitGraceMinutes),
+  };
+}
 
 export default function AdminToolsPage() {
   const { user } = useAuth();
@@ -38,13 +71,34 @@ export default function AdminToolsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<'success' | 'error'>('success');
   const [pendingPreview, setPendingPreview] = useState<AdminActionPreview | null>(null);
+  const [pricingDraft, setPricingDraft] = useState(() => buildPricingDraft(null));
 
   const reconciliationRuns = data?.reconciliationRuns ?? [];
   const metrics = data?.metrics ?? null;
   const canRunReconciliation = hasOperatorCapability(user?.role, 'run-reconciliation');
   const canResetSlots = hasOperatorCapability(user?.role, 'reset-slot-statuses');
+  const canManagePricing = hasOperatorCapability(user?.role, 'manage-pricing');
 
   const latestRun = reconciliationRuns[0] ?? null;
+
+  useEffect(() => {
+    if (!data?.locationPricing) {
+      return;
+    }
+
+    setPricingDraft(buildPricingDraft(data.locationPricing));
+  }, [data?.locationPricing]);
+
+  const parsedPricingConfig = useMemo<ParkingPricingConfig>(() => ({
+    mode: pricingDraft.mode,
+    flatRateAmount: Number(pricingDraft.flatRateAmount) || 0,
+    fixedHourlyRate: Number(pricingDraft.fixedHourlyRate) || 0,
+    firstPeriodHours: Math.max(1, Number(pricingDraft.firstPeriodHours) || DEFAULT_PARKING_PRICING.firstPeriodHours),
+    firstPeriodRate: Number(pricingDraft.firstPeriodRate) || 0,
+    succeedingHourlyRate: Number(pricingDraft.succeedingHourlyRate) || 0,
+    entryGraceMinutes: Math.max(0, Number(pricingDraft.entryGraceMinutes) || 0),
+    exitGraceMinutes: Math.max(0, Number(pricingDraft.exitGraceMinutes) || 0),
+  }), [pricingDraft]);
 
   const toolCards = useMemo(
     () => [
@@ -75,19 +129,22 @@ export default function AdminToolsPage() {
     setMessage(null);
 
     try {
+      const payload = action === 'update-pricing'
+        ? { action, preview: true, pricingConfig: parsedPricingConfig }
+        : { action, preview: true };
       const response = await fetch('/api/operator/admin-tools', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ action, preview: true }),
+        body: JSON.stringify(payload),
       });
-      const payload = await response.json().catch(() => ({}));
+      const responsePayload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to load action preview.');
+        throw new Error(responsePayload?.error || 'Failed to load action preview.');
       }
 
-      setPendingPreview(payload.preview as AdminActionPreview);
+      setPendingPreview(responsePayload.preview as AdminActionPreview);
       recordOperatorActionSuccess();
     } catch (error) {
       recordOperatorActionFailure();
@@ -103,21 +160,24 @@ export default function AdminToolsPage() {
     setMessage(null);
 
     try {
+      const requestPayload = action === 'update-pricing'
+        ? { action, pricingConfig: parsedPricingConfig }
+        : { action };
       const response = await fetch('/api/operator/admin-tools', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(requestPayload),
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const responsePayload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload?.error || 'Admin tool action failed.');
+        throw new Error(responsePayload?.error || 'Admin tool action failed.');
       }
 
-      setMessage(payload?.message ?? 'Action completed.');
+      setMessage(responsePayload?.message ?? 'Action completed.');
       setMessageTone('success');
       setPendingPreview(null);
       recordOperatorActionSuccess();
@@ -129,6 +189,13 @@ export default function AdminToolsPage() {
     } finally {
       setRunningAction(null);
     }
+  }
+
+  function updatePricingField<K extends keyof typeof pricingDraft>(key: K, value: (typeof pricingDraft)[K]) {
+    setPricingDraft((current) => ({
+      ...current,
+      [key]: value,
+    }));
   }
 
   return (
@@ -220,6 +287,177 @@ export default function AdminToolsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle className="text-lg font-semibold text-foreground">Parking Pricing</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Configure the rate model and grace periods for the active parking location.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/40 px-3 py-1 text-xs font-medium text-foreground">
+                <CreditCard className="h-3.5 w-3.5 text-primary" />
+                {formatParkingPricingSummary(parsedPricingConfig)}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {!canManagePricing ? (
+              <div className="rounded-lg border border-border bg-secondary/30 p-3 text-sm text-muted-foreground">
+                Read-only access. Your role can view pricing, but cannot change it.
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-2 xl:col-span-2">
+                <Label htmlFor="pricing-mode">Pricing mode</Label>
+                <Select
+                  value={pricingDraft.mode}
+                  onValueChange={(value) => updatePricingField('mode', value as ParkingPricingMode)}
+                  disabled={!canManagePricing}
+                >
+                  <SelectTrigger id="pricing-mode" className="border-border bg-input">
+                    <SelectValue placeholder="Select a pricing mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRICING_MODE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="entry-grace">Entry grace (min)</Label>
+                <Input
+                  id="entry-grace"
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={pricingDraft.entryGraceMinutes}
+                  onChange={(event) => updatePricingField('entryGraceMinutes', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="exit-grace">Exit grace (min)</Label>
+                <Input
+                  id="exit-grace"
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={pricingDraft.exitGraceMinutes}
+                  onChange={(event) => updatePricingField('exitGraceMinutes', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="flat-rate">Flat rate amount</Label>
+                <Input
+                  id="flat-rate"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={pricingDraft.flatRateAmount}
+                  onChange={(event) => updatePricingField('flatRateAmount', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing || pricingDraft.mode !== 'flat_rate'}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fixed-rate">Fixed hourly rate</Label>
+                <Input
+                  id="fixed-rate"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={pricingDraft.fixedHourlyRate}
+                  onChange={(event) => updatePricingField('fixedHourlyRate', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing || pricingDraft.mode !== 'fixed_rate'}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="first-period-hours">First period hours</Label>
+                <Input
+                  id="first-period-hours"
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={pricingDraft.firstPeriodHours}
+                  onChange={(event) => updatePricingField('firstPeriodHours', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing || pricingDraft.mode !== 'tiered'}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="first-period-rate">First period rate</Label>
+                <Input
+                  id="first-period-rate"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={pricingDraft.firstPeriodRate}
+                  onChange={(event) => updatePricingField('firstPeriodRate', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing || pricingDraft.mode !== 'tiered'}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
+              <div className="space-y-2 xl:max-w-sm">
+                <Label htmlFor="succeeding-rate">Succeeding hourly rate</Label>
+                <Input
+                  id="succeeding-rate"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={pricingDraft.succeedingHourlyRate}
+                  onChange={(event) => updatePricingField('succeedingHourlyRate', event.target.value)}
+                  className="border-border bg-input"
+                  disabled={!canManagePricing || pricingDraft.mode !== 'tiered'}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-w-[150px]"
+                  disabled={!canManagePricing || loadingPreview === 'update-pricing' || runningAction === 'update-pricing'}
+                  onClick={() => setPricingDraft(buildPricingDraft(data?.locationPricing ?? DEFAULT_PARKING_PRICING))}
+                >
+                  Reset form
+                </Button>
+                <Button
+                  type="button"
+                  className="min-w-[180px]"
+                  disabled={!canManagePricing || loadingPreview === 'update-pricing' || runningAction === 'update-pricing'}
+                  onClick={() => void fetchActionPreview('update-pricing')}
+                >
+                  {loadingPreview === 'update-pricing' || runningAction === 'update-pricing' ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Save pricing
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="grid gap-4">

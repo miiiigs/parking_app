@@ -3,6 +3,14 @@ export type ActiveOperatorLocation = {
   name: string;
   address?: string;
   city?: string;
+  pricing_mode?: string | null;
+  flat_rate_amount?: number | null;
+  fixed_hourly_rate?: number | null;
+  first_period_hours?: number | null;
+  first_period_rate?: number | null;
+  succeeding_hourly_rate?: number | null;
+  entry_grace_minutes?: number | null;
+  exit_grace_minutes?: number | null;
 };
 
 export const OPERATOR_LOCATION_COOKIE = 'operator_location_id';
@@ -13,6 +21,19 @@ export function getServiceHeaders(serviceRoleKey: string) {
     Authorization: `Bearer ${serviceRoleKey}`,
     'Content-Type': 'application/json',
   } as Record<string, string>;
+}
+
+function isMissingPricingColumnError(message: string) {
+  return [
+    'pricing_mode',
+    'flat_rate_amount',
+    'fixed_hourly_rate',
+    'first_period_hours',
+    'first_period_rate',
+    'succeeding_hourly_rate',
+    'entry_grace_minutes',
+    'exit_grace_minutes',
+  ].some((column) => message.includes(column));
 }
 
 export async function readRestList<T>(response: Response): Promise<T[]> {
@@ -60,20 +81,35 @@ export function assertOperatorLocationRequest(activeLocationId: string, requeste
 export async function fetchOperatorLocations(
   baseUrl: string,
   headers: Record<string, string>,
-  select = 'id,name,address,city',
+  select = 'id,name,address,city,pricing_mode,flat_rate_amount,fixed_hourly_rate,first_period_hours,first_period_rate,succeeding_hourly_rate,entry_grace_minutes,exit_grace_minutes',
 ): Promise<ActiveOperatorLocation[]> {
-  return readRestList<ActiveOperatorLocation>(
-    await fetch(
-      `${baseUrl}/rest/v1/locations?select=${select}&is_active=eq.true&order=created_at.asc`,
-      { headers, cache: 'no-store' },
-    ),
+  const response = await fetch(
+    `${baseUrl}/rest/v1/locations?select=${select}&is_active=eq.true&order=created_at.asc`,
+    { headers, cache: 'no-store' },
   );
+
+  if (!response.ok) {
+    const message = await response.text();
+    if (!isMissingPricingColumnError(message)) {
+      throw new Error(message);
+    }
+
+    return readRestList<ActiveOperatorLocation>(
+      await fetch(
+        `${baseUrl}/rest/v1/locations?select=id,name,address,city&is_active=eq.true&order=created_at.asc`,
+        { headers, cache: 'no-store' },
+      ),
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+  return Array.isArray(payload) ? (payload as ActiveOperatorLocation[]) : [];
 }
 
 export async function fetchActiveOperatorLocation(
   baseUrl: string,
   headers: Record<string, string>,
-  select = 'id,name,address,city',
+  select = 'id,name,address,city,pricing_mode,flat_rate_amount,fixed_hourly_rate,first_period_hours,first_period_rate,succeeding_hourly_rate,entry_grace_minutes,exit_grace_minutes',
 ): Promise<ActiveOperatorLocation | null> {
   const locations = await fetchOperatorLocations(baseUrl, headers, select);
   return pickOperatorLocation(locations);

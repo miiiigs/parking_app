@@ -1,22 +1,29 @@
 {
   "expo": {
-    "name": "Smart Parking Mobile",
-    "slug": "smart-parking-mobile",
-    "scheme": "smartparkingmobile",
+    "name": "ParkEasy Mobile",
+    "slug": "parkeasy-mobile",
+    "scheme": "parkeasymobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
     "platforms": [
       "ios",
       "android"
     ],
-    "splash": {
-      "backgroundColor": "#08111f"
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.parking.mobile"
     },
     "android": {
-      "package": "com.miiigs.smartparkingmobile"
-    },
-    "plugins": [
-      "expo-router"
-    ]
+      "package": "com.parking.mobile"
+    }
   }
 }

@@ -2,11 +2,27 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["esnext"],
+    "lib": [
+      "esnext"
+    ],
     "allowJs": false,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["react", "react-native"]
+    "strict": true,
+    "types": [
+      "react",
+      "react-native"
+    ]
   },
-  "include": ["App.tsx", "src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

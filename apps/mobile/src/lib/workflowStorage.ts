@@ -5,7 +5,7 @@ import type { ParkingSessionResult, ReservationResult } from './reservations';
 const WORKFLOW_STORAGE_KEY = 'smart-parking-mobile-workflow-v1';
 
 export type StoredWorkflowSnapshot = {
-  stage: 'home' | 'reserve' | 'validate' | 'session';
+  stage: 'home' | 'reserve' | 'arrival' | 'session';
   selectedSlotId: string | null;
   selectedArrivalWindowMinutes: number;
   plateNumber: string;

@@ -1,17 +1,27 @@
-import React from 'react';
 import { Stack } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
+
 import { MobileAuthProvider } from '../src/providers/MobileAuthProvider';
-import { MobileWorkflowProvider } from '../src/providers/MobileWorkflowProvider';
+import { MobileParkingDataProvider } from '../src/providers/MobileParkingDataProvider';
+import { colors } from '../src/theme/tokens';
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <MobileAuthProvider>
-        <MobileWorkflowProvider>
-          <Stack screenOptions={{ headerShown: false }} />
-        </MobileWorkflowProvider>
-      </MobileAuthProvider>
-    </SafeAreaProvider>
+    <MobileAuthProvider>
+      <MobileParkingDataProvider>
+        <>
+          <StatusBar barStyle="dark-content" backgroundColor={colors.canvas} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: colors.canvas,
+              },
+            }}
+          />
+        </>
+      </MobileParkingDataProvider>
+    </MobileAuthProvider>
   );
 }
+

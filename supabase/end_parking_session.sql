@@ -19,7 +19,8 @@ returns table (
   reservation_fee numeric,
   billed_minutes integer,
   billed_amount numeric,
-  payment_status text
+  payment_status text,
+  pricing_config jsonb
 )
 language plpgsql
 security definer
@@ -30,9 +31,10 @@ declare
   v_reservation reservations%rowtype;
   v_slot parking_slots%rowtype;
   v_ended_at timestamptz := now();
+  v_elapsed_minutes integer;
   v_billed_minutes integer;
   v_billed_amount numeric(10,2);
-  v_parking_rate numeric(10,2);
+  v_pricing_config jsonb;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -72,7 +74,19 @@ begin
     raise exception 'Slot not found';
   end if;
 
-  v_parking_rate := coalesce(v_reservation.parking_rate, 50);
+  v_pricing_config := coalesce(
+    nullif(v_reservation.pricing_config, '{}'::jsonb),
+    jsonb_build_object(
+      'mode', 'fixed_rate',
+      'flatRateAmount', coalesce(v_reservation.parking_rate, 50),
+      'fixedHourlyRate', coalesce(v_reservation.parking_rate, 50),
+      'firstPeriodHours', 3,
+      'firstPeriodRate', coalesce(v_reservation.parking_rate, 50),
+      'succeedingHourlyRate', 20,
+      'entryGraceMinutes', 15,
+      'exitGraceMinutes', 15
+    )
+  );
 
   if v_session.status = 'completed' then
     return query
@@ -91,7 +105,8 @@ begin
         v_reservation.reservation_fee,
         v_session.billed_minutes,
         v_session.billed_amount,
-        coalesce((select payments.status from payments where payments.session_id = v_session.id order by payments.paid_at desc nulls last, payments.created_at desc limit 1), 'paid');
+        coalesce((select payments.status from payments where payments.session_id = v_session.id order by payments.paid_at desc nulls last, payments.created_at desc limit 1), 'paid'),
+        v_pricing_config;
 
     return;
   end if;
@@ -100,10 +115,11 @@ begin
     raise exception 'Parking session is not active';
   end if;
 
-  v_billed_minutes := greatest(1, ceil(extract(epoch from (v_ended_at - v_session.started_at)) / 60.0)::integer);
+  v_elapsed_minutes := greatest(0, floor(extract(epoch from (v_ended_at - v_session.started_at)) / 60.0)::integer);
+  v_billed_minutes := greatest(0, v_elapsed_minutes - greatest(0, coalesce((v_pricing_config->>'entryGraceMinutes')::integer, 15)));
   v_billed_amount := coalesce(
     p_billed_amount,
-    calculate_parking_fee(v_billed_minutes, v_parking_rate)
+    calculate_parking_fee_from_config(v_elapsed_minutes, v_pricing_config)
   );
 
   update parking_sessions
@@ -154,7 +170,8 @@ begin
       'billed_minutes', coalesce(p_billed_minutes, v_billed_minutes),
       'billed_amount', v_billed_amount,
       'payment_status', 'paid',
-      'payment_reference', p_payment_reference
+      'payment_reference', p_payment_reference,
+      'pricing_config', v_pricing_config
     )
   );
 
@@ -174,7 +191,8 @@ begin
       v_reservation.reservation_fee,
       coalesce(p_billed_minutes, v_billed_minutes),
       v_billed_amount,
-      'paid';
+      'paid',
+      v_pricing_config;
 end;
 $$;
 
