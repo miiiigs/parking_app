@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { CreditCard, MapPin, Timer } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BottomNav } from '../../../components/navigation/BottomNav';
 import { Screen } from '../../../components/layout/Screen';
 import { AppButton } from '../../../components/ui/AppButton';
 import { DetailRow } from '../../../components/ui/DetailRow';
@@ -24,7 +25,7 @@ export default function SessionScreen() {
 
   useEffect(() => {
     if (!session) {
-      router.replace('/');
+      router.replace('/home');
       return;
     }
 
@@ -73,46 +74,58 @@ export default function SessionScreen() {
   };
 
   return (
-    <Screen>
-      <SurfaceCard style={styles.timerCard}>
-        <StatusBadge label="Session in progress" tone="info" />
-        <View style={styles.timerBlock}>
-          <Timer stroke={colors.surface} size={44} />
-          <Text style={styles.timerValue}>{formatTimer(elapsedSeconds)}</Text>
-          <Text style={styles.timerCaption}>Started at {formatTime(session.startTime)}</Text>
-        </View>
-      </SurfaceCard>
+    <View style={styles.root}>
+      <View style={styles.screenWrap}>
+        <Screen>
+          <SurfaceCard style={styles.timerCard}>
+            <StatusBadge label="Session in progress" tone="info" />
+            <View style={styles.timerBlock}>
+              <Timer stroke={colors.surface} size={44} />
+              <Text style={styles.timerValue}>{formatTimer(elapsedSeconds)}</Text>
+              <Text style={styles.timerCaption}>Started at {formatTime(session.startTime)}</Text>
+            </View>
+          </SurfaceCard>
 
-      <SurfaceCard>
-        <Text style={styles.sectionTitle}>Current bill</Text>
-        <View style={styles.billPanel}>
-          <Text style={styles.billValue}>PHP {currentBill.toFixed(2)}</Text>
-          <Text style={styles.billCaption}>{pricingQuote?.currentTierLabel ?? 'Live parking rate'}</Text>
-        </View>
-        {pricingQuote && pricingQuote.graceRemainingSeconds > 0 ? (
-          <Text style={styles.graceCopy}>
-            Entry grace period active: {formatTimer(pricingQuote.graceRemainingSeconds)} remaining before billable minutes begin.
-          </Text>
-        ) : null}
-        <Text style={styles.settlementCopy}>The backend records the final settlement when you end the session.</Text>
-        <DetailRow label="Rate" value={formatParkingPricingSummary(session.pricingConfig)} icon={<CreditCard stroke={colors.muted} size={16} />} />
-        <DetailRow label="Slot" value={session.slot.number} icon={<MapPin stroke={colors.muted} size={16} />} />
-        <DetailRow label="Plate" value={session.plateNumber} icon={<MapPin stroke={colors.muted} size={16} />} />
-      </SurfaceCard>
+          <SurfaceCard>
+            <Text style={styles.sectionTitle}>Current bill</Text>
+            <View style={styles.billPanel}>
+              <Text style={styles.billValue}>PHP {currentBill.toFixed(2)}</Text>
+              <Text style={styles.billCaption}>{pricingQuote?.currentTierLabel ?? 'Live parking rate'}</Text>
+            </View>
+            {pricingQuote && pricingQuote.graceRemainingSeconds > 0 ? (
+              <Text style={styles.graceCopy}>
+                Entry grace period active: {formatTimer(pricingQuote.graceRemainingSeconds)} remaining before billable minutes begin.
+              </Text>
+            ) : null}
+            <Text style={styles.settlementCopy}>The backend records the final settlement when you end the session.</Text>
+            <DetailRow label="Rate" value={formatParkingPricingSummary(session.pricingConfig)} icon={<CreditCard stroke={colors.muted} size={16} />} />
+            <DetailRow label="Slot" value={session.slot.number} icon={<MapPin stroke={colors.muted} size={16} />} />
+            <DetailRow label="Plate" value={session.plateNumber} icon={<MapPin stroke={colors.muted} size={16} />} />
+          </SurfaceCard>
 
-      <SurfaceCard>
-        <Text style={styles.sectionTitle}>Parking details</Text>
-        <Text style={styles.locationTitle}>{session.lotName}</Text>
-        <Text style={styles.locationCopy}>{session.address}</Text>
-      </SurfaceCard>
+          <SurfaceCard>
+            <Text style={styles.sectionTitle}>Parking details</Text>
+            <Text style={styles.locationTitle}>{session.lotName}</Text>
+            <Text style={styles.locationCopy}>{session.address}</Text>
+          </SurfaceCard>
 
-      <AppButton label="Settle payment & end session" onPress={handleEndSession} variant="danger" loading={isSubmitting} />
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-    </Screen>
+          <AppButton label="Settle payment & end session" onPress={handleEndSession} variant="danger" loading={isSubmitting} />
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        </Screen>
+      </View>
+      <BottomNav activeTab="session" />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.canvas,
+  },
+  screenWrap: {
+    flex: 1,
+  },
   timerCard: {
     backgroundColor: colors.primaryDark,
     borderColor: colors.primaryDark,

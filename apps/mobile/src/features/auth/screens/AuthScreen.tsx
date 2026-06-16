@@ -28,7 +28,7 @@ export default function AuthScreen() {
   const [displayName, setDisplayName] = useState('');
   const [phoneHint, setPhoneHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const returnTo = ((typeof params.returnTo === 'string' && params.returnTo.trim() ? params.returnTo : '/') as Parameters<
+  const returnTo = ((typeof params.returnTo === 'string' && params.returnTo.trim() ? params.returnTo : '/home') as Parameters<
     typeof router.replace
   >[0]);
 

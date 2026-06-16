@@ -13,7 +13,7 @@ export default function NotFoundScreen() {
         <View style={styles.card}>
           <Text style={styles.title}>This screen does not exist.</Text>
           <Text style={styles.copy}>The route could not be resolved in the sample mobile app.</Text>
-          <Link href="/" asChild>
+          <Link href="/home" asChild>
             <AppButton label="Back home" />
           </Link>
         </View>

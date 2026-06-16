@@ -1,1 +1,1 @@
-export { default } from '../src/features/parking/screens/HomeScreen';
+export { default } from '../src/features/onboarding/screens/OnboardingScreen';

@@ -1,1 +1,1 @@
-export { default } from '../src/features/auth/screens/AuthScreen';
+export { default } from '../src/features/auth/screens/LoginScreen';

@@ -10,6 +10,7 @@ import {
   signOutMobileUser,
   signUpMobileUser,
   setCurrentGuestMode,
+  updateMobileUserProfile,
   verifyPhoneVerificationCode,
   subscribeToMobileAuthChanges,
 } from '../lib/supabaseClient';
@@ -24,6 +25,7 @@ type MobileAuthContextValue = {
   verifyPhoneCode: (params: { phone: string; token: string }) => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<void>;
   signUpEmail: (params: { email: string; password: string; displayName?: string }) => Promise<{ requiresEmailConfirmation: boolean }>;
+  updateProfile: (params: { displayName?: string }) => Promise<void>;
   continueAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -109,6 +111,14 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     return { requiresEmailConfirmation: result.requiresEmailConfirmation };
   }, []);
 
+  const updateProfile = React.useCallback(async (params: { displayName?: string }) => {
+    setError(null);
+    await updateMobileUserProfile(params);
+    const nextSession = await getCurrentMobileSession();
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+  }, []);
+
   const continueAsGuest = React.useCallback(async () => {
     setError(null);
     await signOutMobileUser();
@@ -139,11 +149,12 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
       verifyPhoneCode,
       signInEmail,
       signUpEmail,
+      updateProfile,
       continueAsGuest,
       signOut,
       clearError: () => setError(null),
     }),
-    [continueAsGuest, error, isGuest, isLoading, sendPhoneCode, session, signInEmail, signOut, signUpEmail, user, verifyPhoneCode],
+    [continueAsGuest, error, isGuest, isLoading, sendPhoneCode, session, signInEmail, signOut, signUpEmail, updateProfile, user, verifyPhoneCode],
   );
 
   return <MobileAuthContext.Provider value={value}>{children}</MobileAuthContext.Provider>;

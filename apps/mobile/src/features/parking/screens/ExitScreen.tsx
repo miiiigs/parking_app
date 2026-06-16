@@ -31,7 +31,7 @@ export default function ExitScreen() {
 
   useEffect(() => {
     if (!completedSession) {
-      router.replace('/');
+      router.replace('/home');
     }
   }, [completedSession, router]);
 

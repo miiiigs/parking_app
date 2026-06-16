@@ -295,6 +295,32 @@ export async function signOutMobileUser() {
   }
 }
 
+export async function updateMobileUserProfile({ displayName }: { displayName?: string }) {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error('Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
+  }
+
+  const trimmedDisplayName = displayName?.trim() ?? '';
+
+  if (!trimmedDisplayName) {
+    return;
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      display_name: trimmedDisplayName,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  cachedUser = data.user ?? cachedUser;
+}
+
 export function subscribeToMobileAuthChanges(
   callback: (params: {
     event: AuthChangeEvent;
