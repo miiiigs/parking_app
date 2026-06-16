@@ -23,6 +23,40 @@ type AdminToolPreview = {
   counts: Record<string, number>;
 };
 
+function buildPricingPreviewCounts(pricingConfig: ReturnType<typeof normalizeParkingPricingConfig>): Record<string, number> {
+  if (pricingConfig.mode === 'flat_rate') {
+    return {
+      flatRateAmount: pricingConfig.flatRateAmount,
+      entryGraceMinutes: pricingConfig.entryGraceMinutes,
+      exitGraceMinutes: pricingConfig.exitGraceMinutes,
+    };
+  }
+
+  if (pricingConfig.mode === 'fixed_rate') {
+    return {
+      fixedHourlyRate: pricingConfig.fixedHourlyRate,
+      entryGraceMinutes: pricingConfig.entryGraceMinutes,
+      exitGraceMinutes: pricingConfig.exitGraceMinutes,
+    };
+  }
+
+  return {
+    firstPeriodHours: pricingConfig.firstPeriodHours,
+    firstPeriodRate: pricingConfig.firstPeriodRate,
+    succeedingHourlyRate: pricingConfig.succeedingHourlyRate,
+    entryGraceMinutes: pricingConfig.entryGraceMinutes,
+    exitGraceMinutes: pricingConfig.exitGraceMinutes,
+  };
+}
+
+function buildMissingPricingSchemaMessage(rawMessage: string) {
+  return [
+    'Pricing columns are not available in Supabase yet.',
+    'Run `supabase/location_pricing_support.sql` in your database, then retry saving pricing.',
+    `Database error: ${rawMessage}`,
+  ].join(' ');
+}
+
 export async function GET(request: Request) {
   const routeContext = createOperatorRouteContext(request, '/api/operator/admin-tools');
   const operatorUser = await getCurrentOperatorUser();
@@ -353,15 +387,7 @@ export async function POST(request: Request) {
         action: 'update-pricing',
         title: 'Update Parking Pricing',
         summary: `${location.name} will use ${formatParkingPricingSummary(pricingConfig)} with ${pricingConfig.entryGraceMinutes} min entry grace and ${pricingConfig.exitGraceMinutes} min exit grace.`,
-        counts: {
-          flatRateAmount: pricingConfig.flatRateAmount,
-          fixedHourlyRate: pricingConfig.fixedHourlyRate,
-          firstPeriodHours: pricingConfig.firstPeriodHours,
-          firstPeriodRate: pricingConfig.firstPeriodRate,
-          succeedingHourlyRate: pricingConfig.succeedingHourlyRate,
-          entryGraceMinutes: pricingConfig.entryGraceMinutes,
-          exitGraceMinutes: pricingConfig.exitGraceMinutes,
-        },
+        counts: buildPricingPreviewCounts(pricingConfig),
       };
 
       if (preview) {
@@ -384,7 +410,12 @@ export async function POST(request: Request) {
       });
 
       if (!updateResponse.ok) {
-        throw new Error(await updateResponse.text());
+        const rawMessage = await updateResponse.text();
+        if (rawMessage.includes('PGRST204') || rawMessage.includes('entry_grace_minutes') || rawMessage.includes('pricing_mode')) {
+          throw new Error(buildMissingPricingSchemaMessage(rawMessage));
+        }
+
+        throw new Error(rawMessage);
       }
 
       const responsePayload = {

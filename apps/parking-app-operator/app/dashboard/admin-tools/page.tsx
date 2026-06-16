@@ -361,77 +361,89 @@ export default function AdminToolsPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="flat-rate">Flat rate amount</Label>
-                <Input
-                  id="flat-rate"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={pricingDraft.flatRateAmount}
-                  onChange={(event) => updatePricingField('flatRateAmount', event.target.value)}
-                  className="border-border bg-input"
-                  disabled={!canManagePricing || pricingDraft.mode !== 'flat_rate'}
-                />
-              </div>
+              {pricingDraft.mode === 'flat_rate' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="flat-rate">Flat rate amount</Label>
+                  <Input
+                    id="flat-rate"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={pricingDraft.flatRateAmount}
+                    onChange={(event) => updatePricingField('flatRateAmount', event.target.value)}
+                    className="border-border bg-input"
+                    disabled={!canManagePricing}
+                  />
+                </div>
+              ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="fixed-rate">Fixed hourly rate</Label>
-                <Input
-                  id="fixed-rate"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={pricingDraft.fixedHourlyRate}
-                  onChange={(event) => updatePricingField('fixedHourlyRate', event.target.value)}
-                  className="border-border bg-input"
-                  disabled={!canManagePricing || pricingDraft.mode !== 'fixed_rate'}
-                />
-              </div>
+              {pricingDraft.mode === 'fixed_rate' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="fixed-rate">Fixed hourly rate</Label>
+                  <Input
+                    id="fixed-rate"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={pricingDraft.fixedHourlyRate}
+                    onChange={(event) => updatePricingField('fixedHourlyRate', event.target.value)}
+                    className="border-border bg-input"
+                    disabled={!canManagePricing}
+                  />
+                </div>
+              ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="first-period-hours">First period hours</Label>
-                <Input
-                  id="first-period-hours"
-                  type="number"
-                  min={1}
-                  step="1"
-                  value={pricingDraft.firstPeriodHours}
-                  onChange={(event) => updatePricingField('firstPeriodHours', event.target.value)}
-                  className="border-border bg-input"
-                  disabled={!canManagePricing || pricingDraft.mode !== 'tiered'}
-                />
-              </div>
+              {pricingDraft.mode === 'tiered' ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="first-period-hours">First period hours</Label>
+                    <Input
+                      id="first-period-hours"
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={pricingDraft.firstPeriodHours}
+                      onChange={(event) => updatePricingField('firstPeriodHours', event.target.value)}
+                      className="border-border bg-input"
+                      disabled={!canManagePricing}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="first-period-rate">First period rate</Label>
-                <Input
-                  id="first-period-rate"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={pricingDraft.firstPeriodRate}
-                  onChange={(event) => updatePricingField('firstPeriodRate', event.target.value)}
-                  className="border-border bg-input"
-                  disabled={!canManagePricing || pricingDraft.mode !== 'tiered'}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="first-period-rate">First period rate</Label>
+                    <Input
+                      id="first-period-rate"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={pricingDraft.firstPeriodRate}
+                      onChange={(event) => updatePricingField('firstPeriodRate', event.target.value)}
+                      className="border-border bg-input"
+                      disabled={!canManagePricing}
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
-              <div className="space-y-2 xl:max-w-sm">
-                <Label htmlFor="succeeding-rate">Succeeding hourly rate</Label>
-                <Input
-                  id="succeeding-rate"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={pricingDraft.succeedingHourlyRate}
-                  onChange={(event) => updatePricingField('succeedingHourlyRate', event.target.value)}
-                  className="border-border bg-input"
-                  disabled={!canManagePricing || pricingDraft.mode !== 'tiered'}
-                />
-              </div>
+              {pricingDraft.mode === 'tiered' ? (
+                <div className="space-y-2 xl:max-w-sm">
+                  <Label htmlFor="succeeding-rate">Succeeding hourly rate</Label>
+                  <Input
+                    id="succeeding-rate"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={pricingDraft.succeedingHourlyRate}
+                    onChange={(event) => updatePricingField('succeedingHourlyRate', event.target.value)}
+                    className="border-border bg-input"
+                    disabled={!canManagePricing}
+                  />
+                </div>
+              ) : (
+                <div />
+              )}
 
               <div className="flex flex-wrap gap-3">
                 <Button

@@ -1,3 +1,5 @@
+drop function if exists end_parking_session(uuid, integer, numeric, text);
+
 create or replace function end_parking_session(
   p_reservation_id uuid,
   p_billed_minutes integer default null,
