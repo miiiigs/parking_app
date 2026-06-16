@@ -51,7 +51,7 @@ export default function ArrivalScreen() {
 
   useEffect(() => {
     if (!booking) {
-      router.replace('/');
+      router.replace('/home');
       return;
     }
 

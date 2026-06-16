@@ -26,7 +26,7 @@ export default function ReceiptScreen() {
 
   useEffect(() => {
     if (!completedSession) {
-      router.replace('/');
+      router.replace('/home');
     }
   }, [completedSession, router]);
 
@@ -94,7 +94,7 @@ export default function ReceiptScreen() {
   const handleBackHome = async () => {
     await resetFlow();
     setTimeout(() => {
-      router.replace('/');
+      router.replace('/home');
     }, 300);
   };
 

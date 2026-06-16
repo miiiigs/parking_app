@@ -137,7 +137,7 @@ export default function ReservationScreen() {
       <Screen>
         <View style={styles.loadingCard}>
           <Text style={styles.title}>Parking lot not found.</Text>
-          <AppButton label="Back to home" onPress={() => router.replace('/')} />
+          <AppButton label="Back to home" onPress={() => router.replace('/home')} />
         </View>
       </Screen>
     );
@@ -298,7 +298,7 @@ export default function ReservationScreen() {
                 <>
                   <AppButton
                     label="Log in or sign up"
-                    onPress={() => router.push({ pathname: '/login', params: { returnTo: `/reservation/${lot.id}` } })}
+                    onPress={() => router.push({ pathname: '/auth', params: { returnTo: `/reservation/${lot.id}` } })}
                   />
                   <Text style={styles.guestNotice}>
                     Guest mode is available for testing, but booking requires a signed-in customer account.

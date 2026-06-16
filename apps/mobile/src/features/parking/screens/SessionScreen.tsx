@@ -24,7 +24,7 @@ export default function SessionScreen() {
 
   useEffect(() => {
     if (!session) {
-      router.replace('/');
+      router.replace('/home');
       return;
     }
 
