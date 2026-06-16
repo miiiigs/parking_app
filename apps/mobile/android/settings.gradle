@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'Smart Parking Mobile Clean'
+rootProject.name = 'ParkEasy Sample Mobile'
 
 dependencyResolutionManagement {
   versionCatalogs {

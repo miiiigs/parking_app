@@ -15,6 +15,7 @@ const operatorMapDirections = [
 ] as const;
 
 const finiteNumber = z.number().finite();
+const nonNegativeMoney = finiteNumber.min(0);
 
 const parkingMapPointSchema = z.object({
   x: finiteNumber,
@@ -94,8 +95,28 @@ export const operatorSlotUpdateRouteRequestSchema = z.object({
 });
 
 export const operatorAdminToolsRouteRequestSchema = z.object({
-  action: z.enum(['reconcile', 'reset-slots']),
+  action: z.enum(['reconcile', 'reset-slots', 'update-pricing']),
   preview: z.boolean().optional().default(false),
+  pricingConfig: z
+    .object({
+      mode: z.enum(['flat_rate', 'fixed_rate', 'tiered']),
+      flatRateAmount: nonNegativeMoney,
+      fixedHourlyRate: nonNegativeMoney,
+      firstPeriodHours: z.number().int().min(1),
+      firstPeriodRate: nonNegativeMoney,
+      succeedingHourlyRate: nonNegativeMoney,
+      entryGraceMinutes: z.number().int().min(0).max(120),
+      exitGraceMinutes: z.number().int().min(0).max(120),
+    })
+    .optional(),
+}).superRefine((value, context) => {
+  if (value.action === 'update-pricing' && !value.pricingConfig) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'pricingConfig is required for update-pricing.',
+      path: ['pricingConfig'],
+    });
+  }
 });
 
 export function formatRouteValidationIssues(issues: z.ZodIssue[]) {

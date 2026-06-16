@@ -1,1 +1,1 @@
-export { default } from './apps/mobile/App.js';
+import './apps/mobile/index.js';

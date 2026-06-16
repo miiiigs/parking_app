@@ -1,67 +1,34 @@
-# Parking Mobile Production Readiness Checklist
+# Mobile Production Readiness Checklist
 
-Last reassessed: 2026-06-09
+This app is now the React Native frontend baseline for the parking product.
+It is the primary mobile app in the repository.
 
-## Completed In This Pass
+## Done
 
-- [x] Replace anonymous mobile auth with real customer email/password auth.
-- [x] Add an auth provider and auth screen for sign in / sign up.
-- [x] Move the mobile app entry to Expo Router instead of a single root shell.
-- [x] Split the startup flow into route pages for home, reserve, validate, and session.
-- [x] Extract shared workflow state into a provider instead of keeping it only in `App.tsx`.
-- [x] Add a regression test to confirm the mobile auth path no longer uses anonymous sign-in.
-- [x] Keep the mobile test suite and TypeScript build passing after the refactor.
+- [x] Expo Router app shell
+- [x] Native screen flow for home, reservation, arrival, session, exit, and receipt
+- [x] Persisted local flow state with Secure Store
+- [x] Reusable parking-specific UI components
+- [x] Base parking lot sample data and layout rendering
+- [x] Dependency alignment for backend migration work
+- [x] Supabase client/auth foundation
+- [x] Live parking lot data loader with fallback support
+- [x] Backend-aware reservation/session helper layer
+- [x] Auth screen and login route
+- [x] Notification scheduling and workflow recovery foundation
+- [x] Receipt capture and save flow
 
-## Still Open
+## In progress
 
-### Auth and Accounts
+- [ ] Replace the remaining sample-only UI assumptions with backend-first data
+- [ ] Add camera-based QR scanning for on-site validation
+- [ ] Add receipt sharing/export parity beyond local save
+- [ ] Add payment backend integration
+- [ ] Add route-level and device-level tests
 
-- [ ] Add password reset and email confirmation handling in the customer auth flow.
-- [ ] Add a customer profile or account screen.
-- [ ] Add reservation/session history for the signed-in customer.
+## Next
 
-### Backend Integration
-
-- [ ] Move payment confirmation and settlement authority fully server-side.
-- [ ] Replace the client-side "mark as paid" end-session flow with a proper payment-backed flow.
-- [ ] Add stronger server-side reservation/session status reconciliation for the mobile user.
-- [ ] Add paginated history endpoints for past reservations, sessions, and receipts.
-
-### Workflow Architecture
-
-- [ ] Break the workflow provider into smaller hooks or stores if it grows further.
-- [ ] Remove any remaining legacy reliance on the old monolithic `App.tsx` path.
-- [ ] Add clearer state boundaries for auth, live dashboard sync, notifications, and parking actions.
-
-### UI and UX
-
-- [ ] Remove prototype or fallback wording from the primary consumer flow.
-- [ ] Replace hardcoded placeholder values in the home/session summaries.
-- [ ] Polish spacing, typography, and responsiveness on smaller devices.
-- [ ] Add proper empty, loading, and error states for profile and history views.
-
-### Notifications and Offline Recovery
-
-- [ ] Harden push notification fallback behavior for production builds.
-- [ ] Add clearer recovery states when backend data is stale or unavailable.
-- [ ] Verify background refresh behavior on physical devices.
-
-### Testing and Release Hygiene
-
-- [ ] Add device-level flow testing for reserve -> validate -> session.
-- [ ] Add release checks for Android and iOS build profiles.
-- [ ] Add crash reporting and production analytics.
-- [ ] Add a release checklist for store submission and backend environment setup.
-
-## Validation Snapshot
-
-- [x] `npx tsc -p apps/mobile/tsconfig.json --noEmit`
-- [x] `npm --workspace apps/mobile run test`
-
-## Suggested Next Features
-
-- [ ] Customer reservation history.
-- [ ] Account/profile management.
-- [ ] Receipt archive and download/share history.
-- [ ] Push notification preferences.
-- [ ] Support/help flow with contact and issue reporting.
+- [ ] Build the backend contract for reservations, sessions, and payments
+- [ ] Replace prototype UI copy and placeholders with production-facing UX
+- [ ] Add location-aware live refresh and realtime sync
+- [ ] Add customer history, receipt archive, and notification preferences

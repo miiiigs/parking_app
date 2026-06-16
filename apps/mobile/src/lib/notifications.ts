@@ -2,7 +2,6 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-// @ts-expect-error JS helper used for Node test coverage and shared runtime logic.
 import { buildReservationFollowUpNotificationPlan } from './notificationScheduling';
 
 const PARKING_NOTIFICATION_CHANNEL_ID = 'parking-reminders';
@@ -96,6 +95,7 @@ function buildBaseContent(title: string, body: string) {
 
 function asTriggerDate(dateValue: string | Date | number): Notifications.DateTriggerInput | null {
   const triggerDate = typeof dateValue === 'number' ? new Date(dateValue) : typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+
   return triggerDate.getTime() > Date.now() + 5000
     ? { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate }
     : null;
@@ -105,7 +105,11 @@ function getScheduledNotificationData(notification: any) {
   return notification?.content?.data ?? null;
 }
 
-function notificationMatchesReservation(notification: any, reservationId: string, notificationTypes?: string[]) {
+function notificationMatchesReservation(
+  notification: any,
+  reservationId: string,
+  notificationTypes?: string[],
+) {
   const data = getScheduledNotificationData(notification);
 
   if (!data || data.reservationId !== reservationId) {
@@ -119,10 +123,7 @@ function notificationMatchesReservation(notification: any, reservationId: string
   return notificationTypes.includes(data.type);
 }
 
-export async function getScheduledReservationNotificationIds(
-  reservationId: string,
-  notificationTypes?: string[],
-) {
+export async function getScheduledReservationNotificationIds(reservationId: string, notificationTypes?: string[]) {
   if (!reservationId) {
     return [] as string[];
   }
@@ -135,19 +136,12 @@ export async function getScheduledReservationNotificationIds(
     .filter(Boolean);
 }
 
-export async function hasScheduledReservationNotifications(
-  reservationId: string,
-  notificationTypes?: string[],
-) {
+export async function hasScheduledReservationNotifications(reservationId: string, notificationTypes?: string[]) {
   const scheduledNotificationIds = await getScheduledReservationNotificationIds(reservationId, notificationTypes);
   return scheduledNotificationIds.length > 0;
 }
 
-export async function cancelReservationNotifications(
-  reservationId: string,
-  notificationIds: string[] = [],
-  notificationTypes?: string[],
-) {
+export async function cancelReservationNotifications(reservationId: string, notificationIds: string[] = [], notificationTypes?: string[]) {
   const scheduledNotificationIds = await getScheduledReservationNotificationIds(reservationId, notificationTypes);
   const uniqueNotificationIds = [...new Set([...notificationIds, ...scheduledNotificationIds])].filter(Boolean);
 
@@ -235,10 +229,7 @@ export async function scheduleReservationReminderNotifications(params: {
   return scheduleReservationFollowUpNotifications(params);
 }
 
-export async function sendSessionCompletedNotification(params: {
-  slotLabel: string;
-  billedAmount: number | null;
-}) {
+export async function sendSessionCompletedNotification(params: { slotLabel: string; billedAmount: number | null }) {
   if (isRunningInExpoGo()) {
     return null;
   }

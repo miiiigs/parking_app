@@ -6,6 +6,14 @@ create table if not exists locations (
   code text not null unique,
   address text not null,
   city text not null default 'Bonifacio Global City',
+  pricing_mode text not null default 'fixed_rate' check (pricing_mode in ('flat_rate', 'fixed_rate', 'tiered')),
+  flat_rate_amount numeric(10,2) not null default 50,
+  fixed_hourly_rate numeric(10,2) not null default 50,
+  first_period_hours integer not null default 3 check (first_period_hours >= 1),
+  first_period_rate numeric(10,2) not null default 50,
+  succeeding_hourly_rate numeric(10,2) not null default 20,
+  entry_grace_minutes integer not null default 15 check (entry_grace_minutes >= 0 and entry_grace_minutes <= 120),
+  exit_grace_minutes integer not null default 15 check (exit_grace_minutes >= 0 and exit_grace_minutes <= 120),
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -30,6 +38,8 @@ create table if not exists reservations (
   plate_number text not null,
   arrival_window_minutes integer not null,
   reservation_fee numeric(10,2) not null,
+  parking_rate numeric(10,2) not null default 50,
+  pricing_config jsonb not null default '{}'::jsonb,
   status text not null default 'pending' check (status in ('pending', 'confirmed', 'completed', 'expired', 'cancelled', 'no_show')),
   reserved_at timestamptz not null default now(),
   expires_at timestamptz not null,
@@ -96,6 +106,61 @@ for each row execute function set_updated_at();
 create trigger set_reservations_updated_at
 before update on reservations
 for each row execute function set_updated_at();
+
+create or replace function calculate_parking_fee(
+  p_elapsed_minutes integer,
+  p_parking_rate numeric
+)
+returns numeric(10,2)
+language plpgsql
+immutable
+as $$
+declare
+  v_rate numeric(10,2) := coalesce(p_parking_rate, 50);
+  v_elapsed_minutes integer := greatest(0, coalesce(p_elapsed_minutes, 0));
+begin
+  return round(greatest((v_elapsed_minutes / 60.0) * v_rate, v_rate * 0.25)::numeric, 2);
+end;
+$$;
+
+create or replace function calculate_parking_fee_from_config(
+  p_elapsed_minutes integer,
+  p_pricing_config jsonb
+)
+returns numeric(10,2)
+language plpgsql
+immutable
+as $$
+declare
+  v_config jsonb := coalesce(p_pricing_config, '{}'::jsonb);
+  v_mode text := coalesce(v_config->>'mode', 'fixed_rate');
+  v_flat_rate numeric(10,2) := greatest(0, coalesce((v_config->>'flatRateAmount')::numeric, 50));
+  v_fixed_hourly_rate numeric(10,2) := greatest(0, coalesce((v_config->>'fixedHourlyRate')::numeric, 50));
+  v_first_period_hours integer := greatest(1, coalesce((v_config->>'firstPeriodHours')::integer, 3));
+  v_first_period_rate numeric(10,2) := greatest(0, coalesce((v_config->>'firstPeriodRate')::numeric, 50));
+  v_succeeding_hourly_rate numeric(10,2) := greatest(0, coalesce((v_config->>'succeedingHourlyRate')::numeric, 20));
+  v_entry_grace_minutes integer := greatest(0, coalesce((v_config->>'entryGraceMinutes')::integer, 15));
+  v_elapsed_minutes integer := greatest(0, coalesce(p_elapsed_minutes, 0));
+  v_billable_minutes integer := greatest(0, v_elapsed_minutes - v_entry_grace_minutes);
+  v_extra_minutes integer;
+  v_extra_hours integer;
+  v_amount numeric(10,2);
+begin
+  if v_mode = 'flat_rate' then
+    return round(v_flat_rate, 2);
+  end if;
+
+  if v_mode = 'tiered' then
+    v_extra_minutes := greatest(0, v_billable_minutes - (v_first_period_hours * 60));
+    v_extra_hours := case when v_extra_minutes > 0 then ceil(v_extra_minutes / 60.0)::integer else 0 end;
+    v_amount := v_first_period_rate + (v_extra_hours * v_succeeding_hourly_rate);
+    return round(v_amount, 2);
+  end if;
+
+  v_amount := greatest(1, ceil(greatest(1, v_billable_minutes) / 60.0)::integer) * v_fixed_hourly_rate;
+  return round(v_amount, 2);
+end;
+$$;
 
 create trigger set_parking_sessions_updated_at
 before update on parking_sessions
@@ -197,7 +262,8 @@ returns table (
   reservation_fee numeric,
   billed_minutes integer,
   billed_amount numeric,
-  payment_status text
+  payment_status text,
+  pricing_config jsonb
 )
 language plpgsql
 security definer
@@ -208,8 +274,10 @@ declare
   v_reservation reservations%rowtype;
   v_slot parking_slots%rowtype;
   v_ended_at timestamptz := now();
+  v_elapsed_minutes integer;
   v_billed_minutes integer;
   v_billed_amount numeric(10,2);
+  v_pricing_config jsonb;
 begin
   select *
     into v_session
@@ -241,6 +309,20 @@ begin
     raise exception 'Slot not found';
   end if;
 
+  v_pricing_config := coalesce(
+    nullif(v_reservation.pricing_config, '{}'::jsonb),
+    jsonb_build_object(
+      'mode', 'fixed_rate',
+      'flatRateAmount', coalesce(v_reservation.parking_rate, 50),
+      'fixedHourlyRate', coalesce(v_reservation.parking_rate, 50),
+      'firstPeriodHours', 3,
+      'firstPeriodRate', coalesce(v_reservation.parking_rate, 50),
+      'succeedingHourlyRate', 20,
+      'entryGraceMinutes', 15,
+      'exitGraceMinutes', 15
+    )
+  );
+
   if v_session.status = 'completed' then
     return query
       select
@@ -258,7 +340,8 @@ begin
         v_reservation.reservation_fee,
         v_session.billed_minutes,
         v_session.billed_amount,
-        coalesce((select payments.status from payments where payments.session_id = v_session.id order by payments.paid_at desc nulls last, payments.created_at desc limit 1), 'paid');
+        coalesce((select payments.status from payments where payments.session_id = v_session.id order by payments.paid_at desc nulls last, payments.created_at desc limit 1), 'paid'),
+        v_pricing_config;
 
     return;
   end if;
@@ -267,8 +350,9 @@ begin
     raise exception 'Parking session is not active';
   end if;
 
-  v_billed_minutes := greatest(1, ceil(extract(epoch from (v_ended_at - v_session.started_at)) / 60.0)::integer);
-  v_billed_amount := coalesce(p_billed_amount, v_reservation.reservation_fee);
+  v_elapsed_minutes := greatest(0, floor(extract(epoch from (v_ended_at - v_session.started_at)) / 60.0)::integer);
+  v_billed_minutes := greatest(0, v_elapsed_minutes - greatest(0, coalesce((v_pricing_config->>'entryGraceMinutes')::integer, 15)));
+  v_billed_amount := coalesce(p_billed_amount, calculate_parking_fee_from_config(v_elapsed_minutes, v_pricing_config));
 
   update parking_sessions
     set status = 'completed',
@@ -318,7 +402,8 @@ begin
       'billed_minutes', coalesce(p_billed_minutes, v_billed_minutes),
       'billed_amount', v_billed_amount,
       'payment_status', 'paid',
-      'payment_reference', p_payment_reference
+      'payment_reference', p_payment_reference,
+      'pricing_config', v_pricing_config
     )
   );
 
@@ -338,7 +423,8 @@ begin
       v_reservation.reservation_fee,
       coalesce(p_billed_minutes, v_billed_minutes),
       v_billed_amount,
-      'paid';
+      'paid',
+      v_pricing_config;
 end;
 $$;
 

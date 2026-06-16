@@ -17,7 +17,8 @@ returns table (
   reservation_fee numeric,
   billed_minutes integer,
   billed_amount numeric,
-  payment_status text
+  payment_status text,
+  pricing_config jsonb
 )
 language plpgsql
 security definer
@@ -93,7 +94,8 @@ begin
         v_reservation.reservation_fee,
         v_existing_session.billed_minutes,
         v_existing_session.billed_amount,
-        null::text;
+        null::text,
+        v_reservation.pricing_config;
 
     return;
   end if;
@@ -159,7 +161,8 @@ begin
       v_reservation.reservation_fee,
       null::integer,
       null::numeric,
-      null::text;
+      null::text,
+      v_reservation.pricing_config;
 end;
 $$;
 

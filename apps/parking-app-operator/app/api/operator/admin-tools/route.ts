@@ -4,6 +4,7 @@ import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
 import { formatRouteValidationIssues, operatorAdminToolsRouteRequestSchema } from '@/lib/operatorRouteSchemas';
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
 import { hasOperatorCapability } from '@/lib/operatorPermissions';
+import { formatParkingPricingSummary, normalizeParkingPricingConfig } from '@/lib/parkingPricing';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 import { findIdempotentOperatorEvent } from '@/lib/operatorIdempotency';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
@@ -16,11 +17,59 @@ function getHeaders(serviceRoleKey: string) {
 }
 
 type AdminToolPreview = {
-  action: 'reconcile' | 'reset-slots';
+  action: 'reconcile' | 'reset-slots' | 'update-pricing';
   title: string;
   summary: string;
   counts: Record<string, number>;
 };
+
+export async function GET(request: Request) {
+  const routeContext = createOperatorRouteContext(request, '/api/operator/admin-tools');
+  const operatorUser = await getCurrentOperatorUser();
+
+  if (!operatorUser) {
+    return jsonWithRequestContext(routeContext, { error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!hasOperatorCapability(operatorUser.role, 'manage-pricing')) {
+    return jsonWithRequestContext(routeContext, { error: 'Insufficient permissions for pricing settings.' }, { status: 403 });
+  }
+
+  try {
+    const locationContext = await resolveOperatorLocationContext();
+    const location = locationContext.activeLocation;
+
+    if (!location) {
+      return jsonWithRequestContext(routeContext, { error: 'No active parking location found.' }, { status: 404 });
+    }
+
+    const pricingConfig = normalizeParkingPricingConfig({
+      mode: location.pricing_mode,
+      flatRateAmount: location.flat_rate_amount,
+      fixedHourlyRate: location.fixed_hourly_rate,
+      firstPeriodHours: location.first_period_hours,
+      firstPeriodRate: location.first_period_rate,
+      succeedingHourlyRate: location.succeeding_hourly_rate,
+      entryGraceMinutes: location.entry_grace_minutes,
+      exitGraceMinutes: location.exit_grace_minutes,
+    });
+
+    return jsonWithRequestContext(routeContext, {
+      ok: true,
+      locationId: location.id,
+      locationName: location.name,
+      pricingConfig,
+      pricingSummary: formatParkingPricingSummary(pricingConfig),
+    });
+  } catch (error) {
+    logOperatorRouteError(routeContext, 'Failed to load pricing settings', error);
+    return jsonWithRequestContext(
+      routeContext,
+      { error: error instanceof Error ? error.message : 'Failed to load pricing settings.' },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(request: Request) {
   const routeContext = createOperatorRouteContext(request, '/api/operator/admin-tools');
@@ -49,13 +98,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { action, preview } = parsedBody.data;
+  const { action, preview, pricingConfig: rawPricingConfig } = parsedBody.data;
 
   const requiredCapability =
     action === 'reconcile'
       ? 'run-reconciliation'
       : action === 'reset-slots'
         ? 'reset-slot-statuses'
+        : action === 'update-pricing'
+          ? 'manage-pricing'
         : null;
 
   if (!requiredCapability || !hasOperatorCapability(operatorUser.role, requiredCapability)) {
@@ -291,6 +342,84 @@ export async function POST(request: Request) {
       logOperatorRouteSuccess(routeContext, 'Reset slot statuses', {
         locationId: location.id,
         changedSlotCount: previewPayload.counts.changedSlotCount ?? 0,
+      });
+
+      return jsonWithRequestContext(routeContext, responsePayload);
+    }
+
+    if (action === 'update-pricing') {
+      const pricingConfig = normalizeParkingPricingConfig(rawPricingConfig ?? null);
+      const previewPayload: AdminToolPreview = {
+        action: 'update-pricing',
+        title: 'Update Parking Pricing',
+        summary: `${location.name} will use ${formatParkingPricingSummary(pricingConfig)} with ${pricingConfig.entryGraceMinutes} min entry grace and ${pricingConfig.exitGraceMinutes} min exit grace.`,
+        counts: {
+          flatRateAmount: pricingConfig.flatRateAmount,
+          fixedHourlyRate: pricingConfig.fixedHourlyRate,
+          firstPeriodHours: pricingConfig.firstPeriodHours,
+          firstPeriodRate: pricingConfig.firstPeriodRate,
+          succeedingHourlyRate: pricingConfig.succeedingHourlyRate,
+          entryGraceMinutes: pricingConfig.entryGraceMinutes,
+          exitGraceMinutes: pricingConfig.exitGraceMinutes,
+        },
+      };
+
+      if (preview) {
+        return jsonWithRequestContext(routeContext, { ok: true, preview: previewPayload });
+      }
+
+      const updateResponse = await fetch(`${config.url}/rest/v1/locations?id=eq.${location.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          pricing_mode: pricingConfig.mode,
+          flat_rate_amount: pricingConfig.flatRateAmount,
+          fixed_hourly_rate: pricingConfig.fixedHourlyRate,
+          first_period_hours: pricingConfig.firstPeriodHours,
+          first_period_rate: pricingConfig.firstPeriodRate,
+          succeeding_hourly_rate: pricingConfig.succeedingHourlyRate,
+          entry_grace_minutes: pricingConfig.entryGraceMinutes,
+          exit_grace_minutes: pricingConfig.exitGraceMinutes,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error(await updateResponse.text());
+      }
+
+      const responsePayload = {
+        ok: true,
+        message: `Pricing updated for ${location.name}.`,
+        pricingConfig,
+        pricingSummary: formatParkingPricingSummary(pricingConfig),
+      };
+
+      await fetch(`${config.url}/rest/v1/operator_events`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          event_type: 'location_pricing_updated',
+          payload: {
+            idempotency_key: routeContext.idempotencyKey,
+            request_id: routeContext.requestId,
+            location_id: location.id,
+            location_name: location.name,
+            operator: operatorUser.name,
+            actor_user_id: operatorUser.id,
+            actor_role: operatorUser.role,
+            pricing_config: pricingConfig,
+            pricing_summary: formatParkingPricingSummary(pricingConfig),
+            impact_summary: previewPayload.counts,
+            action_scope: 'location',
+            confirmed_at: new Date().toISOString(),
+            response_payload: responsePayload,
+          },
+        }),
+      });
+
+      logOperatorRouteSuccess(routeContext, 'Updated location pricing', {
+        locationId: location.id,
+        pricingMode: pricingConfig.mode,
       });
 
       return jsonWithRequestContext(routeContext, responsePayload);

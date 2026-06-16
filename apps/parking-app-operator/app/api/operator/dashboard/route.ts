@@ -20,6 +20,7 @@ import {
   buildParkingLotDefinitionFromSlots,
   type ParkingLotDefinition,
 } from '@/lib/parkingMap';
+import { normalizeParkingPricingConfig } from '@/lib/parkingPricing';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
 import { deriveReservationPaymentStatus, deriveReservationStatus } from '@/lib/operatorReservationStatus';
@@ -140,6 +141,7 @@ export async function GET(request: Request) {
       const timestamp = new Date().toISOString();
       const payload = {
         location: null,
+        locationPricing: null,
         parkingMap: { id: 'map-empty', name: 'Parking Map', totalSlots: 0, slots: [], layout: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
         reservations: [],
         sessions: [],
@@ -619,9 +621,20 @@ export async function GET(request: Request) {
       updatedAt: new Date().toISOString(),
     };
     const generatedAt = new Date().toISOString();
+    const locationPricing = normalizeParkingPricingConfig({
+      mode: location.pricing_mode,
+      flatRateAmount: location.flat_rate_amount,
+      fixedHourlyRate: location.fixed_hourly_rate,
+      firstPeriodHours: location.first_period_hours,
+      firstPeriodRate: location.first_period_rate,
+      succeedingHourlyRate: location.succeeding_hourly_rate,
+      entryGraceMinutes: location.entry_grace_minutes,
+      exitGraceMinutes: location.exit_grace_minutes,
+    });
 
     const payload: OperatorDashboardData = {
       location,
+      locationPricing,
       parkingMap,
       reservations,
       sessions,
