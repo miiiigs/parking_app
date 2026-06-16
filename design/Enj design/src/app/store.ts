@@ -28,3 +28,17 @@ let savedPayment: string | null = "GCash";
 export function getPayment(): string | null { return savedPayment; }
 export function savePayment(method: string) { savedPayment = method; }
 export function clearPayment() { savedPayment = null; }
+
+// ── Active Session ────────────────────────────────────────────────
+// false → no session in progress (default after login)
+// true  → set when user scans entrance QR (reservation or walk-in)
+let activeSession = false;
+let sessionType: "reservation" | "walkin" = "reservation";
+
+export function getActiveSession(): boolean { return activeSession; }
+export function getSessionType() { return sessionType; }
+export function startSession(type: "reservation" | "walkin" = "reservation") {
+  activeSession = true;
+  sessionType = type;
+}
+export function endSession() { activeSession = false; }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, CreditCard, Smartphone, Check } from "lucide-react";
+import { getSessionType } from "../store";
 
 const METHODS = [
   { id: "card", label: "Credit / Debit Card", sub: "Visa ending in 4242", icon: CreditCard },
@@ -12,7 +13,8 @@ export default function PaymentPage() {
   const navigate = useNavigate();
   const [method, setMethod] = useState("gcash");
 
-  const reservationFee = 50;
+  const isWalkIn = getSessionType() === "walkin";
+  const reservationFee = isWalkIn ? 0 : 50;
   const parkingFee = 150;
   const total = reservationFee + parkingFee;
 
@@ -33,7 +35,7 @@ export default function PaymentPage() {
           </div>
           {[
             { label: "Parking Fee (3 hrs)", amount: parkingFee },
-            { label: "Reservation Fee", amount: reservationFee },
+            ...(!isWalkIn ? [{ label: "Reservation Fee", amount: reservationFee }] : []),
           ].map((row) => (
             <div key={row.label} className="flex justify-between items-center px-4 py-2.5" style={{ borderTop: "1px solid #F1F5F9" }}>
               <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "13px", color: "#64748B" }}>{row.label}</span>

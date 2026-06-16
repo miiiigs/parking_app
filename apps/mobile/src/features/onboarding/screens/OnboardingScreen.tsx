@@ -65,8 +65,8 @@ export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const isLastSlide = currentIndex === slides.length - 1;
 
-  const contentWidth = Math.min(width - 64, 356);
-  const illustrationFrameHeight = height < 760 ? 334 : 366;
+  const contentWidth = Math.min(width - 48, 332);
+  const illustrationFrameHeight = height < 760 ? 332 : 340;
 
   const goToIndex = (nextIndex: number) => {
     if (nextIndex < 0 || nextIndex >= slides.length) {
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 40,
     paddingHorizontal: 24,
-    paddingTop: 18,
+    paddingTop: 16,
   },
   skipButton: {
     paddingHorizontal: 8,
@@ -629,41 +629,41 @@ const styles = StyleSheet.create({
     flex: 1,
     alignSelf: 'center',
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   illustrationFrame: {
-    width: '92%',
+    width: '100%',
     justifyContent: 'center',
   },
   copyBlock: {
-    marginTop: 40,
+    marginTop: 32,
     alignItems: 'center',
-    gap: 18,
-    paddingHorizontal: 10,
+    gap: 16,
+    paddingHorizontal: 8,
   },
   title: {
     color: '#1E293B',
-    fontSize: 31,
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 34,
     fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: -0.55,
+    letterSpacing: -0.3,
     textAlign: 'center',
   },
   description: {
-    maxWidth: 286,
+    maxWidth: 300,
     color: '#64748B',
-    fontSize: 16,
-    lineHeight: 27,
+    fontSize: 15,
+    lineHeight: 25,
     fontFamily: 'Poppins_400Regular',
-    letterSpacing: 0.06,
+    letterSpacing: 0.03,
     textAlign: 'center',
   },
   footer: {
     paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 34,
-    gap: 22,
+    paddingTop: 8,
+    paddingBottom: 32,
+    gap: 20,
   },
   paginationRow: {
     alignItems: 'center',
@@ -724,20 +724,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     shadowColor: '#0F766E',
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 5,
   },
   primaryButtonText: {
     color: colors.surface,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Poppins_500Medium',
     letterSpacing: 0.08,
   },
   signInCopy: {
     color: '#64748B',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.04,
     textAlign: 'center',
@@ -749,10 +749,10 @@ const styles = StyleSheet.create({
   figureCanvas: {
     flex: 1,
     justifyContent: 'center',
-    paddingVertical: 2,
+    paddingVertical: 0,
   },
   figureCard: {
-    height: '98%',
+    height: '94%',
     borderRadius: 28,
     borderWidth: 1,
     borderColor: '#D8ECE4',
@@ -760,10 +760,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows,
     shadowOpacity: 0.1,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 4,
-    transform: [{ scale: 1.03 }],
   },
   findFigureCard: {
     backgroundColor: '#EAF8F3',
@@ -908,10 +907,10 @@ const styles = StyleSheet.create({
   },
   reserveHeader: {
     backgroundColor: '#0F766E',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 14,
-    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 8,
   },
   reserveEyebrow: {
     color: 'rgba(255,255,255,0.75)',
@@ -927,7 +926,7 @@ const styles = StyleSheet.create({
   reserveLegend: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
     flexWrap: 'wrap',
   },
   legendItem: {
@@ -947,15 +946,16 @@ const styles = StyleSheet.create({
   },
   reserveBody: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 8,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 7,
   },
   laneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   laneLine: {
     flex: 1,
@@ -971,7 +971,7 @@ const styles = StyleSheet.create({
   slotRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   slotRowLabel: {
     width: 12,
@@ -982,34 +982,34 @@ const styles = StyleSheet.create({
   slotGrid: {
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   slotCard: {
     flex: 1,
-    height: 52,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 10,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   slotCardText: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Poppins_700Bold',
   },
   slotCardTag: {
     color: colors.surface,
-    fontSize: 8,
+    fontSize: 7,
     fontFamily: 'Poppins_600SemiBold',
   },
   reserveFooterCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
+    marginHorizontal: 14,
+    marginBottom: 14,
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#BBF7D0',
     backgroundColor: '#F0FDF4',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

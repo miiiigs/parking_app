@@ -1,8 +1,11 @@
 import { useNavigate } from "react-router";
 import { Printer } from "lucide-react";
+import { getSessionType } from "../store";
 
 export default function ReceiptPage() {
   const navigate = useNavigate();
+  const isWalkIn = getSessionType() === "walkin";
+  const totalPaid = isWalkIn ? "₱150.00" : "₱200.00";
 
   return (
     <div className="flex flex-col" style={{ height: "100%", background: "#FAFAF9", overflowY: "auto" }}>
@@ -59,7 +62,7 @@ export default function ReceiptPage() {
 
           <div className="px-5 py-4">
             {[
-              { label: "Reservation Fee", amount: "₱50.00" },
+              ...(!isWalkIn ? [{ label: "Reservation Fee", amount: "₱50.00" }] : []),
               { label: "Parking Fee (3 hrs)", amount: "₱150.00" },
             ].map((row) => (
               <div key={row.label} className="flex justify-between items-center py-1.5">
@@ -69,7 +72,7 @@ export default function ReceiptPage() {
             ))}
             <div className="flex justify-between items-center mt-3 pt-3" style={{ borderTop: "2px solid #E2E8F0" }}>
               <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "15px", fontWeight: 700, color: "#1E293B" }}>Total Paid</span>
-              <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "18px", fontWeight: 700, color: "#0F766E" }}>₱200.00</span>
+              <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "18px", fontWeight: 700, color: "#0F766E" }}>{totalPaid}</span>
             </div>
             <div className="flex justify-between items-center mt-2">
               <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "12px", color: "#64748B" }}>Payment Method</span>

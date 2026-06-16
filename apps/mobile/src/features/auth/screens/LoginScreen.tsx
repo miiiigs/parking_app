@@ -15,7 +15,6 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const returnTo = getRouteParam(params.returnTo, '/home');
   const normalizedPhone = formatPhilippinePhoneE164(phone);
-  const displayPhone = formatPhilippinePhoneDisplay(normalizedPhone);
   const isValid = normalizedPhone.length === 13;
 
   const handleContinue = async () => {
@@ -58,11 +57,10 @@ export default function LoginScreen() {
             setPhone(formatPhoneInput(nextValue));
             setErrorMessage(null);
           }}
-          helper="A 6-digit OTP will be sent via SMS to this number."
+          helper="Enter your 10-digit PH mobile number (e.g. 9171234567)"
           valid={isValid}
         />
 
-        {displayPhone && isValid ? <Text style={styles.previewCopy}>Code destination: {displayPhone}</Text> : null}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
         <AuthActionButton label="Send OTP" onPress={handleContinue} disabled={!isValid} loading={busy} />
@@ -88,51 +86,43 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 36,
+    paddingTop: 32,
     paddingBottom: 32,
-    gap: 24,
+    gap: 22,
   },
   heroBlock: {
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 2,
   },
   heroTitle: {
     color: '#1E293B',
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 29,
     textAlign: 'center',
     fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: -0.42,
+    letterSpacing: -0.28,
   },
   heroCopy: {
     color: '#64748B',
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
-    letterSpacing: 0.03,
-  },
-  previewCopy: {
-    color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 19,
-    fontFamily: 'Poppins_500Medium',
-    marginTop: -8,
     letterSpacing: 0.03,
   },
   errorText: {
     color: '#DC2626',
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
-    marginTop: -8,
+    marginTop: -6,
     letterSpacing: 0.02,
   },
   footerCopy: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     marginTop: 6,

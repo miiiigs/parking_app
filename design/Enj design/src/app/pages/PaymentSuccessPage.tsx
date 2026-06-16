@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router";
+import { getSessionType } from "../store";
 
 function ExitQR() {
   const pat = [
@@ -31,6 +32,8 @@ function ExitQR() {
 
 export default function PaymentSuccessPage() {
   const navigate = useNavigate();
+  const isWalkIn = getSessionType() === "walkin";
+  const totalPaid = isWalkIn ? "₱150.00" : "₱200.00";
 
   return (
     <div className="flex flex-col" style={{ height: "100%", background: "#FAFAF9", overflowY: "auto" }}>
@@ -69,7 +72,7 @@ export default function PaymentSuccessPage() {
           {[
             { label: "Parking Lot", value: "SM Mall of Asia" },
             { label: "Slot Number", value: "B-4 · Level 2" },
-            { label: "Total Paid", value: "₱200.00", bold: true, teal: true },
+            { label: "Total Paid", value: totalPaid, bold: true, teal: true },
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #F8FAFC" }}>
               <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "13px", color: "#64748B" }}>{row.label}</span>

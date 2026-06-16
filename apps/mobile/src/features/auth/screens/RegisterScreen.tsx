@@ -56,7 +56,7 @@ export default function RegisterScreen() {
 
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Full Name</Text>
-          <View style={styles.nameField}>
+          <View style={[styles.nameField, displayName.trim().length >= 2 ? styles.nameFieldValid : null]}>
             <User color="#94A3B8" size={16} strokeWidth={2.1} />
             <TextInput
               value={displayName}
@@ -77,7 +77,7 @@ export default function RegisterScreen() {
             setPhone(formatPhoneInput(nextValue));
             setErrorMessage(null);
           }}
-          helper="A 6-digit OTP will be sent to verify your number."
+          helper="Enter your 10-digit PH mobile number (e.g. 9171234567)"
           valid={normalizedPhone.length === 13}
         />
 
@@ -116,27 +116,27 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 36,
+    paddingTop: 32,
     paddingBottom: 32,
-    gap: 22,
+    gap: 20,
   },
   heroBlock: {
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     marginBottom: 2,
   },
   heroTitle: {
     color: '#1E293B',
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 29,
     textAlign: 'center',
     fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: -0.42,
+    letterSpacing: -0.28,
   },
   heroCopy: {
     color: '#64748B',
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
@@ -160,10 +160,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
   },
+  nameFieldValid: {
+    borderColor: '#0F766E',
+  },
   nameInput: {
     flex: 1,
     color: '#1E293B',
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'Poppins_500Medium',
     paddingVertical: 0,
   },
@@ -182,15 +185,15 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     color: '#0F766E',
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.03,
   },
   infoCopy: {
     color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     marginTop: 3,
     opacity: 0.82,
@@ -198,15 +201,15 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#DC2626',
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.02,
   },
   footerCopy: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     marginTop: 6,

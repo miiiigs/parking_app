@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { calculateBill, createExitCode, createReceiptNumber, createTransactionId } from '../lib/flow';
+import { calculateBill, createExitCode, createReceiptNumber, createTransactionId, createWalkInCode } from '../lib/flow';
 import { secureStorage } from '../lib/storage';
 import type { Booking, CompletedSession, ParkingLot, ParkingSession, ParkingSlot } from '../types';
 import {
@@ -35,6 +35,12 @@ interface ReserveSlotInput {
   plateNumber: string;
 }
 
+interface StartWalkInSessionInput {
+  lot: ParkingLot;
+  slot: ParkingSlot;
+  plateNumber: string;
+}
+
 type ReservationDraft = {
   lotId: string;
   slotId: string | null;
@@ -54,6 +60,7 @@ interface ParkingFlowState {
   setReservationDraft: (draft: ReservationDraft) => void;
   clearReservationDraft: () => void;
   startSession: (slotQrToken?: string) => Promise<ParkingSession | null>;
+  startWalkInSession: (input: StartWalkInSessionInput) => Promise<ParkingSession | null>;
   finishSession: (durationSeconds: number) => Promise<CompletedSession | null>;
   restoreWorkflow: (lots: ParkingLot[]) => Promise<void>;
   setValidationQrToken: (value: string) => void;
@@ -284,6 +291,41 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
 
         return session;
       },
+      startWalkInSession: async ({ lot, slot, plateNumber }) => {
+        const startTime = new Date().toISOString();
+        const reservationCode = createWalkInCode(slot.id);
+
+        const session: ParkingSession = {
+          reservationCode,
+          lotId: lot.id,
+          lotName: lot.name,
+          address: lot.address,
+          slotId: slot.id,
+          slotLabel: slot.number,
+          slot,
+          arrivalWindowMinutes: 0,
+          plateNumber,
+          pricePerHour: lot.pricePerHour,
+          pricingConfig: lot.pricingConfig,
+          qrToken: slot.qrToken ?? null,
+          createdAt: startTime,
+          startTime,
+          startedAt: startTime,
+          validatedAt: startTime,
+          sessionStatus: 'active',
+        };
+
+        set({
+          booking: null,
+          session,
+          completedSession: null,
+          reservationDraft: null,
+          validationQrToken: slot.qrToken ?? '',
+          scheduledNotificationIds: [],
+        });
+
+        return session;
+      },
       finishSession: async (durationSeconds) => {
         const session = get().session;
 
@@ -291,15 +333,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           return null;
         }
 
-        const endRecords = await endParkingSession({
-          reservationId: session.reservationId ?? session.reservationCode,
-        });
-
         let completedSession: CompletedSession;
 
-        if (endRecords && endRecords.length > 0) {
-          completedSession = mapCompletedSession(endRecords[0], session);
-        } else {
+        if (session.reservationCode.startsWith('WIN-')) {
           const endTime = new Date().toISOString();
           completedSession = {
             ...session,
@@ -313,6 +349,28 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
               new Date(endTime).getTime() + session.pricingConfig.exitGraceMinutes * 60 * 1000,
             ).toISOString(),
           };
+        } else {
+          const endRecords = await endParkingSession({
+            reservationId: session.reservationId ?? session.reservationCode,
+          });
+
+          if (endRecords && endRecords.length > 0) {
+            completedSession = mapCompletedSession(endRecords[0], session);
+          } else {
+            const endTime = new Date().toISOString();
+            completedSession = {
+              ...session,
+              endTime,
+              durationSeconds,
+              totalBill: calculateBill(durationSeconds, session.pricingConfig),
+              receiptNumber: createReceiptNumber(),
+              transactionId: createTransactionId(),
+              exitCode: createExitCode(session.slot.id),
+              exitGraceEndsAt: new Date(
+                new Date(endTime).getTime() + session.pricingConfig.exitGraceMinutes * 60 * 1000,
+              ).toISOString(),
+            };
+          }
         }
 
         await sendSessionCompletedNotification({

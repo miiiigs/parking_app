@@ -3,23 +3,23 @@ import { useNavigate } from "react-router";
 import { MapPin, Clock, Car, X, Search } from "lucide-react";
 import { MOCK_SESSION } from "../constants";
 import { AppLogoStatic } from "../components/AppLogo";
-
-// Set to true when a session is active (driven by navigation from reservation/walk-in flow)
-const HAS_ACTIVE_SESSION = false;
+import { getActiveSession, getSessionType, endSession } from "../store";
 
 export default function ActiveSessionPage() {
   const navigate = useNavigate();
+  const hasSession = getActiveSession();
+  const isWalkIn = getSessionType() === "walkin";
   const [seconds, setSeconds] = useState(0);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    if (!HAS_ACTIVE_SESSION) return;
+    if (!hasSession) return;
     const t = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [hasSession]);
 
   // ── Empty state ─────────────────────────────────────────────────
-  if (!HAS_ACTIVE_SESSION) {
+  if (!hasSession) {
     return (
       <div className="flex flex-col" style={{ minHeight: "100%", background: "#FAFAF9" }}>
         {/* Header */}
@@ -134,7 +134,7 @@ export default function ActiveSessionPage() {
         <div className="rounded-2xl p-4" style={{ background: "#FFFFFF", border: "1px solid #E2E8F0" }}>
           <p style={{ fontFamily: "'Poppins', sans-serif", fontSize: "13px", fontWeight: 600, color: "#1E293B", margin: "0 0 10px" }}>Fee Summary</p>
           {[
-            { label: "Reservation Fee", amount: `₱${MOCK_SESSION.reservationFee}.00` },
+            ...(!isWalkIn ? [{ label: "Reservation Fee", amount: `₱${MOCK_SESSION.reservationFee}.00` }] : []),
             { label: "Parking Fee (running)", amount: `₱${fee}.00` },
           ].map((row) => (
             <div key={row.label} className="flex justify-between items-center py-1.5" style={{ borderBottom: "1px solid #F1F5F9" }}>
@@ -144,7 +144,9 @@ export default function ActiveSessionPage() {
           ))}
           <div className="flex justify-between items-center pt-2 mt-1">
             <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "14px", fontWeight: 600, color: "#1E293B" }}>Estimated Total</span>
-            <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "16px", fontWeight: 700, color: "#0F766E" }}>₱{(fee + MOCK_SESSION.reservationFee).toFixed(2)}</span>
+            <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: "16px", fontWeight: 700, color: "#0F766E" }}>
+              ₱{(fee + (isWalkIn ? 0 : MOCK_SESSION.reservationFee)).toFixed(2)}
+            </span>
           </div>
         </div>
 
@@ -170,7 +172,7 @@ export default function ActiveSessionPage() {
               </p>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={() => { setShowModal(false); navigate("/payment"); }} style={{ height: "50px", borderRadius: "12px", background: "#EF4444", color: "#FFFFFF", fontFamily: "'Poppins', sans-serif", fontSize: "15px", fontWeight: 500, border: "none", cursor: "pointer" }}>Continue</button>
+              <button onClick={() => { setShowModal(false); endSession(); navigate("/payment"); }} style={{ height: "50px", borderRadius: "12px", background: "#EF4444", color: "#FFFFFF", fontFamily: "'Poppins', sans-serif", fontSize: "15px", fontWeight: 500, border: "none", cursor: "pointer" }}>Continue</button>
               <button onClick={() => setShowModal(false)} style={{ height: "50px", borderRadius: "12px", background: "#F1F5F9", color: "#64748B", fontFamily: "'Poppins', sans-serif", fontSize: "15px", fontWeight: 500, border: "none", cursor: "pointer" }}>Cancel</button>
             </div>
           </div>

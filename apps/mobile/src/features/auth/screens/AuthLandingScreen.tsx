@@ -20,7 +20,7 @@ export default function AuthLandingScreen() {
         <View style={styles.heroSection}>
           <View style={styles.heroBubbleTop} />
           <View style={styles.heroBubbleBottom} />
-          <AuthLogo stacked size={88} showTagline />
+          <AuthLogo stacked size={80} showTagline />
         </View>
 
         <View style={styles.contentSection}>
@@ -104,29 +104,29 @@ const styles = StyleSheet.create({
   contentSection: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 30,
+    paddingTop: 28,
     paddingBottom: 24,
   },
   copyBlock: {
     gap: 6,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   title: {
     color: '#1E293B',
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 26,
+    lineHeight: 31,
     fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: -0.48,
+    letterSpacing: -0.3,
   },
   subtitle: {
     color: '#64748B',
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 22,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.04,
   },
   actions: {
-    gap: 13,
+    gap: 12,
   },
   noticeCard: {
     marginTop: 18,

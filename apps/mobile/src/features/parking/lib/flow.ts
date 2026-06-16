@@ -29,6 +29,10 @@ export function createReservationCode(slotId: string) {
   return `RSV-${slotId}-${Date.now().toString().slice(-6)}`;
 }
 
+export function createWalkInCode(slotId: string) {
+  return `WIN-${slotId}-${Date.now().toString().slice(-6)}`;
+}
+
 export function createReceiptNumber() {
   return `PK${Date.now().toString().slice(-8)}`;
 }

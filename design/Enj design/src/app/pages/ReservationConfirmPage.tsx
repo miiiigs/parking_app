@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { AppLogoStatic } from "../components/AppLogo";
 import { MapPin, Clock, X } from "lucide-react";
+import { startSession } from "../store";
 
 type Stage = "qr" | "grace";
 
@@ -17,8 +18,11 @@ function ReservationQR() {
 function GracePeriodScreen({ onParked }: { onParked: () => void }) {
   const navigate = useNavigate();
   const [secs, setSecs] = useState(600);
+
+  const goToSession = () => { startSession(); navigate("/session"); };
+
   useEffect(() => {
-    if (secs <= 0) { navigate("/session"); return; }
+    if (secs <= 0) { goToSession(); return; }
     const t = setInterval(() => setSecs(s => s - 1), 1000);
     return () => clearInterval(t);
   }, [secs]);
@@ -80,7 +84,7 @@ function GracePeriodScreen({ onParked }: { onParked: () => void }) {
         )}
       </div>
       <div className="px-5 pb-6 pt-3" style={{ flexShrink: 0 }}>
-        <button onClick={onParked} className="w-full flex items-center justify-center gap-2"
+        <button onClick={() => { startSession(); onParked(); }} className="w-full flex items-center justify-center gap-2"
           style={{ height: "56px", borderRadius: "16px", background: "linear-gradient(135deg, #0F766E 0%, #0D9488 100%)", color: "#FFFFFF", fontFamily: "'Poppins', sans-serif", fontSize: "17px", fontWeight: 600, border: "none", cursor: "pointer", boxShadow: "0 8px 24px rgba(15,118,110,0.35)" }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="16" r="1"/></svg>
           I am Parked

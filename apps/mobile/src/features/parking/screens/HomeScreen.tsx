@@ -1,18 +1,51 @@
 import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CarFront, ChevronRight, MapPin, Menu, Search, SlidersHorizontal, X, Zap } from 'lucide-react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  AlertTriangle,
+  CarFront,
+  ChevronRight,
+  CreditCard,
+  Info,
+  MapPin,
+  Menu,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  User,
+  X,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
-import { colors } from '../../../theme/tokens';
 import { formatDistance } from '../../../utils/format';
-import { AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
+import { BottomNav } from '../../../components/navigation/BottomNav';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import type { ParkingLot } from '../types';
 
 type BuildingType = 'All' | 'Mall' | 'Commercial' | 'Office';
+
+type DrawerItem = {
+  icon: LucideIcon;
+  label: string;
+  sublabel: string;
+  onPress: () => void;
+};
 
 const BUILDING_TYPES: BuildingType[] = ['All', 'Mall', 'Commercial', 'Office'];
 
@@ -28,6 +61,9 @@ export default function HomeScreen() {
   const [query, setQuery] = useState('');
   const [activeType, setActiveType] = useState<BuildingType>('All');
   const [showFilters, setShowFilters] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [pendingLot, setPendingLot] = useState<ParkingLot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const filteredLots = useMemo(() => {
@@ -44,38 +80,80 @@ export default function HomeScreen() {
 
   const featuredLot = filteredLots[0] ?? lots[0] ?? null;
   const isGuest = auth.isGuest;
+  const requiresAuth = auth.isGuest || (!auth.user && !auth.isLoading);
+
   const quickAction = session
     ? {
         title: 'Active session',
         copy: `Slot ${session.slot.number} at ${session.lotName}`,
-        buttonLabel: 'Resume session',
         onPress: () => router.push('/session'),
       }
     : booking
       ? {
           title: 'Reservation saved',
           copy: `Open the entry pass for slot ${booking.slot.number}`,
-          buttonLabel: 'Open entry pass',
           onPress: () => router.push('/arrival'),
         }
       : completedSession
         ? {
             title: 'Latest receipt',
             copy: `View ${completedSession.receiptNumber} from ${completedSession.lotName}`,
-            buttonLabel: 'Open receipt',
             onPress: () => router.push('/receipt'),
           }
         : featuredLot
           ? {
               title: 'Walk-In Parking',
-              copy: 'Already at the facility? Reserve your slot now.',
-              buttonLabel: 'View details',
-              onPress: () => handleLotPress(featuredLot),
+              copy: 'Already at the facility? Pay & park instantly',
+              onPress: () => router.push({ pathname: '/reservation/[lotId]', params: { lotId: featuredLot.id, mode: 'walkin' } }),
             }
           : null;
 
+  const drawerItems: DrawerItem[] = [
+    {
+      icon: User,
+      label: 'My Profile',
+      sublabel: 'Edit name, photo',
+      onPress: () => showComingSoon('My Profile'),
+    },
+    {
+      icon: CreditCard,
+      label: 'Payment Methods',
+      sublabel: 'Cards, GCash, Maya',
+      onPress: () => showComingSoon('Payment Methods'),
+    },
+    {
+      icon: Settings,
+      label: 'Settings',
+      sublabel: 'Notifications, privacy',
+      onPress: () => showComingSoon('Settings'),
+    },
+    {
+      icon: AlertTriangle,
+      label: 'Report an Issue',
+      sublabel: 'Help & support',
+      onPress: () => showComingSoon('Report an Issue'),
+    },
+    {
+      icon: Info,
+      label: 'About ParkingPH',
+      sublabel: 'Version, terms, contact',
+      onPress: () => showComingSoon('About ParkingPH'),
+    },
+  ];
+
+  function showComingSoon(label: string) {
+    setShowDrawer(false);
+    Alert.alert(label, 'This destination is in the latest design but is not implemented in the mobile app yet.');
+  }
+
   function handleLotPress(lot: ParkingLot) {
-    router.push(`/reservation/${lot.id}`);
+    if (requiresAuth) {
+      setPendingLot(lot);
+      setShowGuestModal(true);
+      return;
+    }
+
+    router.push({ pathname: '/reservation/[lotId]', params: { lotId: lot.id } });
   }
 
   async function handleRefresh() {
@@ -87,25 +165,35 @@ export default function HomeScreen() {
     }
   }
 
+  const authReturnTo = pendingLot ? `/reservation/${pendingLot.id}` : '/home';
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor="#0F766E" />}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
-          <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View style={styles.headerShell}>
+      <View style={styles.page}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} tintColor="#0F766E" />}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
+            <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
+            <View
+              style={[
+                styles.headerShell,
+                {
+                  marginHorizontal: -horizontalPadding,
+                  paddingHorizontal: horizontalPadding + 20,
+                },
+              ]}
+            >
               <View style={styles.headerTopRow}>
                 <View style={styles.headerBrandRow}>
                   <AuthLogo height={32} />
                   {isGuest ? <GuestBadge label="Guest" /> : null}
-                  {!isGuest && !auth.user ? <GuestBadge label="Sign in needed" tone="warning" /> : null}
                 </View>
 
-                <Pressable style={styles.headerIconButton} disabled>
+                <Pressable onPress={() => setShowDrawer(true)} style={styles.headerIconButton} hitSlop={8}>
                   <Menu color="#1E293B" size={22} strokeWidth={2.2} />
                 </Pressable>
               </View>
@@ -165,7 +253,7 @@ export default function HomeScreen() {
                   <Text style={styles.walkInTitle}>{quickAction.title}</Text>
                   <Text style={styles.walkInCopy}>{quickAction.copy}</Text>
                 </View>
-                <ChevronRight color="rgba(255,255,255,0.8)" size={18} strokeWidth={2.2} />
+                <ChevronRight color="rgba(255,255,255,0.82)" size={18} strokeWidth={2.2} />
               </Pressable>
             ) : null}
 
@@ -198,10 +286,74 @@ export default function HomeScreen() {
                 </View>
               ) : null}
             </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        <BottomNav activeTab="search" onMenuPress={() => setShowDrawer(true)} />
+      </View>
+
+      <Modal animationType="fade" transparent visible={showDrawer} onRequestClose={() => setShowDrawer(false)}>
+        <Pressable style={styles.drawerBackdrop} onPress={() => setShowDrawer(false)}>
+          <Pressable style={styles.drawerSheet} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.drawerHandleWrap}>
+              <View style={styles.drawerHandle} />
+            </View>
+            <View style={styles.drawerContent}>
+              <Text style={styles.drawerEyebrow}>QUICK ACCESS</Text>
+              <View style={styles.drawerItemList}>
+                {drawerItems.map((item) => (
+                  <Pressable key={item.label} onPress={item.onPress} style={styles.drawerItem}>
+                    <View style={styles.drawerItemIconWrap}>
+                      <item.icon color="#0F766E" size={18} strokeWidth={2.2} />
+                    </View>
+                    <View style={styles.drawerItemCopy}>
+                      <Text style={styles.drawerItemTitle}>{item.label}</Text>
+                      <Text style={styles.drawerItemSubtitle}>{item.sublabel}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal animationType="slide" transparent visible={showGuestModal} onRequestClose={() => setShowGuestModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalIconWrap}>
+              <View style={styles.modalIconBubble}>
+                <MapPin color="#F97316" size={24} strokeWidth={2.2} />
+              </View>
+            </View>
+
+            <Text style={styles.modalTitle}>Sign In Required</Text>
+            <Text style={styles.modalCopy}>Sign in to reserve a parking space.</Text>
+
+            <View style={styles.modalActions}>
+              <AuthActionButton
+                label="Log In"
+                onPress={() => {
+                  setShowGuestModal(false);
+                  router.push({ pathname: '/login', params: { returnTo: authReturnTo } });
+                }}
+              />
+              <AuthActionButton
+                label="Register"
+                variant="secondary"
+                onPress={() => {
+                  setShowGuestModal(false);
+                  router.push({ pathname: '/register', params: { returnTo: authReturnTo } });
+                }}
+              />
+              <Pressable onPress={() => setShowGuestModal(false)} style={styles.modalCancelButton}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
-      </ScrollView>
-
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -233,18 +385,18 @@ function HomeLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void })
               <CarFront color="#94A3B8" size={11} strokeWidth={2.2} />
               <Text style={styles.metricLabel}>Available</Text>
             </View>
-            <Text style={[styles.metricValue, { color: availabilityColor }]}>
-              {lot.availableSlots}
+            <View style={styles.metricValueRow}>
+              <Text style={[styles.metricValue, { color: availabilityColor }]}>{lot.availableSlots}</Text>
               <Text style={styles.metricValueSuffix}>/{lot.totalSlots}</Text>
-            </Text>
+            </View>
           </View>
 
           <View style={styles.metricCard}>
             <Text style={styles.metricLabelStandalone}>Starting at</Text>
-            <Text style={styles.metricValuePrice}>
-              PHP {lot.pricePerHour}
+            <View style={styles.metricValueRow}>
+              <Text style={styles.metricValuePrice}>PHP {lot.pricePerHour}</Text>
               <Text style={styles.metricValueSuffix}>/hr</Text>
-            </Text>
+            </View>
           </View>
         </View>
 
@@ -257,10 +409,10 @@ function HomeLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void })
   );
 }
 
-function GuestBadge({ label, tone = 'guest' }: { label: string; tone?: 'guest' | 'warning' }) {
+function GuestBadge({ label }: { label: string }) {
   return (
-    <View style={[styles.guestBadge, tone === 'warning' ? styles.warningBadge : null]}>
-      <Text style={[styles.guestBadgeText, tone === 'warning' ? styles.warningBadgeText : null]}>{label}</Text>
+    <View style={styles.guestBadge}>
+      <Text style={styles.guestBadgeText}>{label}</Text>
     </View>
   );
 }
@@ -299,7 +451,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAF9',
   },
   scrollContent: {
-    paddingBottom: 28,
+    paddingBottom: 24,
+  },
+  page: {
+    flex: 1,
   },
   inner: {
     width: '100%',
@@ -307,18 +462,16 @@ const styles = StyleSheet.create({
   },
   maxWidth: {
     width: '100%',
-    gap: 18,
-    paddingTop: 12,
+    gap: 16,
+    paddingTop: 0,
   },
   headerShell: {
-    paddingHorizontal: 22,
     paddingTop: 20,
-    paddingBottom: 18,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    gap: 16,
+    gap: 14,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -330,7 +483,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexWrap: 'wrap',
   },
   guestBadge: {
     borderRadius: 6,
@@ -347,27 +499,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.05,
   },
-  warningBadge: {
-    borderColor: '#C7D2FE',
-    backgroundColor: '#EEF2FF',
-  },
-  warningBadgeText: {
-    color: '#4338CA',
-  },
   headerIconButton: {
     padding: 4,
   },
   searchRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   searchBox: {
     flex: 1,
-    height: 48,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
@@ -376,14 +521,14 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: '#1E293B',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Poppins_400Regular',
     paddingVertical: 0,
   },
   filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
@@ -432,11 +577,11 @@ const styles = StyleSheet.create({
   walkInCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    borderRadius: 20,
+    gap: 12,
+    borderRadius: 18,
     backgroundColor: '#0F766E',
-    paddingHorizontal: 18,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     shadowColor: '#0F766E',
     shadowOpacity: 0.22,
     shadowRadius: 16,
@@ -444,9 +589,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   walkInIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -457,29 +602,27 @@ const styles = StyleSheet.create({
   },
   walkInTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_700Bold',
-    letterSpacing: 0.04,
   },
   walkInCopy: {
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
-    letterSpacing: 0.03,
   },
   resultsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
   },
   resultsCopy: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     flex: 1,
   },
@@ -499,8 +642,8 @@ const styles = StyleSheet.create({
   },
   nearYouText: {
     color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_500Medium',
   },
   dataModeBadge: {
@@ -527,11 +670,11 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
   listSection: {
-    gap: 14,
+    gap: 12,
   },
   lotCard: {
     overflow: 'hidden',
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
@@ -546,8 +689,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F766E',
   },
   lotCardBody: {
-    padding: 18,
-    gap: 14,
+    padding: 16,
+    gap: 12,
   },
   lotCardTopRow: {
     flexDirection: 'row',
@@ -560,10 +703,9 @@ const styles = StyleSheet.create({
   },
   lotCardTitle: {
     color: '#1E293B',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: -0.12,
   },
   lotAddressRow: {
     flexDirection: 'row',
@@ -573,76 +715,86 @@ const styles = StyleSheet.create({
   },
   lotAddress: {
     color: '#64748B',
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: 'Poppins_400Regular',
     flex: 1,
-    letterSpacing: 0.03,
   },
   distanceBadge: {
-    borderRadius: 9,
+    borderRadius: 8,
     backgroundColor: '#F0FDF4',
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 4,
   },
   distanceBadgeText: {
     color: '#16A34A',
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 11,
+    lineHeight: 14,
     fontFamily: 'Poppins_600SemiBold',
   },
   metricCardsRow: {
     flexDirection: 'row',
-    gap: 13,
+    gap: 12,
   },
   metricCard: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 74,
+    justifyContent: 'space-between',
   },
   metricLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   metricLabel: {
     color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 13,
     fontFamily: 'Poppins_400Regular',
   },
   metricLabelStandalone: {
     color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 13,
     fontFamily: 'Poppins_400Regular',
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  metricValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    columnGap: 2,
   },
   metricValue: {
-    fontSize: 18,
+    fontSize: 16,
     lineHeight: 22,
     fontFamily: 'Poppins_700Bold',
+    includeFontPadding: false,
   },
   metricValuePrice: {
     color: '#0F766E',
-    fontSize: 18,
+    fontSize: 16,
     lineHeight: 22,
     fontFamily: 'Poppins_700Bold',
+    includeFontPadding: false,
   },
   metricValueSuffix: {
     color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 15,
     fontFamily: 'Poppins_400Regular',
+    includeFontPadding: false,
   },
   viewDetailsButton: {
-    height: 44,
-    borderRadius: 12,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: '#0F766E',
     flexDirection: 'row',
     alignItems: 'center',
@@ -651,29 +803,158 @@ const styles = StyleSheet.create({
   },
   viewDetailsText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 16,
     fontFamily: 'Poppins_500Medium',
-    letterSpacing: 0.04,
   },
   emptyCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    gap: 7,
+    padding: 18,
+    gap: 6,
   },
   emptyTitle: {
     color: '#1E293B',
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     fontFamily: 'Poppins_600SemiBold',
   },
   emptyCopy: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+  },
+  drawerBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  drawerSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+  },
+  drawerHandleWrap: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  drawerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+  },
+  drawerContent: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 24,
+  },
+  drawerEyebrow: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.6,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  drawerItemList: {
+    gap: 8,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  drawerItemIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F0FDFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawerItemCopy: {
+    flex: 1,
+  },
+  drawerItemTitle: {
+    color: '#1E293B',
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  drawerItemSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 32,
+  },
+  modalIconWrap: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalIconBubble: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    color: '#1E293B',
+    fontSize: 17,
+    lineHeight: 22,
+    textAlign: 'center',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  modalCopy: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  modalActions: {
+    gap: 12,
+  },
+  modalCancelButton: {
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
   },
 });
