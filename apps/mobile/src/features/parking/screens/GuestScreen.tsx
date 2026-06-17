@@ -1,16 +1,16 @@
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Redirect } from 'expo-router';
 
-import { useMobileAuth } from '../src/providers/MobileAuthProvider';
-import { colors } from '../src/theme/tokens';
+import { useMobileAuth } from '../../../providers/MobileAuthProvider';
+import HomeScreen from './HomeScreen';
 
-export default function IndexScreen() {
+export default function GuestScreen() {
   const auth = useMobileAuth();
 
   if (auth.isLoading) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="small" color={colors.primaryDark} />
+        <ActivityIndicator size="small" color="#0F766E" />
       </View>
     );
   }
@@ -19,11 +19,11 @@ export default function IndexScreen() {
     return <Redirect href="/home" />;
   }
 
-  if (auth.isGuest) {
-    return <Redirect href="/guest" />;
+  if (!auth.isGuest) {
+    return <Redirect href={{ pathname: '/auth', params: { returnTo: '/guest' } }} />;
   }
 
-  return <Redirect href="/onboarding" />;
+  return <HomeScreen />;
 }
 
 const styles = StyleSheet.create({
@@ -31,6 +31,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.canvas,
+    backgroundColor: '#FAFAF9',
   },
 });

@@ -1,8 +1,8 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Clock3, Menu, Search } from 'lucide-react-native';
 
-type BottomNavTab = 'search' | 'session';
+type BottomNavTab = 'search' | 'session' | 'menu';
 
 type BottomNavProps = {
   activeTab: BottomNavTab;
@@ -12,7 +12,7 @@ type BottomNavProps = {
 const tabs = [
   { key: 'search', label: 'Search', icon: Search, route: '/home' },
   { key: 'session', label: 'Active Session', icon: Clock3, route: '/session' },
-  { key: 'menu', label: 'Menu', icon: Menu, route: null },
+  { key: 'menu', label: 'Menu', icon: Menu, route: '/menu' },
 ] as const;
 
 export function BottomNav({ activeTab, onMenuPress }: BottomNavProps) {
@@ -34,9 +34,6 @@ export function BottomNav({ activeTab, onMenuPress }: BottomNavProps) {
                     onMenuPress();
                     return;
                   }
-
-                  Alert.alert('Menu', 'This menu destination is not implemented on this screen yet.');
-                  return;
                 }
 
                 router.replace(tab.route);
@@ -73,8 +70,8 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     color: '#94A3B8',
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 13,
     fontFamily: 'Poppins_400Regular',
   },
   tabLabelActive: {
@@ -92,3 +89,4 @@ const styles = StyleSheet.create({
     height: 4,
   },
 });
+

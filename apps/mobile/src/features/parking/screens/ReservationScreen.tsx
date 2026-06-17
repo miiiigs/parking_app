@@ -1,31 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  ArrowLeft,
+  CarFront,
   ChevronDown,
+  ChevronLeft,
+  Check,
   Clock3,
   CreditCard,
   MapPin,
   X,
   Zap,
 } from 'lucide-react-native';
-import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ParkingLotLayoutMap } from '../../../components/parking/ParkingLotLayoutMap';
 import { ParkingMap } from '../../../components/parking/ParkingMap';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
-import { formatParkingPricingSummary } from '@parking/shared';
+import { calculateParkingCharge, formatParkingPricingSummary } from '@parking/shared';
 import { getRouteParam } from '../../auth/utils';
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
+import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
+import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import type { ParkingLot, ParkingSlot } from '../types';
 
 type ReservationMode = 'reserve' | 'walkin';
 
 const arrivalWindows = [30, 60, 120];
-const SHEET_COLLAPSED_HEIGHT = 122;
-const SHEET_EXPANDED_HEIGHT = 404;
+const SHEET_COLLAPSED_HEIGHT = 126;
+const SHEET_EXPANDED_HEIGHT_RESERVE = 360;
+const SHEET_EXPANDED_HEIGHT_RESERVE_GUEST = 412;
+const SHEET_EXPANDED_HEIGHT_WALKIN = 472;
 
 function animateSheetTo(value: Animated.Value, nextValue: number) {
   Animated.spring(value, {
@@ -42,6 +48,11 @@ export default function ReservationScreen() {
   const params = useLocalSearchParams<{ lotId?: string; mode?: string }>();
   const auth = useMobileAuth();
   const { lots, isLoading } = useMobileParkingData();
+  const storedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
+  const storedVehicle = useWalkInPreferencesStore((state) => state.vehicle);
+  const setPaymentMethod = useWalkInPreferencesStore((state) => state.setPaymentMethod);
+  const wallets = usePaymentMethodsStore((state) => state.wallets);
+  const cards = usePaymentMethodsStore((state) => state.cards);
   const reserveSlot = useParkingFlowStore((state) => state.reserveSlot);
   const reservationDraft = useParkingFlowStore((state) => state.reservationDraft);
   const setReservationDraft = useParkingFlowStore((state) => state.setReservationDraft);
@@ -49,27 +60,74 @@ export default function ReservationScreen() {
   const [mode, setMode] = useState<ReservationMode>(getRouteParam(params.mode) === 'walkin' ? 'walkin' : 'reserve');
   const [selectedSlot, setSelectedSlot] = useState<ParkingSlot | null>(null);
   const [arrivalWindowMinutes, setArrivalWindowMinutes] = useState(60);
-  const [plateNumber, setPlateNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
+  const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const lot = lots.find((entry) => entry.id === String(params.lotId ?? '')) ?? lots[0] ?? null;
   const lotId = lot?.id ?? null;
   const selectedSlotId = selectedSlot?.id ?? null;
-  const normalizedPlateNumber = plateNumber.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  const normalizedPlateNumber = (storedVehicle?.plate ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
   const requiresAuth = !auth.user || auth.isGuest;
-  const sheetTranslateY = useRef(new Animated.Value(SHEET_EXPANDED_HEIGHT)).current;
-  const sheetStartOffset = useRef(SHEET_EXPANDED_HEIGHT);
+  const currentExpandedHeight =
+    mode === 'reserve'
+      ? requiresAuth
+        ? SHEET_EXPANDED_HEIGHT_RESERVE_GUEST
+        : SHEET_EXPANDED_HEIGHT_RESERVE
+      : SHEET_EXPANDED_HEIGHT_WALKIN;
+  const sheetTranslateY = useRef(new Animated.Value(SHEET_EXPANDED_HEIGHT_WALKIN)).current;
+  const sheetStartOffset = useRef(SHEET_EXPANDED_HEIGHT_WALKIN);
   const hydratedScreenKeyRef = useRef<string | null>(null);
   const sheetVisible = Boolean(selectedSlot);
-  const collapsedOffset = Math.max(0, SHEET_EXPANDED_HEIGHT - SHEET_COLLAPSED_HEIGHT);
+  const collapsedOffset = Math.max(0, currentExpandedHeight - SHEET_COLLAPSED_HEIGHT);
   const slotStatusLabel = selectedSlot?.status === 'available' || selectedSlot?.isAvailable ? 'Open now' : 'Unavailable';
   const hourlyRateLabel = useMemo(() => (lot ? formatParkingPricingSummary(lot.pricingConfig) : 'PHP 0/hr'), [lot]);
   const displayHours = useMemo(() => getHoursLabel(lot), [lot]);
+  const arrivalWindowOptions = useMemo(
+    () =>
+      arrivalWindows.map((minutes) => ({
+        minutes,
+        label: minutes === 30 ? '30 min' : minutes === 60 ? '1 Hour' : '2 Hours',
+        fee: lot ? calculateParkingCharge(minutes * 60, lot.pricingConfig).amount : 0,
+      })),
+    [lot],
+  );
+  const selectedWindowOption = arrivalWindowOptions.find((option) => option.minutes === arrivalWindowMinutes) ?? arrivalWindowOptions[1];
+  const paymentOptions = useMemo(() => {
+    const cardOptions = cards.map((card) => ({
+      id: `card-${card.id}`,
+      label: `${card.type} **** ${card.last4}`,
+      detail: 'Saved card',
+    }));
+    const walletOptions = wallets
+      .filter((wallet) => wallet.linked)
+      .map((wallet) => ({
+        id: `wallet-${wallet.id}`,
+        label: wallet.name,
+        detail: wallet.detail,
+      }));
+    const fallbackOptions = ['Credit / Debit Card', 'GCash', 'Maya']
+      .filter((label) => ![...cardOptions, ...walletOptions].some((option) => option.label === label))
+      .map((label) => ({
+        id: `fallback-${label}`,
+        label,
+        detail: 'Select as default',
+      }));
+
+    return [...cardOptions, ...walletOptions, ...fallbackOptions];
+  }, [cards, wallets]);
 
   const clearSelectedSlot = () => {
     setErrorMessage(null);
     setSelectedSlot(null);
+    if (mode === 'reserve' && lotId) {
+      setReservationDraft({
+        lotId,
+        slotId: null,
+        arrivalWindowMinutes,
+        plateNumber: normalizedPlateNumber,
+      });
+    }
   };
 
   useEffect(() => {
@@ -90,59 +148,17 @@ export default function ReservationScreen() {
         : null;
 
       setArrivalWindowMinutes(reservationDraft.arrivalWindowMinutes);
-      setPlateNumber(reservationDraft.plateNumber);
       setSelectedSlot(draftSlot);
       return;
     }
 
     setSelectedSlot(null);
     setArrivalWindowMinutes(60);
-    setPlateNumber('');
+
+    if (mode === 'reserve' && reservationDraft && reservationDraft.lotId !== lotId) {
+      clearReservationDraft();
+    }
   }, [lot, lotId, mode, reservationDraft]);
-
-  useEffect(() => {
-    if (!lotId) {
-      return;
-    }
-
-    if (hydratedScreenKeyRef.current !== `${mode}:${lotId}`) {
-      return;
-    }
-
-    if (mode === 'reserve') {
-      const nextDraft = {
-        lotId,
-        slotId: selectedSlot?.id ?? null,
-        arrivalWindowMinutes,
-        plateNumber: normalizedPlateNumber,
-      };
-
-      const draftChanged =
-        reservationDraft?.lotId !== nextDraft.lotId ||
-        reservationDraft?.slotId !== nextDraft.slotId ||
-        reservationDraft?.arrivalWindowMinutes !== nextDraft.arrivalWindowMinutes ||
-        reservationDraft?.plateNumber !== nextDraft.plateNumber;
-
-      if (draftChanged) {
-        setReservationDraft(nextDraft);
-      }
-
-      return;
-    }
-
-    if (reservationDraft !== null) {
-      void clearReservationDraft();
-    }
-  }, [
-    arrivalWindowMinutes,
-    clearReservationDraft,
-    lotId,
-    mode,
-    normalizedPlateNumber,
-    reservationDraft,
-    selectedSlot?.id,
-    setReservationDraft,
-  ]);
 
   useEffect(() => {
     if (!selectedSlotId) {
@@ -150,7 +166,7 @@ export default function ReservationScreen() {
         setSheetExpanded(true);
       }
 
-      animateSheetTo(sheetTranslateY, SHEET_EXPANDED_HEIGHT);
+      animateSheetTo(sheetTranslateY, currentExpandedHeight);
       return;
     }
 
@@ -159,7 +175,7 @@ export default function ReservationScreen() {
     }
 
     animateSheetTo(sheetTranslateY, 0);
-  }, [selectedSlotId, sheetExpanded, sheetTranslateY]);
+  }, [currentExpandedHeight, selectedSlotId, sheetExpanded, sheetTranslateY]);
 
   const sheetPanResponder = useMemo(
     () =>
@@ -221,10 +237,17 @@ export default function ReservationScreen() {
 
   return (
     <View style={styles.safeArea}>
+      <Stack.Screen
+        options={{
+          animation: 'none',
+          gestureEnabled: true,
+        }}
+      />
+
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft color="#1E293B" size={20} strokeWidth={2.2} />
+          <Pressable onPress={() => router.replace('/home')} style={styles.backButton}>
+            <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
           </Pressable>
           <AuthLogo height={26} />
           <View style={styles.headerTitleBlock}>
@@ -235,7 +258,9 @@ export default function ReservationScreen() {
             </View>
           </View>
         </View>
+      </View>
 
+      <View style={styles.modeTabsSection}>
         <View style={styles.modeTabsShell}>
           <Pressable
             onPress={() => {
@@ -249,14 +274,21 @@ export default function ReservationScreen() {
           </Pressable>
           <Pressable
             onPress={() => {
-              setMode('walkin');
-              clearSelectedSlot();
-              setErrorMessage(null);
+              if (reservationDraft !== null) {
+                clearReservationDraft();
+              }
+              router.push({
+                pathname: '/walkin-confirm',
+                params: {
+                  lotId: lot.id,
+                  ...(selectedSlot ? { slotId: selectedSlot.id } : {}),
+                },
+              });
             }}
-            style={styles.modeTab}
+            style={[styles.modeTab, mode === 'walkin' ? styles.modeTabActive : null]}
           >
-            <Zap color="#64748B" size={12} strokeWidth={2.3} />
-            <Text style={styles.modeTabText}>Walk-In Parking</Text>
+            <Zap color={mode === 'walkin' ? '#0F766E' : '#64748B'} size={12} strokeWidth={2.3} />
+            <Text style={[styles.modeTabText, mode === 'walkin' ? styles.modeTabTextActive : null]}>Walk-In Parking</Text>
           </Pressable>
         </View>
       </View>
@@ -276,53 +308,73 @@ export default function ReservationScreen() {
           </View>
         </View>
 
-        <View style={styles.legendRow}>
-          <LegendChip label="available" tone="available" />
-          <LegendChip label="occupied" tone="occupied" />
-          <LegendChip label="reserved" tone="reserved" />
-        </View>
+        <View style={styles.contentSection}>
+          <View style={styles.legendRow}>
+            <LegendChip label="available" tone="available" />
+            <LegendChip label="occupied" tone="occupied" />
+            <LegendChip label="reserved" tone="reserved" />
+          </View>
 
-        <View style={styles.mapShell}>
-          {lot.lotLayout ? (
-            <ParkingLotLayoutMap
-              style={styles.mapViewport}
-              lot={lot.lotLayout}
-              slots={lot.slots.map((slot, index) => ({
-                id: slot.id,
-                label: slot.number,
-                status: slot.status ?? (slot.isAvailable ? 'available' : 'occupied'),
-                displayOrder: index + 1,
-              }))}
-              selectedSlotId={selectedSlotId}
-              onSelectSlot={(slotId) => {
-                const nextSlot = lot.slots.find((slot) => slot.id === slotId) ?? null;
-                setErrorMessage(null);
-                setSelectedSlot(nextSlot && nextSlot.isAvailable ? nextSlot : null);
-              }}
-            />
-          ) : (
-            <View style={styles.fallbackMapFrame}>
-              <ParkingMap
-                slots={lot.slots}
-                selectedSlotId={selectedSlotId ?? undefined}
-                onSelectSlot={(slot) => {
+          <View style={styles.mapShell}>
+            {lot.lotLayout ? (
+              <ParkingLotLayoutMap
+                style={styles.mapViewport}
+                lot={lot.lotLayout}
+                slots={lot.slots.map((slot, index) => ({
+                  id: slot.id,
+                  label: slot.number,
+                  status: slot.status ?? (slot.isAvailable ? 'available' : 'occupied'),
+                  displayOrder: index + 1,
+                }))}
+                selectedSlotId={selectedSlotId}
+                onSelectSlot={(slotId) => {
+                  const nextSlot = lot.slots.find((slot) => slot.id === slotId) ?? null;
                   setErrorMessage(null);
-                  setSelectedSlot(slot?.isAvailable ? slot : null);
+                  const nextSelectedSlot = nextSlot && nextSlot.isAvailable ? nextSlot : null;
+                  setSelectedSlot(nextSelectedSlot);
+                  if (mode === 'reserve' && lotId) {
+                    setReservationDraft({
+                      lotId,
+                      slotId: nextSelectedSlot?.id ?? null,
+                      arrivalWindowMinutes,
+                      plateNumber: normalizedPlateNumber,
+                    });
+                  }
                 }}
               />
-            </View>
-          )}
+            ) : (
+              <View style={styles.fallbackMapFrame}>
+                <ParkingMap
+                  slots={lot.slots}
+                  selectedSlotId={selectedSlotId ?? undefined}
+                  onSelectSlot={(slot) => {
+                    setErrorMessage(null);
+                    const nextSelectedSlot = slot?.isAvailable ? slot : null;
+                    setSelectedSlot(nextSelectedSlot);
+                    if (mode === 'reserve' && lotId) {
+                      setReservationDraft({
+                        lotId,
+                        slotId: nextSelectedSlot?.id ?? null,
+                        arrivalWindowMinutes,
+                        plateNumber: normalizedPlateNumber,
+                      });
+                    }
+                  }}
+                />
+              </View>
+            )}
 
-          {!selectedSlot ? (
-            <View style={styles.mapHint}>
-              <Text style={styles.mapHintText}>Tap an available slot to continue.</Text>
-            </View>
-          ) : null}
+            {!selectedSlot ? (
+              <View style={styles.mapHint}>
+                <Text style={styles.mapHintText}>Tap an available slot to continue.</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </ScrollView>
 
       {selectedSlot ? (
-        <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: sheetTranslateY }] }]}>
+        <Animated.View style={[styles.bottomSheet, { height: currentExpandedHeight, transform: [{ translateY: sheetTranslateY }] }]}>
           <View style={styles.sheetHeaderZone} {...sheetPanResponder.panHandlers}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeaderRow}>
@@ -364,18 +416,66 @@ export default function ReservationScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.sheetDetailGrid}>
-              <View style={[styles.sheetDetailCard, styles.sheetDetailCardSoft]}>
-                <Text style={styles.sheetDetailLabel}>Rate</Text>
-                <Text style={styles.sheetDetailValue}>{hourlyRateLabel}</Text>
-              </View>
-              <View style={[styles.sheetDetailCard, styles.sheetDetailCardMint]}>
-                <Text style={styles.sheetDetailLabel}>{mode === 'reserve' ? 'Window' : 'Billing'}</Text>
-                <Text style={[styles.sheetDetailValue, styles.sheetDetailValueMint]}>
-                  {mode === 'reserve' ? `${arrivalWindowMinutes} min` : 'On exit'}
-                </Text>
-              </View>
+            <View style={styles.selectorGrid}>
+              <Pressable
+                onPress={() => setShowPaymentSheet(true)}
+                style={[
+                  styles.selectorSummaryCard,
+                  storedPaymentMethod ? styles.selectorSummaryCardActive : styles.selectorSummaryCardWarning,
+                ]}
+              >
+                <View style={styles.selectorSummaryLeading}>
+                  <View
+                    style={[
+                      styles.selectorSummaryIconWrap,
+                      storedPaymentMethod ? styles.selectorSummaryIconWrapActive : styles.selectorSummaryIconWrapWarning,
+                    ]}
+                  >
+                    <CreditCard color={storedPaymentMethod ? '#0F766E' : '#F97316'} size={15} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.selectorSummaryCopy}>
+                    <Text style={styles.selectorSummaryLabel}>Payment</Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.selectorSummaryValue,
+                        storedPaymentMethod ? styles.selectorSummaryValueActive : styles.selectorSummaryValueWarning,
+                      ]}
+                    >
+                      {storedPaymentMethod ?? 'Tap to set'}
+                    </Text>
+                  </View>
+                </View>
+                <ChevronDown color="#94A3B8" size={16} strokeWidth={2.2} />
+              </Pressable>
+
+              <Pressable onPress={() => router.push('/edit-vehicle')} style={[styles.selectorSummaryCard, styles.selectorSummaryCardActive]}>
+                <View style={styles.selectorSummaryLeading}>
+                  <View style={[styles.selectorSummaryIconWrap, styles.selectorSummaryIconWrapActive]}>
+                    <CarFront color="#0F766E" size={15} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.selectorSummaryCopy}>
+                    <Text style={styles.selectorSummaryLabel}>Vehicle</Text>
+                    <Text numberOfLines={1} style={styles.selectorSummaryValueActive}>
+                      {storedVehicle ? storedVehicle.plate : 'Add vehicle'}
+                    </Text>
+                  </View>
+                </View>
+                <ChevronDown color="#94A3B8" size={16} strokeWidth={2.2} />
+              </Pressable>
             </View>
+
+            {mode === 'walkin' ? (
+              <View style={styles.walkInRateCard}>
+                <Text style={styles.walkInRateLabel}>Parking Rate</Text>
+                <Text style={styles.walkInRateValue}>{hourlyRateLabel}</Text>
+                <View style={styles.walkInRateDivider} />
+                <View style={styles.walkInRateRow}>
+                  <Text style={styles.walkInRateTitle}>Billed on exit</Text>
+                  <Text style={styles.walkInRateMeta}>Metered billing</Text>
+                </View>
+              </View>
+            ) : null}
 
             {mode === 'reserve' ? (
               <>
@@ -387,30 +487,26 @@ export default function ReservationScreen() {
                     return (
                       <Pressable
                         key={minutes}
-                        onPress={() => setArrivalWindowMinutes(minutes)}
+                        onPress={() => {
+                          setArrivalWindowMinutes(minutes);
+                          if (mode === 'reserve' && lotId) {
+                            setReservationDraft({
+                              lotId,
+                              slotId: selectedSlot?.id ?? null,
+                              arrivalWindowMinutes: minutes,
+                              plateNumber: normalizedPlateNumber,
+                            });
+                          }
+                        }}
                         style={[styles.windowChip, active ? styles.windowChipActive : null]}
                       >
                         <Text style={[styles.windowChipTitle, active ? styles.windowChipTitleActive : null]}>{label}</Text>
                         <Text style={[styles.windowChipSubtitle, active ? styles.windowChipSubtitleActive : null]}>
-                          {minutes === 30 ? 'Quick stop' : minutes === 60 ? 'Flexible arrival' : 'More buffer'}
+                          PHP {arrivalWindowOptions.find((option) => option.minutes === minutes)?.fee.toFixed(2) ?? '0.00'}
                         </Text>
                       </Pressable>
                     );
                   })}
-                </View>
-
-                <View style={styles.plateFieldGroup}>
-                  <Text style={styles.plateFieldLabel}>Plate Number</Text>
-                  <TextInput
-                    value={normalizedPlateNumber}
-                    onChangeText={setPlateNumber}
-                    placeholder="ABC-1234"
-                    placeholderTextColor="#94A3B8"
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={10}
-                    style={styles.plateField}
-                  />
                 </View>
               </>
             ) : (
@@ -439,7 +535,7 @@ export default function ReservationScreen() {
               </>
             ) : mode === 'reserve' ? (
               <AuthActionButton
-                label="Reserve Slot"
+                label={`Reserve Slot - PHP ${selectedWindowOption?.fee.toFixed(2) ?? '0.00'}`}
                 onPress={() => void handleConfirmReservation()}
                 disabled={!selectedSlot || normalizedPlateNumber.length < 5}
                 loading={isSubmitting}
@@ -462,6 +558,41 @@ export default function ReservationScreen() {
           </ScrollView>
         </Animated.View>
       ) : null}
+
+      <Modal animationType="slide" transparent visible={showPaymentSheet} onRequestClose={() => setShowPaymentSheet(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={styles.modalBackdropPressable} onPress={() => setShowPaymentSheet(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Payment Method</Text>
+            <View style={styles.modalOptionList}>
+              {paymentOptions.map((option) => {
+                const active = storedPaymentMethod === option.label;
+                return (
+                  <Pressable
+                    key={option.id}
+                    onPress={() => {
+                      setPaymentMethod(option.label);
+                      setShowPaymentSheet(false);
+                    }}
+                    style={[styles.modalOptionCard, active ? styles.modalOptionCardActive : null]}
+                  >
+                    <View style={styles.modalOptionCopy}>
+                      <Text style={[styles.modalOptionTitle, active ? styles.modalOptionTitleActive : null]}>{option.label}</Text>
+                      <Text style={styles.modalOptionDetail}>{option.detail}</Text>
+                    </View>
+                    {active ? (
+                      <View style={styles.modalCheckBadge}>
+                        <Check color="#FFFFFF" size={12} strokeWidth={3} />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -532,8 +663,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
     paddingHorizontal: 16,
     paddingTop: 20,
-    paddingBottom: 14,
-    gap: 14,
+    paddingBottom: 16,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -556,8 +686,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#1E293B',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
   },
   headerAddressRow: {
@@ -568,9 +698,16 @@ const styles = StyleSheet.create({
   },
   headerAddress: {
     color: '#64748B',
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
+  },
+  modeTabsSection: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   modeTabsShell: {
     flexDirection: 'row',
@@ -581,7 +718,7 @@ const styles = StyleSheet.create({
   },
   modeTab: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -598,8 +735,8 @@ const styles = StyleSheet.create({
   },
   modeTabText: {
     color: '#64748B',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
   },
   modeTabTextActive: {
@@ -610,23 +747,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyContent: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingTop: 0,
     paddingBottom: 140,
-    gap: 12,
+    gap: 0,
   },
   statsShell: {
     backgroundColor: '#F0FDFA',
     borderBottomWidth: 1,
     borderBottomColor: '#CCFBF1',
-    borderRadius: 18,
-    overflow: 'hidden',
+    paddingTop: 2,
+  },
+  contentSection: {
+    paddingHorizontal: 0,
+    gap: 6,
   },
   statsRow: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: 8,
   },
   statBlock: {
@@ -634,14 +773,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 21,
     fontFamily: 'Poppins_700Bold',
   },
   statLabel: {
     color: '#64748B',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: 'Poppins_400Regular',
   },
   hoursRow: {
@@ -653,8 +792,8 @@ const styles = StyleSheet.create({
   },
   hoursText: {
     color: '#64748B',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
   },
   hoursLabel: {
@@ -665,7 +804,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    paddingHorizontal: 2,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 2,
   },
   legendChip: {
     flexDirection: 'row',
@@ -680,14 +821,17 @@ const styles = StyleSheet.create({
   },
   legendText: {
     color: '#64748B',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: 'Poppins_400Regular',
     textTransform: 'capitalize',
   },
   mapShell: {
     minHeight: 430,
-    borderRadius: 22,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -716,8 +860,8 @@ const styles = StyleSheet.create({
   },
   mapHintText: {
     color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontFamily: 'Poppins_600SemiBold',
     textAlign: 'center',
   },
@@ -726,7 +870,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: SHEET_EXPANDED_HEIGHT,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: '#FFFFFF',
@@ -763,8 +906,8 @@ const styles = StyleSheet.create({
   },
   sheetEyebrow: {
     color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
   },
   sheetSlotRow: {
@@ -775,8 +918,8 @@ const styles = StyleSheet.create({
   },
   sheetSlotTitle: {
     color: '#0F766E',
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 24,
+    lineHeight: 30,
     fontFamily: 'Poppins_700Bold',
   },
   walkInBadge: {
@@ -792,8 +935,8 @@ const styles = StyleSheet.create({
   },
   walkInBadgeText: {
     color: '#0F766E',
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 13,
     fontFamily: 'Poppins_600SemiBold',
   },
   sheetMetaBlock: {
@@ -804,8 +947,8 @@ const styles = StyleSheet.create({
   },
   sheetMeta: {
     color: '#64748B',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_500Medium',
   },
   sheetCloseButton: {
@@ -822,50 +965,120 @@ const styles = StyleSheet.create({
   sheetScrollContent: {
     paddingHorizontal: 20,
     paddingTop: 2,
-    paddingBottom: 26,
-    gap: 18,
+    paddingBottom: 14,
+    gap: 20,
   },
-  sheetDetailGrid: {
+  selectorGrid: {
     flexDirection: 'row',
     gap: 8,
   },
-  sheetDetailCard: {
+  selectorSummaryCard: {
     flex: 1,
-    minHeight: 58,
-    borderRadius: 12,
+    minHeight: 76,
+    borderRadius: 14,
+    borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    gap: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  sheetDetailCardSoft: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sheetDetailCardMint: {
+  selectorSummaryCardActive: {
     backgroundColor: '#F0FDFA',
-    borderWidth: 1.5,
     borderColor: '#A7F3D0',
   },
-  sheetDetailLabel: {
-    color: '#94A3B8',
+  selectorSummaryCardWarning: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  selectorSummaryLeading: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  selectorSummaryIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectorSummaryIconWrapActive: {
+    backgroundColor: '#D1FAE5',
+  },
+  selectorSummaryIconWrapWarning: {
+    backgroundColor: '#FFEDD5',
+  },
+  selectorSummaryCopy: {
+    flex: 1,
+  },
+  selectorSummaryLabel: {
+    color: '#64748B',
     fontSize: 10,
     lineHeight: 13,
     fontFamily: 'Poppins_400Regular',
   },
-  sheetDetailValue: {
-    color: '#1E293B',
+  selectorSummaryValue: {
+    marginTop: 2,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 17,
     fontFamily: 'Poppins_600SemiBold',
   },
-  sheetDetailValueMint: {
+  selectorSummaryValueActive: {
     color: '#0F766E',
+  },
+  selectorSummaryValueWarning: {
+    color: '#F97316',
+  },
+  walkInRateCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  walkInRateLabel: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+  },
+  walkInRateValue: {
+    color: '#1E293B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
+  },
+  walkInRateDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  walkInRateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  walkInRateTitle: {
+    color: '#1E293B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  walkInRateMeta: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: 'Poppins_400Regular',
   },
   sectionEyebrow: {
     color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.6,
   },
@@ -875,7 +1088,7 @@ const styles = StyleSheet.create({
   },
   windowChip: {
     flex: 1,
-    minHeight: 62,
+    minHeight: 66,
     borderRadius: 12,
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 10,
@@ -888,8 +1101,8 @@ const styles = StyleSheet.create({
   },
   windowChipTitle: {
     color: '#1E293B',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 18,
     fontFamily: 'Poppins_700Bold',
     textAlign: 'center',
   },
@@ -898,33 +1111,13 @@ const styles = StyleSheet.create({
   },
   windowChipSubtitle: {
     color: '#64748B',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
     textAlign: 'center',
   },
   windowChipSubtitleActive: {
     color: 'rgba(255,255,255,0.82)',
-  },
-  plateFieldGroup: {
-    gap: 9,
-  },
-  plateFieldLabel: {
-    color: '#374151',
-    fontSize: 13,
-    lineHeight: 17,
-    fontFamily: 'Poppins_500Medium',
-  },
-  plateField: {
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    color: '#1E293B',
-    fontSize: 15,
-    fontFamily: 'Poppins_500Medium',
   },
   walkInInfoCard: {
     flexDirection: 'row',
@@ -941,29 +1134,107 @@ const styles = StyleSheet.create({
   },
   walkInInfoTitle: {
     color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_600SemiBold',
   },
   walkInInfoText: {
     color: '#0F766E',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     marginTop: 3,
     opacity: 0.84,
   },
   errorText: {
     color: '#DC2626',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
   },
   guestNotice: {
     color: '#64748B',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15,23,42,0.42)',
+  },
+  modalBackdropPressable: {
+    flex: 1,
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 30,
+    gap: 14,
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+  },
+  modalTitle: {
+    color: '#1E293B',
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  modalOptionList: {
+    gap: 10,
+  },
+  modalOptionCard: {
+    minHeight: 62,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalOptionCardActive: {
+    backgroundColor: '#F0FDFA',
+    borderColor: '#0F766E',
+  },
+  modalOptionCopy: {
+    flex: 1,
+  },
+  modalOptionTitle: {
+    color: '#1E293B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_500Medium',
+  },
+  modalOptionTitleActive: {
+    color: '#0F766E',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  modalOptionDetail: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 2,
+  },
+  modalCheckBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#0F766E',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

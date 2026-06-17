@@ -12,7 +12,7 @@ type WalkInVehicle = {
 type WalkInPreferencesState = {
   paymentMethod: string | null;
   vehicle: WalkInVehicle | null;
-  setPaymentMethod: (value: string) => void;
+  setPaymentMethod: (value: string | null) => void;
   setVehicle: (value: WalkInVehicle) => void;
 };
 

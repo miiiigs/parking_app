@@ -1,6 +1,16 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
   <item android:drawable="@color/splashscreen_background"/>
-  <item>
-    <bitmap android:gravity="center" android:src="@drawable/splashscreen_logo"/>
+  <item android:gravity="center">
+    <shape android:shape="rectangle">
+      <size android:width="92dp" android:height="92dp"/>
+      <corners android:radius="24dp"/>
+      <solid android:color="#0F766E"/>
+    </shape>
+  </item>
+  <item android:gravity="center">
+    <shape android:shape="oval">
+      <size android:width="18dp" android:height="18dp"/>
+      <solid android:color="#FFFFFF"/>
+    </shape>
   </item>
 </layer-list>

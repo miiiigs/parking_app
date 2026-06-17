@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Car, ChevronDown, ChevronLeft, Check, CreditCard, Hash, Palette, Zap } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Car, ChevronDown, ChevronLeft, Check, CreditCard, Hash, MapPin, Palette, Zap } from 'lucide-react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
 import { getRouteParam } from '../../auth/utils';
+import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 
-const PAYMENT_METHODS = ['Credit / Debit Card', 'GCash', 'Maya'];
 const VEHICLE_MODELS = [
   'Toyota Vios', 'Toyota Innova', 'Toyota Fortuner', 'Honda Civic', 'Honda City', 'Honda CR-V',
   'Mitsubishi Xpander', 'Mitsubishi Montero Sport', 'Ford Everest', 'Ford Ranger', 'Nissan Navara', 'Others',
@@ -23,11 +23,13 @@ export default function WalkInConfirmScreen() {
   const storedVehicle = useWalkInPreferencesStore((state) => state.vehicle);
   const setPaymentMethod = useWalkInPreferencesStore((state) => state.setPaymentMethod);
   const setVehicle = useWalkInPreferencesStore((state) => state.setVehicle);
+  const wallets = usePaymentMethodsStore((state) => state.wallets);
+  const cards = usePaymentMethodsStore((state) => state.cards);
   const lotId = getRouteParam(params.lotId);
   const slotId = getRouteParam(params.slotId);
   const lot = lots.find((entry) => entry.id === lotId) ?? null;
   const slot = lot?.slots.find((entry) => entry.id === slotId) ?? null;
-  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(!storedVehicle);
@@ -36,35 +38,87 @@ export default function WalkInConfirmScreen() {
   const [plateNumber, setPlateNumber] = useState(storedVehicle?.plate ?? '');
   const [customModel, setCustomModel] = useState('');
   const [customColor, setCustomColor] = useState('');
+  const hasSelectedSlot = Boolean(slot);
 
   useEffect(() => {
-    if (!lot || !slot) {
+    if (!lot) {
       router.replace('/home');
     }
-  }, [lot, router, slot]);
+  }, [lot, router]);
 
   const displayModel = selectedModel === 'Others' ? customModel : selectedModel;
   const displayColor = selectedColor === 'Others' ? customColor : selectedColor;
   const normalizedPlate = plateNumber.toUpperCase().replace(/[^A-Z0-9- ]/g, '');
   const vehicleValid = displayModel.trim().length >= 2 && displayColor.trim().length >= 2 && normalizedPlate.trim().length >= 3;
-  const canProceed = Boolean(storedPaymentMethod) && (!editingVehicle || vehicleValid);
+  const canProceed = hasSelectedSlot && Boolean(storedPaymentMethod) && (!editingVehicle || vehicleValid);
 
   const selectedPaymentLabel = useMemo(() => storedPaymentMethod ?? 'Tap to select', [storedPaymentMethod]);
+  const paymentOptions = useMemo(() => {
+    const cardOptions = cards.map((card) => ({
+      id: `card-${card.id}`,
+      label: `${card.type} **** ${card.last4}`,
+      detail: 'Saved card',
+    }));
+    const walletOptions = wallets
+      .filter((wallet) => wallet.linked)
+      .map((wallet) => ({
+        id: `wallet-${wallet.id}`,
+        label: wallet.name,
+        detail: wallet.detail,
+      }));
+    const fallbackOptions = ['Credit / Debit Card', 'GCash', 'Maya']
+      .filter((label) => ![...cardOptions, ...walletOptions].some((option) => option.label === label))
+      .map((label) => ({
+        id: `fallback-${label}`,
+        label,
+        detail: 'Select as default',
+      }));
 
-  if (!lot || !slot) {
+    return [...cardOptions, ...walletOptions, ...fallbackOptions];
+  }, [cards, wallets]);
+
+  if (!lot) {
     return null;
   }
 
   return (
     <View style={styles.safeArea}>
+      <Stack.Screen
+        options={{
+          animation: 'none',
+          gestureEnabled: true,
+        }}
+      />
+
       <View style={styles.header}>
-        <View style={styles.headerLeading}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <View style={styles.headerTopRow}>
+          <Pressable onPress={() => router.replace('/home')} style={styles.backButton}>
             <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
           </Pressable>
-          <AuthLogo height={28} />
+          <AuthLogo height={26} />
+          <View style={styles.headerTitleBlock}>
+            <Text numberOfLines={1} style={styles.headerLotTitle}>{lot.name}</Text>
+            <View style={styles.headerAddressRow}>
+              <MapPin color="#94A3B8" size={9} strokeWidth={2.2} />
+              <Text numberOfLines={1} style={styles.headerAddress}>{lot.address}</Text>
+            </View>
+          </View>
         </View>
-        <Text style={styles.headerTitle}>Walk-In Parking</Text>
+      </View>
+
+      <View style={styles.modeTabsSection}>
+        <View style={styles.modeTabsShell}>
+          <Pressable
+            onPress={() => router.push({ pathname: '/reservation/[lotId]', params: { lotId: lot.id } })}
+            style={styles.modeTab}
+          >
+            <Text style={styles.modeTabText}>Reserve in Advance</Text>
+          </Pressable>
+          <Pressable style={[styles.modeTab, styles.modeTabActive]}>
+            <Zap color="#0F766E" size={12} strokeWidth={2.3} />
+            <Text style={[styles.modeTabText, styles.modeTabTextActive]}>Walk-In Parking</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -74,13 +128,25 @@ export default function WalkInConfirmScreen() {
           </View>
           <View style={styles.heroCopyBlock}>
             <Text style={styles.heroTitle}>Already at the facility?</Text>
-            <Text style={styles.heroCopy}>Generate your entrance QR for slot {slot.number} at {lot.name}.</Text>
+            <Text style={styles.heroCopy}>
+              {slot
+                ? `Generate your entrance QR for slot ${slot.number} at ${lot.name}.`
+                : `Set your payment and vehicle details, then choose a walk-in slot at ${lot.name}.`}
+            </Text>
           </View>
         </View>
 
+        {!slot ? (
+          <View style={styles.noticeCardInfo}>
+            <Text style={styles.noticeCopyInfo}>
+              Choose a walk-in slot from the reservation map before generating your entrance QR.
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>PAYMENT METHOD</Text>
-          <Pressable onPress={() => setPaymentOpen((value) => !value)} style={styles.selectorCard}>
+          <Pressable onPress={() => setShowPaymentSheet(true)} style={styles.selectorCard}>
             <View style={styles.selectorLeading}>
               <View style={[styles.selectorIconWrap, storedPaymentMethod ? styles.selectorIconWrapActive : styles.selectorIconWrapWarning]}>
                 <CreditCard color={storedPaymentMethod ? '#FFFFFF' : '#F97316'} size={18} strokeWidth={2.2} />
@@ -90,32 +156,8 @@ export default function WalkInConfirmScreen() {
                 <Text style={[styles.selectorValue, !storedPaymentMethod ? styles.selectorValueWarning : null]}>{selectedPaymentLabel}</Text>
               </View>
             </View>
-            <ChevronDown color="#94A3B8" size={18} strokeWidth={2.2} style={{ transform: [{ rotate: paymentOpen ? '180deg' : '0deg' }] }} />
+            <ChevronDown color="#94A3B8" size={18} strokeWidth={2.2} />
           </Pressable>
-          {paymentOpen ? (
-            <View style={styles.dropdownCard}>
-              {PAYMENT_METHODS.map((method, index) => {
-                const active = storedPaymentMethod === method;
-                return (
-                  <Pressable
-                    key={method}
-                    onPress={() => {
-                      setPaymentMethod(method);
-                      setPaymentOpen(false);
-                    }}
-                    style={[styles.dropdownItem, index < PAYMENT_METHODS.length - 1 ? styles.dropdownItemBorder : null, active ? styles.dropdownItemActive : null]}
-                  >
-                    <Text style={[styles.dropdownText, active ? styles.dropdownTextActive : null]}>{method}</Text>
-                    {active ? (
-                      <View style={styles.dropdownCheck}>
-                        <Check color="#FFFFFF" size={12} strokeWidth={3} />
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -236,8 +278,13 @@ export default function WalkInConfirmScreen() {
         </View>
 
         <AuthActionButton
-          label="Generate Entrance QR"
+          label={slot ? 'Generate Entrance QR' : 'Choose Walk-In Slot'}
           onPress={() => {
+            if (!slot) {
+              router.push({ pathname: '/reservation/[lotId]', params: { lotId: lot.id, mode: 'walkin' } });
+              return;
+            }
+
             if (editingVehicle && vehicleValid) {
               setVehicle({
                 model: displayModel.trim(),
@@ -254,9 +301,44 @@ export default function WalkInConfirmScreen() {
               },
             });
           }}
-          disabled={!canProceed}
+          disabled={!slot ? false : !canProceed}
         />
       </ScrollView>
+
+      <Modal animationType="slide" transparent visible={showPaymentSheet} onRequestClose={() => setShowPaymentSheet(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable style={styles.modalBackdropPressable} onPress={() => setShowPaymentSheet(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Select Payment Method</Text>
+            <View style={styles.modalOptionList}>
+              {paymentOptions.map((option) => {
+                const active = storedPaymentMethod === option.label;
+                return (
+                  <Pressable
+                    key={option.id}
+                    onPress={() => {
+                      setPaymentMethod(option.label);
+                      setShowPaymentSheet(false);
+                    }}
+                    style={[styles.modalOptionCard, active ? styles.modalOptionCardActive : null]}
+                  >
+                    <View style={styles.modalOptionCopy}>
+                      <Text style={[styles.modalOptionTitle, active ? styles.modalOptionTitleActive : null]}>{option.label}</Text>
+                      <Text style={styles.modalOptionDetail}>{option.detail}</Text>
+                    </View>
+                    {active ? (
+                      <View style={styles.dropdownCheck}>
+                        <Check color="#FFFFFF" size={12} strokeWidth={3} />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -308,9 +390,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAF9',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -318,7 +397,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
   },
-  headerLeading: {
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -331,17 +410,76 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
+  headerTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    gap: 2,
+  },
+  headerLotTitle: {
     color: '#1E293B',
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  headerAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: '100%',
+  },
+  headerAddress: {
+    color: '#64748B',
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: 'Poppins_400Regular',
+  },
+  modeTabsSection: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  modeTabsShell: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+  },
+  modeTab: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  modeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  modeTabText: {
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: 'Poppins_400Regular',
+  },
+  modeTabTextActive: {
+    color: '#0F766E',
     fontFamily: 'Poppins_600SemiBold',
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 28,
-    gap: 20,
+    paddingTop: 24,
+    paddingBottom: 32,
+    gap: 22,
   },
   heroCard: {
     flexDirection: 'row',
@@ -365,14 +503,14 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 21,
     fontFamily: 'Poppins_700Bold',
   },
   heroCopy: {
     color: 'rgba(255,255,255,0.85)',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     marginTop: 3,
   },
@@ -381,8 +519,8 @@ const styles = StyleSheet.create({
   },
   sectionEyebrow: {
     color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.6,
   },
@@ -420,14 +558,14 @@ const styles = StyleSheet.create({
   },
   selectorLabel: {
     color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
   },
   selectorValue: {
     color: '#1E293B',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: 'Poppins_600SemiBold',
     marginTop: 1,
   },
@@ -458,8 +596,8 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     color: '#1E293B',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
   },
   dropdownTextActive: {
@@ -493,14 +631,14 @@ const styles = StyleSheet.create({
   },
   vehicleInfoLabel: {
     color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
   },
   vehicleInfoValue: {
     color: '#1E293B',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_600SemiBold',
   },
   editVehicleButton: {
@@ -512,8 +650,8 @@ const styles = StyleSheet.create({
   },
   editVehicleText: {
     color: '#64748B',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_500Medium',
   },
   vehicleForm: {
@@ -528,8 +666,8 @@ const styles = StyleSheet.create({
   },
   noticeCopyWarning: {
     color: '#9A3412',
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
   },
   inputShell: {
@@ -555,8 +693,8 @@ const styles = StyleSheet.create({
   },
   inputValue: {
     color: '#1E293B',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: 'Poppins_400Regular',
     flex: 1,
   },
@@ -566,7 +704,7 @@ const styles = StyleSheet.create({
   inlineTextInput: {
     flex: 1,
     color: '#1E293B',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_400Regular',
     paddingVertical: 0,
   },
@@ -578,7 +716,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     color: '#1E293B',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_400Regular',
   },
   textFieldActive: {
@@ -593,8 +731,91 @@ const styles = StyleSheet.create({
   },
   noticeCopySuccess: {
     color: '#065F46',
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 20,
     fontFamily: 'Poppins_400Regular',
+  },
+  noticeCardInfo: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    padding: 12,
+  },
+  noticeCopyInfo: {
+    color: '#1D4ED8',
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15,23,42,0.42)',
+  },
+  modalBackdropPressable: {
+    flex: 1,
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 30,
+    gap: 14,
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+  },
+  modalTitle: {
+    color: '#1E293B',
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  modalOptionList: {
+    gap: 10,
+  },
+  modalOptionCard: {
+    minHeight: 62,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalOptionCardActive: {
+    backgroundColor: '#F0FDFA',
+    borderColor: '#0F766E',
+  },
+  modalOptionCopy: {
+    flex: 1,
+  },
+  modalOptionTitle: {
+    color: '#1E293B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_500Medium',
+  },
+  modalOptionTitleActive: {
+    color: '#0F766E',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  modalOptionDetail: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 2,
   },
 });

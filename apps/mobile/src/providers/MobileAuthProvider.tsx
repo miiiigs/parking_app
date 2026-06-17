@@ -5,10 +5,12 @@ import {
   clearCachedAuthUser,
   getCurrentGuestMode,
   getCurrentMobileSession,
+  requestMobilePhoneChange,
   sendPhoneVerificationCode,
   signInMobileUser,
   signOutMobileUser,
   signUpMobileUser,
+  verifyMobilePhoneChange,
   setCurrentGuestMode,
   updateMobileUserProfile,
   verifyPhoneVerificationCode,
@@ -23,6 +25,8 @@ type MobileAuthContextValue = {
   error: string | null;
   sendPhoneCode: (phone: string) => Promise<{ phone: string }>;
   verifyPhoneCode: (params: { phone: string; token: string }) => Promise<void>;
+  requestPhoneChange: (phone: string) => Promise<{ phone: string }>;
+  verifyPhoneChange: (params: { phone: string; token: string }) => Promise<void>;
   signInEmail: (email: string, password: string) => Promise<void>;
   signUpEmail: (params: { email: string; password: string; displayName?: string }) => Promise<{ requiresEmailConfirmation: boolean }>;
   updateProfile: (params: { displayName?: string }) => Promise<void>;
@@ -111,6 +115,23 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
     return { requiresEmailConfirmation: result.requiresEmailConfirmation };
   }, []);
 
+  const requestPhoneChange = React.useCallback(async (phone: string) => {
+    setError(null);
+    const normalizedPhone = await requestMobilePhoneChange(phone);
+    const nextSession = await getCurrentMobileSession();
+    setSession(nextSession);
+    setUser(nextSession?.user ?? user);
+    return { phone: normalizedPhone };
+  }, [user]);
+
+  const verifyPhoneChange = React.useCallback(async ({ phone, token }: { phone: string; token: string }) => {
+    setError(null);
+    await verifyMobilePhoneChange({ phone, token });
+    const nextSession = await getCurrentMobileSession();
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+  }, []);
+
   const updateProfile = React.useCallback(async (params: { displayName?: string }) => {
     setError(null);
     await updateMobileUserProfile(params);
@@ -147,6 +168,8 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
       error,
       sendPhoneCode,
       verifyPhoneCode,
+      requestPhoneChange,
+      verifyPhoneChange,
       signInEmail,
       signUpEmail,
       updateProfile,
@@ -154,7 +177,7 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
       signOut,
       clearError: () => setError(null),
     }),
-    [continueAsGuest, error, isGuest, isLoading, sendPhoneCode, session, signInEmail, signOut, signUpEmail, updateProfile, user, verifyPhoneCode],
+    [continueAsGuest, error, isGuest, isLoading, requestPhoneChange, sendPhoneCode, session, signInEmail, signOut, signUpEmail, updateProfile, user, verifyPhoneChange, verifyPhoneCode],
   );
 
   return <MobileAuthContext.Provider value={value}>{children}</MobileAuthContext.Provider>;

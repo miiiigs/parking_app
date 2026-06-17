@@ -25,7 +25,7 @@ function buildFallbackLots() {
 
 export function MobileParkingDataProvider({ children }: { children: React.ReactNode }) {
   const restoreWorkflow = useParkingFlowStore((state) => state.restoreWorkflow);
-  const [lots, setLots] = useState<ParkingLot[]>(buildFallbackLots());
+  const [lots, setLots] = useState<ParkingLot[]>([]);
   const [isLiveData, setIsLiveData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const isRefreshingRef = useRef(false);

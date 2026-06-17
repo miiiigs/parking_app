@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
@@ -12,7 +12,24 @@ export default function AuthLandingScreen() {
   const params = useLocalSearchParams<{ returnTo?: string }>();
   const auth = useMobileAuth();
   const [busyGuest, setBusyGuest] = useState(false);
-  const returnTo = getRouteParam(params.returnTo, '/home');
+  const requestedReturnTo = getRouteParam(params.returnTo);
+  const authReturnTo = requestedReturnTo ?? '/home';
+  const guestReturnTo = requestedReturnTo ?? '/guest';
+
+  useEffect(() => {
+    if (auth.isLoading) {
+      return;
+    }
+
+    if (auth.user) {
+      router.replace(authReturnTo as Parameters<typeof router.replace>[0]);
+      return;
+    }
+
+    if (auth.isGuest) {
+      router.replace(guestReturnTo as Parameters<typeof router.replace>[0]);
+    }
+  }, [auth.isGuest, auth.isLoading, auth.user, authReturnTo, guestReturnTo, router]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -32,12 +49,12 @@ export default function AuthLandingScreen() {
           <View style={styles.actions}>
             <AuthActionButton
               label="Log In"
-              onPress={() => router.push({ pathname: '/login', params: { returnTo } })}
+              onPress={() => router.push({ pathname: '/login', params: { returnTo: authReturnTo } })}
             />
             <AuthActionButton
               label="Register"
               variant="secondary"
-              onPress={() => router.push({ pathname: '/register', params: { returnTo } })}
+              onPress={() => router.push({ pathname: '/register', params: { returnTo: authReturnTo } })}
             />
             <AuthActionButton
               label="Continue as Guest"
@@ -47,7 +64,7 @@ export default function AuthLandingScreen() {
                 try {
                   setBusyGuest(true);
                   await auth.continueAsGuest();
-                  router.replace(returnTo as Parameters<typeof router.replace>[0]);
+                  router.replace(guestReturnTo as Parameters<typeof router.replace>[0]);
                 } finally {
                   setBusyGuest(false);
                 }
@@ -113,15 +130,15 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#1E293B',
-    fontSize: 26,
-    lineHeight: 31,
+    fontSize: 28,
+    lineHeight: 33,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: -0.3,
   },
   subtitle: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 23,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.04,
   },
@@ -142,9 +159,10 @@ const styles = StyleSheet.create({
   noticeCopy: {
     flex: 1,
     color: '#9A3412',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
   },
 });
+
