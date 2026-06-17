@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Car, Check, ChevronDown, ChevronLeft, Hash, Palette } from 'lucide-react-native';
+import { Car, Check, ChevronDown, Hash, Palette } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
-import { AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
 import { useWalkInPreferencesStore } from '../../parking/store/useWalkInPreferencesStore';
 
 const VEHICLE_MODELS = [
@@ -72,20 +72,13 @@ export default function EditVehicleScreen() {
           <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
               <View
                 style={[
-                  styles.header,
-                  {
-                    marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding,
-                  },
-                ]}
-              >
-              <View style={styles.headerLeading}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                  <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
-                </Pressable>
-                <AuthLogo height={28} />
-              </View>
-              <Text style={styles.headerTitle}>Vehicle Information</Text>
+                styles.header,
+                {
+                  marginHorizontal: -horizontalPadding,
+                },
+              ]}
+            >
+              <AppScreenHeader title="Vehicle Information" onBack={() => router.back()} />
             </View>
 
             <View style={styles.content}>
@@ -274,33 +267,7 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
-    gap: 14,
-  },
-  headerLeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 17,
-    lineHeight: 20,
-    fontFamily: 'Poppins_600SemiBold',
-  },
+  header: {},
   content: {
     gap: 20,
     paddingTop: 24,

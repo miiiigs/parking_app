@@ -4,7 +4,7 @@ import { AlertTriangle, Car, Clock, Zap } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { getRouteParam } from '../../auth/utils';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
@@ -109,9 +109,7 @@ export default function WalkInQrScreen() {
   return (
     <View style={styles.safeArea}>
       <View style={styles.header}>
-        <AuthLogo height={28} />
-        <Text style={styles.headerTitle}>Walk-In Entrance Pass</Text>
-        <View style={styles.headerSpacer} />
+        <AppScreenHeader title="Walk-In Entrance Pass" />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -232,26 +230,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAF9',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 17,
-    lineHeight: 21,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  headerSpacer: {
-    width: 28,
-  },
+  header: {},
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 22,

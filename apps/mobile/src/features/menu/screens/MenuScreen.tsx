@@ -28,7 +28,7 @@ import {
 import { BottomNav } from '../../../components/navigation/BottomNav';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
-import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { useWalkInPreferencesStore } from '../../parking/store/useWalkInPreferencesStore';
 
 type SectionId = 'profile' | 'wallet' | 'settings' | 'about';
@@ -131,17 +131,13 @@ export default function MenuScreen() {
             <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
               <View
                 style={[
-                  styles.header,
-                  {
-                    marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding,
-                  },
-                ]}
-              >
-                <View style={styles.headerRow}>
-                  <AuthLogo height={30} />
-                  <Text numberOfLines={1} style={styles.headerTitle}>Menu</Text>
-                </View>
+                styles.header,
+                {
+                  marginHorizontal: -horizontalPadding,
+                },
+              ]}
+            >
+                <AppScreenHeader title="Menu" />
               </View>
 
               <View style={styles.content}>
@@ -360,27 +356,7 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 19,
-    lineHeight: 24,
-    fontFamily: 'Poppins_600SemiBold',
-    flex: 1,
-    textAlign: 'right',
-  },
+  header: {},
   content: {
     gap: 16,
     paddingTop: 20,

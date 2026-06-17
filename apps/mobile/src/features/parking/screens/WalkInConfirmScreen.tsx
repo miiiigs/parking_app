@@ -95,7 +95,7 @@ export default function WalkInConfirmScreen() {
           <Pressable onPress={() => router.replace('/home')} style={styles.backButton}>
             <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
           </Pressable>
-          <AuthLogo height={26} />
+          <AuthLogo />
           <View style={styles.headerTitleBlock}>
             <Text numberOfLines={1} style={styles.headerLotTitle}>{lot.name}</Text>
             <View style={styles.headerAddressRow}>
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   headerTitleBlock: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 2,
   },
   headerLotTitle: {
@@ -421,6 +421,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'right',
   },
   headerAddressRow: {
     flexDirection: 'row',
@@ -433,6 +434,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
+    textAlign: 'right',
   },
   modeTabsSection: {
     backgroundColor: '#FFFFFF',

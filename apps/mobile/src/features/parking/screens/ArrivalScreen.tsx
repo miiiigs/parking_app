@@ -4,9 +4,10 @@ import { Check, Clock3, MapPin, Timer, X } from 'lucide-react-native';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { formatParkingPricingSummary } from '@parking/shared';
+import { formatTime } from '../../../utils/format';
 
 type ArrivalStage = 'qr' | 'grace' | 'cancelled';
 
@@ -17,6 +18,10 @@ function formatCountdown(totalSeconds: number) {
   const minutes = Math.floor(clamped / 60);
   const seconds = clamped % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatCurrency(amount: number) {
+  return `PHP ${amount.toFixed(2)}`;
 }
 
 export default function ArrivalScreen() {
@@ -82,6 +87,10 @@ export default function ArrivalScreen() {
   const cancellationCharge = reservationFee / 2;
   const releaseAmount = reservationFee - cancellationCharge;
   const isUrgent = remainingSeconds <= 120;
+  const reservationStartTime = formatTime(reservation.createdAt);
+  const reservationExpiryTime = reservation.expiresAt
+    ? formatTime(reservation.expiresAt)
+    : formatTime(new Date(new Date(reservation.createdAt).getTime() + reservation.arrivalWindowMinutes * 60 * 1000).toISOString());
 
   async function handleStartArrival() {
     setErrorMessage(null);
@@ -126,11 +135,7 @@ export default function ArrivalScreen() {
   if (stage === 'grace' && session) {
     return (
       <View style={styles.safeArea}>
-        <View style={styles.headerBar}>
-          <AuthLogo height={28} />
-          <Text style={styles.headerBarTitle}>Grace Period</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <AppScreenHeader title="Grace Period" />
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.graceBanner}>
@@ -212,48 +217,50 @@ export default function ArrivalScreen() {
           <Text style={styles.confirmHeaderCopy}>Your slot is secured and ready for arrival.</Text>
         </View>
 
-        <View style={styles.qrCard}>
-          <View style={styles.qrFrame}>
-            <QRCode value={entryQrValue} size={164} color="#1E293B" backgroundColor="#FFFFFF" />
+        <View style={styles.confirmContent}>
+          <View style={styles.qrCard}>
+            <View style={styles.qrFrame}>
+              <QRCode value={entryQrValue} size={164} color="#1E293B" backgroundColor="#FFFFFF" />
+            </View>
+            <View style={styles.qrCodeBadge}>
+              <Text style={styles.qrCodeBadgeText}>{reservation.reservationCode}</Text>
+            </View>
+            <Text style={styles.qrCaption}>Scan this QR code at the parking entrance to activate your session.</Text>
           </View>
-          <View style={styles.qrCodeBadge}>
-            <Text style={styles.qrCodeBadgeText}>{reservation.reservationCode}</Text>
+
+          <View style={styles.detailCard}>
+            <InfoRow label="Parking Lot" value={reservation.lotName} />
+            <InfoRow label="Parking Slot" value={reservation.slot.number} />
+            <InfoRow label="Reservation Window" value={`${reservation.arrivalWindowMinutes} min`} />
+            <InfoRow label="Start Time" value={reservationStartTime} />
+            <InfoRow label="Expiration Time" value={reservationExpiryTime} />
+            <InfoRow label="Reservation Fee" value={`${formatCurrency(reservationFee)} held`} valueTone="success" last />
           </View>
-          <Text style={styles.qrCaption}>Scan this QR code at the parking entrance to activate your session.</Text>
+
+          <View style={styles.noticeCardSuccess}>
+            <Text style={styles.noticeCopySuccess}>
+              No payment is collected here yet. Final billing continues through the mobile session flow.
+            </Text>
+          </View>
+
+          <View style={styles.noticeCardWarning}>
+            <Text style={styles.noticeCopyWarning}>
+              After scanning, you have 10 minutes to occupy your slot before it may be released.
+            </Text>
+          </View>
+
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+          <AuthActionButton
+            label={isSubmitting ? 'Activating...' : 'I Have Arrived - Scan QR'}
+            onPress={() => void handleStartArrival()}
+            loading={isSubmitting}
+          />
+
+          <Pressable onPress={() => setShowCancelModal(true)} style={styles.cancelButton}>
+            <Text style={styles.cancelButtonText}>Cancel Reservation</Text>
+          </Pressable>
         </View>
-
-        <View style={styles.detailCard}>
-          <InfoRow label="Parking Lot" value={reservation.lotName} />
-          <InfoRow label="Parking Slot" value={reservation.slot.number} />
-          <InfoRow label="Reservation Window" value={`${reservation.arrivalWindowMinutes} min`} />
-          <InfoRow label="Rate" value={formatParkingPricingSummary(reservation.pricingConfig)} />
-          <InfoRow label="Plate Number" value={reservation.plateNumber} />
-        </View>
-
-        <View style={styles.noticeCardSuccess}>
-          <Text style={styles.noticeCopySuccess}>
-            No payment is collected here yet. Final billing continues through the mobile session flow.
-          </Text>
-        </View>
-
-        <View style={styles.noticeCardWarning}>
-          <Text style={styles.noticeCopyWarning}>
-            After scanning, you have 10 minutes to occupy your slot before it may be released.
-          </Text>
-        </View>
-
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-        <AuthActionButton
-          label={isSubmitting ? 'Activating...' : 'I Have Arrived - Scan QR'}
-          onPress={() => void handleStartArrival()}
-          loading={isSubmitting}
-          style={styles.fullWidthButton}
-        />
-
-        <Pressable onPress={() => setShowCancelModal(true)} style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>Cancel Reservation</Text>
-        </Pressable>
       </ScrollView>
 
       <Modal animationType="slide" transparent visible={showCancelModal} onRequestClose={() => setShowCancelModal(false)}>
@@ -286,16 +293,18 @@ export default function ArrivalScreen() {
 }
 
 function InfoRow({
+  last = false,
   label,
   value,
   valueTone,
 }: {
+  last?: boolean;
   label: string;
   value: string;
   valueTone?: 'danger' | 'success';
 }) {
   return (
-    <View style={styles.infoRow}>
+    <View style={[styles.infoRow, !last ? styles.infoRowBorder : null]}>
       <Text style={styles.infoLabel}>{label}</Text>
       <Text
         style={[
@@ -324,10 +333,16 @@ const styles = StyleSheet.create({
   confirmScroll: {
     paddingBottom: 28,
   },
+  confirmContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 28,
+    gap: 14,
+  },
   confirmHeader: {
     alignItems: 'center',
     paddingTop: 24,
-    paddingBottom: 20,
+    paddingBottom: 18,
     backgroundColor: '#ECFDF5',
     borderBottomWidth: 1,
     borderBottomColor: '#A7F3D0',
@@ -355,15 +370,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   qrCard: {
-    marginHorizontal: 20,
-    marginTop: 20,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 18,
     shadowColor: '#0F172A',
     shadowOpacity: 0.05,
     shadowRadius: 12,
@@ -398,10 +411,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
   detailCard: {
-    marginHorizontal: 20,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -415,6 +427,8 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 13,
+  },
+  infoRowBorder: {
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
@@ -439,7 +453,6 @@ const styles = StyleSheet.create({
     color: '#16A34A',
   },
   noticeCardSuccess: {
-    marginHorizontal: 20,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#A7F3D0',
@@ -453,7 +466,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
   },
   noticeCardWarning: {
-    marginHorizontal: 20,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#FED7AA',
@@ -471,47 +483,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
-    marginHorizontal: 20,
   },
   fullWidthButton: {
-    marginHorizontal: 20,
+    width: '100%',
   },
   cancelButton: {
     height: 46,
-    marginHorizontal: 20,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#FECACA',
     backgroundColor: '#FEF2F2',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
   },
   cancelButtonText: {
     color: '#DC2626',
     fontSize: 15,
     lineHeight: 19,
     fontFamily: 'Poppins_500Medium',
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  headerBarTitle: {
-    color: '#1E293B',
-    fontSize: 17,
-    lineHeight: 21,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  headerSpacer: {
-    width: 28,
   },
   graceBanner: {
     flexDirection: 'row',

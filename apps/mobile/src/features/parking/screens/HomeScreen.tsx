@@ -174,7 +174,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingPage}>
           <View style={styles.loadingHeader}>
-            <AuthLogo height={32} />
+            <AuthLogo />
           </View>
           <View style={styles.loadingBody}>
             <ActivityIndicator size="small" color="#0F766E" />
@@ -209,7 +209,7 @@ export default function HomeScreen() {
               >
               <View style={styles.headerTopRow}>
                 <View style={styles.headerBrandRow}>
-                  <AuthLogo height={32} />
+                  <AuthLogo />
                   {isGuest ? <GuestBadge label="Guest" /> : null}
                 </View>
 
