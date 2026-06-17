@@ -1,11 +1,7 @@
 import { createClient, type AuthChangeEvent, type Session, type SupabaseClient, type User } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-import { getSupabaseConfigStatus } from './supabaseConfig';
-
-function getEnv() {
-  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
-}
+import { getResolvedSupabaseConfig, getSupabaseConfigStatus } from './supabaseConfig';
 
 let cachedClient: SupabaseClient | null = null;
 let cachedUser: User | null = null;
@@ -140,17 +136,14 @@ export function getSupabaseClient(): SupabaseClient | null {
     return cachedClient;
   }
 
-  const env = getEnv();
-  const configStatus = getSupabaseConfigStatus(env);
+  const resolvedConfig = getResolvedSupabaseConfig();
+  const configStatus = getSupabaseConfigStatus();
 
   if (!configStatus.isConfigured) {
     return null;
   }
 
-  const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL as string;
-  const supabaseAnonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
-
-  cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
+  cachedClient = createClient(resolvedConfig.supabaseUrl as string, resolvedConfig.supabaseAnonKey as string, {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: false,

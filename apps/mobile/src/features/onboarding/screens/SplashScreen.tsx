@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { AuthLogo } from '../../auth/components/AuthPrimitives';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
+import { colors } from '../../../theme/tokens';
 
 const DEFAULT_SPLASH_DURATION_MS = 2600;
 
@@ -26,6 +27,22 @@ export default function SplashScreen({
   const progressTrackWidth = useMemo(() => Math.min(Math.max(width - 96, 180), 280), [width]);
 
   useEffect(() => {
+    if (launchOnly) {
+      logoOpacity.setValue(1);
+      logoScale.setValue(1);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: durationMs,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          setIsProgressComplete(true);
+        }
+      });
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
@@ -50,7 +67,7 @@ export default function SplashScreen({
         setIsProgressComplete(true);
       }
     });
-  }, [durationMs, logoOpacity, logoScale, progress]);
+  }, [durationMs, launchOnly, logoOpacity, logoScale, progress]);
 
   useEffect(() => {
     if (launchOnly) {
@@ -100,7 +117,7 @@ export default function SplashScreen({
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
           </View>
-          {!launchOnly && auth.isLoading && isProgressComplete ? <Text style={styles.loadingCopy}>Loading your account...</Text> : null}
+          {auth.isLoading && isProgressComplete ? <Text style={styles.loadingCopy}>Loading your account...</Text> : null}
         </View>
       </View>
     </SafeAreaView>
@@ -110,13 +127,13 @@ export default function SplashScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.canvas,
   },
   root: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.canvas,
   },
   logoWrap: {
     alignItems: 'center',
@@ -132,16 +149,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 4,
     borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#D9E4DC',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#0F766E',
+    backgroundColor: colors.primary,
   },
   loadingCopy: {
-    color: '#94A3B8',
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 17,
     fontFamily: 'Poppins_400Regular',

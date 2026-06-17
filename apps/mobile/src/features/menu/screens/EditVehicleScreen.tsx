@@ -70,15 +70,15 @@ export default function EditVehicleScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
           <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View
-              style={[
-                styles.header,
-                {
-                  marginHorizontal: -horizontalPadding,
-                  paddingHorizontal: horizontalPadding + 16,
-                },
-              ]}
-            >
+              <View
+                style={[
+                  styles.header,
+                  {
+                    marginHorizontal: -horizontalPadding,
+                    paddingHorizontal: horizontalPadding,
+                  },
+                ]}
+              >
               <View style={styles.headerLeading}>
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                   <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />

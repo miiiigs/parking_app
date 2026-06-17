@@ -96,7 +96,7 @@ export default function PaymentMethodsScreen() {
                   styles.header,
                   {
                     marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding + 16,
+                    paddingHorizontal: horizontalPadding,
                   },
                 ]}
               >

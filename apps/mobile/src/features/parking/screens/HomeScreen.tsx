@@ -198,15 +198,15 @@ export default function HomeScreen() {
         >
           <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
             <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View
-              style={[
-                styles.headerShell,
-                {
-                  marginHorizontal: -horizontalPadding,
-                  paddingHorizontal: horizontalPadding + 20,
-                },
-              ]}
-            >
+              <View
+                style={[
+                  styles.headerShell,
+                  {
+                    marginHorizontal: -horizontalPadding,
+                    paddingHorizontal: horizontalPadding,
+                  },
+                ]}
+              >
               <View style={styles.headerTopRow}>
                 <View style={styles.headerBrandRow}>
                   <AuthLogo height={32} />

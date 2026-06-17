@@ -106,12 +106,14 @@ export default function SessionScreen() {
             style={[
               styles.header,
               {
-                paddingHorizontal: horizontalPadding + 20,
+                paddingHorizontal: horizontalPadding,
               },
             ]}
           >
-            <AuthLogo height={28} />
-            <Text style={styles.emptyHeaderTitle}>Active Session</Text>
+            <View style={styles.headerRow}>
+              <AuthLogo height={28} />
+              <Text numberOfLines={1} style={styles.emptyHeaderTitle}>Active Session</Text>
+            </View>
           </View>
 
           <View style={styles.emptyStateWrap}>
@@ -161,15 +163,20 @@ export default function SessionScreen() {
                   styles.header,
                   {
                     marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding + 20,
+                    paddingHorizontal: horizontalPadding,
                   },
                 ]}
               >
-                <View style={styles.activeBadgeRow}>
-                  <View style={styles.activeDot} />
-                  <Text style={styles.activeBadgeText}>ACTIVE SESSION</Text>
+                <View style={styles.headerRow}>
+                  <AuthLogo height={28} />
+                  <View style={styles.headerTitleWrap}>
+                    <View style={styles.activeBadgeRow}>
+                      <View style={styles.activeDot} />
+                      <Text numberOfLines={1} style={styles.activeBadgeText}>ACTIVE SESSION</Text>
+                    </View>
+                    <Text numberOfLines={1} style={styles.headerTitle}>Active Parking Session</Text>
+                  </View>
                 </View>
-                <Text style={styles.headerTitle}>Active Parking Session</Text>
               </View>
 
               <View style={styles.content}>
@@ -299,6 +306,17 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+  },
   activeBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -322,13 +340,15 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 30,
     fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'right',
   },
   emptyHeaderTitle: {
     color: '#1E293B',
     fontSize: 18,
     lineHeight: 23,
     fontFamily: 'Poppins_600SemiBold',
-    marginTop: 4,
+    flex: 1,
+    textAlign: 'right',
   },
   content: {
     gap: 16,

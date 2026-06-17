@@ -134,13 +134,14 @@ export default function MenuScreen() {
                   styles.header,
                   {
                     marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding + 20,
+                    paddingHorizontal: horizontalPadding,
                   },
                 ]}
               >
-                <AuthLogo height={30} />
-                <Text style={styles.headerTitle}>Menu</Text>
-                <View style={styles.headerSpacer} />
+                <View style={styles.headerRow}>
+                  <AuthLogo height={30} />
+                  <Text numberOfLines={1} style={styles.headerTitle}>Menu</Text>
+                </View>
               </View>
 
               <View style={styles.content}>
@@ -365,18 +366,20 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
     paddingTop: 20,
     paddingBottom: 16,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
   },
   headerTitle: {
     color: '#1E293B',
     fontSize: 19,
     lineHeight: 24,
     fontFamily: 'Poppins_600SemiBold',
-  },
-  headerSpacer: {
-    width: 30,
+    flex: 1,
+    textAlign: 'right',
   },
   content: {
     gap: 16,
