@@ -1,33 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { CheckCircle2, Clock3, CreditCard, QrCode } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
+import { Check } from 'lucide-react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Screen } from '../../../components/layout/Screen';
-import { QrPanel } from '../../../components/parking/QrPanel';
-import { AppButton } from '../../../components/ui/AppButton';
-import { DetailRow } from '../../../components/ui/DetailRow';
-import { StatusBadge } from '../../../components/ui/StatusBadge';
-import { SurfaceCard } from '../../../components/ui/SurfaceCard';
+import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
-import { colors, spacing, typography } from '../../../theme/tokens';
-import { formatDuration, formatTime } from '../../../utils/format';
-import { formatParkingPricingSummary } from '@parking/shared';
+import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 
-function formatCountdown(totalSeconds: number) {
-  if (totalSeconds <= 0) {
-    return 'Expired';
-  }
-
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m ${seconds}s`;
+function formatCurrency(amount: number) {
+  return `PHP ${amount.toFixed(2)}`;
 }
 
 export default function ExitScreen() {
   const router = useRouter();
+  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
-  const [remainingExitSeconds, setRemainingExitSeconds] = useState(0);
+  const paymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
 
   useEffect(() => {
     if (!completedSession) {
@@ -35,113 +24,244 @@ export default function ExitScreen() {
     }
   }, [completedSession, router]);
 
-  useEffect(() => {
-    if (!completedSession?.exitGraceEndsAt) {
-      setRemainingExitSeconds(0);
-      return;
-    }
-
-    const updateCountdown = () => {
-      const endsAtMs = new Date(completedSession.exitGraceEndsAt ?? '').getTime();
-      setRemainingExitSeconds(Math.max(0, Math.floor((endsAtMs - Date.now()) / 1000)));
-    };
-
-    updateCountdown();
-    const intervalId = setInterval(updateCountdown, 1000);
-    return () => clearInterval(intervalId);
-  }, [completedSession?.exitGraceEndsAt]);
-
   if (!completedSession) {
     return null;
   }
 
+  const isWalkIn = completedSession.reservationCode.startsWith('WIN-');
+  const totalPaid = completedSession.totalBill + (isWalkIn ? 0 : Number(completedSession.pricePerHour ?? 0));
+
   return (
-    <Screen>
-      <SurfaceCard style={styles.heroCard}>
-        <StatusBadge label="Payment successful" tone="success" />
-        <Text style={styles.heroTitle}>Exit is ready.</Text>
-        <Text style={styles.heroCopy}>Present this QR code at the barrier to complete departure.</Text>
-        {completedSession.exitGraceEndsAt ? (
-          <View style={styles.graceChip}>
-            <Clock3 stroke={colors.surface} size={16} />
-            <Text style={styles.graceChipText}>Exit grace: {formatCountdown(remainingExitSeconds)}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
+          <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
+            <View style={styles.heroHeader}>
+              <View style={styles.successBubble}>
+                <Check color="#FFFFFF" size={30} strokeWidth={2.8} />
+              </View>
+              <Text style={styles.successTitle}>Payment Successful</Text>
+              <Text style={styles.successCopy}>Your parking session is now complete</Text>
+            </View>
+
+            <View style={styles.content}>
+              <View style={styles.qrCard}>
+                <View style={styles.qrFrame}>
+                  <QRCode value={completedSession.exitCode} size={130} color="#0F766E" backgroundColor="#FFFFFF" />
+                </View>
+
+                <View style={styles.exitCodeBadge}>
+                  <Text style={styles.exitCodeText}>{completedSession.exitCode}</Text>
+                </View>
+
+                <View style={styles.noticeChip}>
+                  <Text style={styles.noticeChipText}>Present this QR code at the exit gate.</Text>
+                </View>
+              </View>
+
+              <View style={styles.ticketCard}>
+                <Text style={styles.ticketTitle}>Parking Ticket</Text>
+                <TicketRow label="Parking Lot" value={completedSession.lotName} />
+                <TicketRow label="Slot Number" value={completedSession.slot.number} />
+                <TicketRow label="Payment Method" value={paymentMethod ?? 'Mobile payment'} />
+                <TicketRow label="Total Paid" value={formatCurrency(totalPaid)} highlight last />
+              </View>
+
+              <Pressable onPress={() => router.replace('/receipt')} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>View Receipt</Text>
+              </Pressable>
+            </View>
           </View>
-        ) : null}
-      </SurfaceCard>
-
-      <QrPanel title="Exit QR code" caption="The exit token is tied to the paid session." code={completedSession.exitCode} />
-
-      <SurfaceCard>
-        <Text style={styles.sectionTitle}>Final ticket</Text>
-        <DetailRow label="Parking slot" value={completedSession.slot.number} icon={<QrCode stroke={colors.muted} size={16} />} />
-        <DetailRow label="Plate" value={completedSession.plateNumber} icon={<QrCode stroke={colors.muted} size={16} />} />
-        <DetailRow label="Rate" value={formatParkingPricingSummary(completedSession.pricingConfig)} icon={<CreditCard stroke={colors.muted} size={16} />} />
-        <DetailRow label="Entry" value={formatTime(completedSession.startTime)} icon={<CheckCircle2 stroke={colors.muted} size={16} />} />
-        <DetailRow label="Exit" value={formatTime(completedSession.endTime)} icon={<CheckCircle2 stroke={colors.muted} size={16} />} />
-        <DetailRow label="Duration" value={formatDuration(completedSession.durationSeconds)} icon={<CheckCircle2 stroke={colors.muted} size={16} />} />
-        <DetailRow label="Total paid" value={`PHP ${completedSession.totalBill.toFixed(2)}`} icon={<CreditCard stroke={colors.muted} size={16} />} />
-        {completedSession.exitGraceEndsAt ? (
-          <DetailRow label="Exit valid until" value={formatTime(completedSession.exitGraceEndsAt)} icon={<Clock3 stroke={colors.muted} size={16} />} />
-        ) : null}
-      </SurfaceCard>
-
-      <SurfaceCard>
-        <Text style={styles.sectionTitle}>What happens next</Text>
-        <View style={styles.stepList}>
-          <Text style={styles.stepCopy}>1. Drive to the exit gate.</Text>
-          <Text style={styles.stepCopy}>2. Scan the exit QR code.</Text>
-          <Text style={styles.stepCopy}>3. Open the official receipt after you leave the lot.</Text>
         </View>
-      </SurfaceCard>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
-      <AppButton label="I've exited - view receipt" onPress={() => router.replace('/receipt')} />
-    </Screen>
+function TicketRow({
+  highlight = false,
+  label,
+  last = false,
+  value,
+}: {
+  highlight?: boolean;
+  label: string;
+  last?: boolean;
+  value: string;
+}) {
+  return (
+    <View style={[styles.ticketRow, !last ? styles.ticketRowBorder : null]}>
+      <Text style={styles.ticketLabel}>{label}</Text>
+      <Text style={[styles.ticketValue, highlight ? styles.ticketValueHighlight : null]}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  heroCard: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FAFAF9',
   },
-  heroTitle: {
-    color: colors.surface,
-    fontSize: typography.title,
-    fontWeight: '800',
+  scrollContent: {
+    paddingBottom: 32,
   },
-  heroCopy: {
-    color: '#E7FFF5',
-    fontSize: typography.body,
-    lineHeight: 22,
+  inner: {
+    width: '100%',
+    alignItems: 'center',
   },
-  graceChip: {
-    marginTop: spacing.sm,
+  maxWidth: {
+    width: '100%',
+  },
+  heroHeader: {
+    alignItems: 'center',
+    paddingTop: 32,
+    paddingBottom: 24,
+    backgroundColor: '#D1FAE5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#A7F3D0',
+    marginHorizontal: -16,
+  },
+  successBubble: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#0F766E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F766E',
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+    marginBottom: 12,
+  },
+  successTitle: {
+    color: '#0F766E',
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: 'Poppins_700Bold',
+  },
+  successCopy: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 6,
+  },
+  content: {
+    gap: 16,
+    paddingTop: 20,
+  },
+  qrCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    padding: 20,
+  },
+  qrFrame: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+  },
+  exitCodeBadge: {
+    marginTop: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+    backgroundColor: '#F0FDFA',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  exitCodeText: {
+    color: '#0F766E',
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  noticeChip: {
+    marginTop: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  noticeChipText: {
+    color: '#1D4ED8',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
+  },
+  ticketCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  ticketTitle: {
+    color: '#1E293B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  ticketRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: spacing.xs,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  graceChipText: {
-    color: colors.surface,
-    fontSize: typography.caption,
-    fontWeight: '700',
+  ticketRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
   },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.section,
-    fontWeight: '700',
+  ticketLabel: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
   },
-  stepList: {
-    gap: spacing.sm,
+  ticketValue: {
+    color: '#1E293B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
+    textAlign: 'right',
+    flexShrink: 1,
   },
-  stepCopy: {
-    color: colors.text,
-    fontSize: typography.body,
-    lineHeight: 22,
+  ticketValueHighlight: {
+    color: '#0F766E',
+    fontFamily: 'Poppins_700Bold',
+  },
+  primaryButton: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#0F766E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F766E',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: 'Poppins_500Medium',
   },
 });
-

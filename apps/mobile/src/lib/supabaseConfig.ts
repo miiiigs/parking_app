@@ -3,15 +3,33 @@ export type SupabaseConfigStatus = {
   missingKeys: string[];
 };
 
-export function getSupabaseConfigStatus(env?: Record<string, string | undefined>): SupabaseConfigStatus {
-  const sourceEnv = env ?? ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {});
+type SupabaseEnv = Record<string, string | undefined>;
+
+function normalizeEnvValue(value: string | undefined) {
+  const trimmedValue = value?.trim();
+  return trimmedValue ? trimmedValue : undefined;
+}
+
+// Expo only inlines EXPO_PUBLIC_* values when they are referenced directly via process.env.KEY.
+const expoPublicSupabaseUrl = normalizeEnvValue(process.env.EXPO_PUBLIC_SUPABASE_URL);
+const expoPublicSupabaseAnonKey = normalizeEnvValue(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+
+export function getResolvedSupabaseConfig(env?: SupabaseEnv) {
+  return {
+    supabaseUrl: normalizeEnvValue(env?.EXPO_PUBLIC_SUPABASE_URL) ?? expoPublicSupabaseUrl,
+    supabaseAnonKey: normalizeEnvValue(env?.EXPO_PUBLIC_SUPABASE_ANON_KEY) ?? expoPublicSupabaseAnonKey,
+  };
+}
+
+export function getSupabaseConfigStatus(env?: SupabaseEnv): SupabaseConfigStatus {
+  const { supabaseUrl, supabaseAnonKey } = getResolvedSupabaseConfig(env);
   const missingKeys: string[] = [];
 
-  if (!sourceEnv.EXPO_PUBLIC_SUPABASE_URL) {
+  if (!supabaseUrl) {
     missingKeys.push('EXPO_PUBLIC_SUPABASE_URL');
   }
 
-  if (!sourceEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
+  if (!supabaseAnonKey) {
     missingKeys.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
   }
 

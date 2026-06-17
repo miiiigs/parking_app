@@ -1,46 +1,66 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { CreditCard, MapPin, Timer } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  Car,
+  Clock3,
+  MapPin,
+  Search,
+  Timer,
+  X,
+} from 'lucide-react-native';
+import {
+  Modal,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { BottomNav } from '../../../components/navigation/BottomNav';
-import { Screen } from '../../../components/layout/Screen';
-import { AppButton } from '../../../components/ui/AppButton';
-import { DetailRow } from '../../../components/ui/DetailRow';
-import { StatusBadge } from '../../../components/ui/StatusBadge';
-import { SurfaceCard } from '../../../components/ui/SurfaceCard';
-import { calculateBill } from '../lib/flow';
+import { useResponsiveMetrics } from '../../../hooks/useResponsive';
+import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
+import { formatParkingPricingSummary } from '@parking/shared';
+import { AuthLogo } from '../../auth/components/AuthPrimitives';
+import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
-import { colors, radius, spacing, typography } from '../../../theme/tokens';
-import { formatTime, formatTimer } from '../../../utils/format';
-import { calculateParkingCharge, formatParkingPricingSummary } from '@parking/shared';
+import { calculateBill } from '../lib/flow';
+import { formatTimer, formatTime } from '../../../utils/format';
+
+function formatCurrency(amount: number) {
+  return `PHP ${amount.toFixed(2)}`;
+}
 
 export default function SessionScreen() {
   const router = useRouter();
+  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { lots } = useMobileParkingData();
   const session = useParkingFlowStore((state) => state.session);
   const finishSession = useParkingFlowStore((state) => state.finishSession);
+  const savedVehicle = useWalkInPreferencesStore((state) => state.vehicle);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) {
-      router.replace('/home');
+      setElapsedSeconds(0);
       return;
     }
 
     const update = () => {
       const startTime = new Date(session.startTime).getTime();
-      const now = Date.now();
-      setElapsedSeconds(Math.max(0, Math.floor((now - startTime) / 1000)));
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startTime) / 1000)));
     };
 
     update();
     const intervalId = setInterval(update, 1000);
     return () => clearInterval(intervalId);
-  }, [router, session]);
+  }, [session]);
 
-  const currentBill = useMemo(() => {
+  const runningFee = useMemo(() => {
     if (!session) {
       return 0;
     }
@@ -48,147 +68,628 @@ export default function SessionScreen() {
     return calculateBill(elapsedSeconds, session.pricingConfig);
   }, [elapsedSeconds, session]);
 
-  const pricingQuote = useMemo(() => {
+  const isWalkIn = Boolean(session?.reservationCode.startsWith('WIN-'));
+  const reservationFee = !session || isWalkIn ? 0 : Number(session.pricePerHour ?? 0);
+  const estimatedTotal = runningFee + reservationFee;
+  const walkInLot = lots[0] ?? null;
+
+  const vehicleTitle = savedVehicle?.model ?? 'Registered vehicle';
+  const vehicleSubtitle = savedVehicle
+    ? `${savedVehicle.color} - ${savedVehicle.plate}`
+    : session
+      ? session.plateNumber
+      : '';
+
+  async function handleEndSession() {
     if (!session) {
-      return null;
+      return;
     }
 
-    return calculateParkingCharge(elapsedSeconds, session.pricingConfig);
-  }, [elapsedSeconds, session]);
-
-  if (!session) {
-    return null;
-  }
-
-  const handleEndSession = async () => {
-    setIsSubmitting(true);
-    setErrorMessage(null);
     try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
       await finishSession(elapsedSeconds);
-      router.replace('/exit');
+      setShowModal(false);
+      router.replace('/payment');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to settle the session right now.');
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
+
+  if (!session) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.page}>
+          <View
+            style={[
+              styles.header,
+              {
+                paddingHorizontal: horizontalPadding,
+              },
+            ]}
+          >
+            <View style={styles.headerRow}>
+              <AuthLogo height={28} />
+              <Text numberOfLines={1} style={styles.emptyHeaderTitle}>Active Session</Text>
+            </View>
+          </View>
+
+          <View style={styles.emptyStateWrap}>
+            <View style={styles.emptyCircle}>
+              <Car color="#A7F3D0" size={44} strokeWidth={1.9} />
+            </View>
+            <Text style={styles.emptyTitle}>No Active Session</Text>
+            <Text style={styles.emptyCopy}>
+              You don&apos;t have a parking session in progress. Reserve a slot or use Walk-In Parking to get started.
+            </Text>
+
+            <View style={styles.emptyActionGroup}>
+              <Pressable onPress={() => router.replace('/home')} style={styles.primaryAction}>
+                <Search color="#FFFFFF" size={17} strokeWidth={2.2} />
+                <Text style={styles.primaryActionText}>Find Parking</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (walkInLot) {
+                    router.push({ pathname: '/walkin-confirm', params: { lotId: walkInLot.id } });
+                    return;
+                  }
+                  router.replace('/home');
+                }}
+                style={styles.secondaryAction}
+              >
+                <Car color="#0F766E" size={17} strokeWidth={2.2} />
+                <Text style={styles.secondaryActionText}>Walk-In Parking</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <BottomNav activeTab="session" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.screenWrap}>
-        <Screen>
-          <SurfaceCard style={styles.timerCard}>
-            <StatusBadge label="Session in progress" tone="info" />
-            <View style={styles.timerBlock}>
-              <Timer stroke={colors.surface} size={44} />
-              <Text style={styles.timerValue}>{formatTimer(elapsedSeconds)}</Text>
-              <Text style={styles.timerCaption}>Started at {formatTime(session.startTime)}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.page}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
+            <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
+              <View
+                style={[
+                  styles.header,
+                  {
+                    marginHorizontal: -horizontalPadding,
+                    paddingHorizontal: horizontalPadding,
+                  },
+                ]}
+              >
+                <View style={styles.headerRow}>
+                  <AuthLogo height={28} />
+                  <View style={styles.headerTitleWrap}>
+                    <View style={styles.activeBadgeRow}>
+                      <View style={styles.activeDot} />
+                      <Text numberOfLines={1} style={styles.activeBadgeText}>ACTIVE SESSION</Text>
+                    </View>
+                    <Text numberOfLines={1} style={styles.headerTitle}>Active Parking Session</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.content}>
+                <View style={styles.timerCard}>
+                  <Text style={styles.timerEyebrow}>PARKING DURATION</Text>
+                  <Text style={styles.timerValue}>{formatTimer(elapsedSeconds)}</Text>
+                  <View style={styles.timerMetaRow}>
+                    <Clock3 color="rgba(255,255,255,0.7)" size={13} strokeWidth={2.2} />
+                    <Text style={styles.timerMetaText}>Started at {formatTime(session.startTime)}</Text>
+                  </View>
+                  <View style={styles.runningFeeChip}>
+                    <Text style={styles.runningFeeText}>Running fee: {formatCurrency(runningFee)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoCard}>
+                  <View style={styles.infoHeaderRow}>
+                    <MapPin color="#0F766E" size={16} strokeWidth={2.2} />
+                    <Text style={styles.infoHeaderTitle}>Location</Text>
+                  </View>
+                  <Text style={styles.infoPrimaryText}>{session.lotName}</Text>
+                  <Text style={styles.infoSecondaryText}>{session.address} · Slot {session.slot.number}</Text>
+                </View>
+
+                <View style={styles.infoCard}>
+                  <View style={styles.infoHeaderRow}>
+                    <Car color="#0F766E" size={16} strokeWidth={2.2} />
+                    <Text style={styles.infoHeaderTitle}>Vehicle</Text>
+                  </View>
+                  <View style={styles.vehicleRow}>
+                    <View style={styles.vehicleIconWrap}>
+                      <Car color="#0F766E" size={22} strokeWidth={2.2} />
+                    </View>
+                    <View style={styles.vehicleCopy}>
+                      <Text style={styles.vehicleTitle}>{vehicleTitle}</Text>
+                      <Text style={styles.vehicleSubtitle}>{vehicleSubtitle}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryTitle}>Fee Summary</Text>
+                  {!isWalkIn ? <FeeRow label="Reservation Fee" amount={formatCurrency(reservationFee)} /> : null}
+                  <FeeRow label="Parking Fee (running)" amount={formatCurrency(runningFee)} />
+                  <View style={styles.summaryTotalRow}>
+                    <Text style={styles.summaryTotalLabel}>Estimated Total</Text>
+                    <Text style={styles.summaryTotalValue}>{formatCurrency(estimatedTotal)}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.rateCopy}>{formatParkingPricingSummary(session.pricingConfig)}</Text>
+                {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+                <Pressable onPress={() => setShowModal(true)} style={styles.endButton}>
+                  <Text style={styles.endButtonText}>End Session & Pay</Text>
+                </Pressable>
+              </View>
             </View>
-          </SurfaceCard>
+          </View>
+        </ScrollView>
 
-          <SurfaceCard>
-            <Text style={styles.sectionTitle}>Current bill</Text>
-            <View style={styles.billPanel}>
-              <Text style={styles.billValue}>PHP {currentBill.toFixed(2)}</Text>
-              <Text style={styles.billCaption}>{pricingQuote?.currentTierLabel ?? 'Live parking rate'}</Text>
-            </View>
-            {pricingQuote && pricingQuote.graceRemainingSeconds > 0 ? (
-              <Text style={styles.graceCopy}>
-                Entry grace period active: {formatTimer(pricingQuote.graceRemainingSeconds)} remaining before billable minutes begin.
-              </Text>
-            ) : null}
-            <Text style={styles.settlementCopy}>The backend records the final settlement when you end the session.</Text>
-            <DetailRow label="Rate" value={formatParkingPricingSummary(session.pricingConfig)} icon={<CreditCard stroke={colors.muted} size={16} />} />
-            <DetailRow label="Slot" value={session.slot.number} icon={<MapPin stroke={colors.muted} size={16} />} />
-            <DetailRow label="Plate" value={session.plateNumber} icon={<MapPin stroke={colors.muted} size={16} />} />
-          </SurfaceCard>
-
-          <SurfaceCard>
-            <Text style={styles.sectionTitle}>Parking details</Text>
-            <Text style={styles.locationTitle}>{session.lotName}</Text>
-            <Text style={styles.locationCopy}>{session.address}</Text>
-          </SurfaceCard>
-
-          <AppButton label="Settle payment & end session" onPress={handleEndSession} variant="danger" loading={isSubmitting} />
-          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-        </Screen>
+        <BottomNav activeTab="session" />
       </View>
-      <BottomNav activeTab="session" />
+
+      <Modal animationType="slide" transparent visible={showModal} onRequestClose={() => setShowModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ready to End Your Session?</Text>
+              <Pressable onPress={() => setShowModal(false)} hitSlop={8}>
+                <X color="#94A3B8" size={20} strokeWidth={2.3} />
+              </Pressable>
+            </View>
+
+            <View style={styles.modalNotice}>
+              <Text style={styles.modalNoticeText}>
+                After ending your session, payment should be completed before exit. Your exit QR will appear on the next screen.
+              </Text>
+            </View>
+
+            <View style={styles.modalActionGroup}>
+              <Pressable onPress={() => void handleEndSession()} disabled={isSubmitting} style={styles.modalPrimaryButton}>
+                <Text style={styles.modalPrimaryButtonText}>{isSubmitting ? 'Processing...' : 'Continue'}</Text>
+              </Pressable>
+              <Pressable onPress={() => setShowModal(false)} disabled={isSubmitting} style={styles.modalSecondaryButton}>
+                <Text style={styles.modalSecondaryButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+function FeeRow({ label, amount }: { label: string; amount: string }) {
+  return (
+    <View style={styles.feeRow}>
+      <Text style={styles.feeLabel}>{label}</Text>
+      <Text style={styles.feeAmount}>{amount}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  safeArea: {
     flex: 1,
-    backgroundColor: colors.canvas,
+    backgroundColor: '#FAFAF9',
   },
-  screenWrap: {
+  page: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  inner: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  maxWidth: {
+    width: '100%',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+  },
+  activeBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34D399',
+  },
+  activeBadgeText: {
+    color: '#34D399',
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: 'Poppins_500Medium',
+  },
+  headerTitle: {
+    color: '#1E293B',
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'right',
+  },
+  emptyHeaderTitle: {
+    color: '#1E293B',
+    fontSize: 18,
+    lineHeight: 23,
+    fontFamily: 'Poppins_600SemiBold',
+    flex: 1,
+    textAlign: 'right',
+  },
+  content: {
+    gap: 16,
+    paddingTop: 20,
   },
   timerCard: {
-    backgroundColor: colors.primaryDark,
-    borderColor: colors.primaryDark,
-  },
-  timerBlock: {
+    borderRadius: 22,
+    backgroundColor: '#0F766E',
     alignItems: 'center',
-    gap: spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    shadowColor: '#0F766E',
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  timerEyebrow: {
+    color: 'rgba(255,255,255,0.76)',
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: 'Poppins_500Medium',
+    letterSpacing: 0.5,
   },
   timerValue: {
-    color: colors.surface,
-    fontSize: typography.hero,
-    fontWeight: '800',
-    letterSpacing: -1,
+    color: '#FFFFFF',
+    fontSize: 40,
+    lineHeight: 48,
+    fontFamily: 'Poppins_700Bold',
+    letterSpacing: 2,
+    marginTop: 8,
   },
-  timerCaption: {
-    color: '#D7F3E8',
-    fontSize: typography.body,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.section,
-    fontWeight: '700',
-  },
-  billPanel: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
+  timerMetaRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
+    marginTop: 4,
   },
-  billValue: {
-    color: colors.text,
-    fontSize: typography.hero,
-    fontWeight: '800',
-  },
-  billCaption: {
-    color: colors.muted,
-    fontSize: typography.caption,
-  },
-  settlementCopy: {
-    color: colors.muted,
-    fontSize: typography.caption,
+  timerMetaText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
     lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
   },
-  graceCopy: {
-    color: colors.primaryDark,
-    fontSize: typography.caption,
+  runningFeeChip: {
+    marginTop: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  runningFeeText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  infoCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+  },
+  infoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  infoHeaderTitle: {
+    color: '#0F766E',
+    fontSize: 14,
     lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
   },
-  locationTitle: {
-    color: colors.text,
-    fontSize: typography.section,
-    fontWeight: '700',
+  infoPrimaryText: {
+    color: '#1E293B',
+    fontSize: 16,
+    lineHeight: 21,
+    fontFamily: 'Poppins_600SemiBold',
   },
-  locationCopy: {
-    color: colors.muted,
-    fontSize: typography.body,
-    lineHeight: 22,
+  infoSecondaryText: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 2,
+  },
+  vehicleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  vehicleIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F0FDFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleCopy: {
+    flex: 1,
+  },
+  vehicleTitle: {
+    color: '#1E293B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  vehicleSubtitle: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 2,
+  },
+  summaryCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+  },
+  summaryTitle: {
+    color: '#1E293B',
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
+    marginBottom: 10,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  feeLabel: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+  },
+  feeAmount: {
+    color: '#1E293B',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
+  },
+  summaryTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  summaryTotalLabel: {
+    color: '#1E293B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  summaryTotalValue: {
+    color: '#0F766E',
+    fontSize: 18,
+    lineHeight: 23,
+    fontFamily: 'Poppins_700Bold',
+  },
+  rateCopy: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
   },
   errorText: {
-    color: colors.danger,
-    fontSize: typography.body,
+    color: '#DC2626',
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+  },
+  endButton: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#EF4444',
+    shadowOpacity: 0.26,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  endButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     lineHeight: 20,
+    fontFamily: 'Poppins_500Medium',
+  },
+  emptyStateWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 60,
+  },
+  emptyCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#F0FDFA',
+    borderWidth: 2,
+    borderColor: '#CCFBF1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyTitle: {
+    color: '#1E293B',
+    fontSize: 22,
+    lineHeight: 28,
+    fontFamily: 'Poppins_700Bold',
+    textAlign: 'center',
+  },
+  emptyCopy: {
+    color: '#64748B',
+    fontSize: 15,
+    lineHeight: 24,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 32,
+  },
+  emptyActionGroup: {
+    width: '100%',
+    gap: 12,
+  },
+  primaryAction: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#0F766E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
+  },
+  secondaryAction: {
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#0F766E',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryActionText: {
+    color: '#0F766E',
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 30,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    color: '#1E293B',
+    fontSize: 20,
+    lineHeight: 26,
+    fontFamily: 'Poppins_600SemiBold',
+    flex: 1,
+  },
+  modalNotice: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    backgroundColor: '#FFF7ED',
+    padding: 14,
+    marginBottom: 18,
+  },
+  modalNoticeText: {
+    color: '#9A3412',
+    fontSize: 14,
+    lineHeight: 21,
+    fontFamily: 'Poppins_400Regular',
+  },
+  modalActionGroup: {
+    gap: 12,
+  },
+  modalPrimaryButton: {
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
+  },
+  modalSecondaryButton: {
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryButtonText: {
+    color: '#64748B',
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: 'Poppins_500Medium',
   },
 });
-

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -81,6 +82,7 @@ export default function HomeScreen() {
   const featuredLot = filteredLots[0] ?? lots[0] ?? null;
   const isGuest = auth.isGuest;
   const requiresAuth = auth.isGuest || (!auth.user && !auth.isLoading);
+  const isInitialLoading = isLoading && lots.length === 0;
 
   const quickAction = session
     ? {
@@ -104,7 +106,7 @@ export default function HomeScreen() {
           ? {
               title: 'Walk-In Parking',
               copy: 'Already at the facility? Pay & park instantly',
-              onPress: () => router.push({ pathname: '/reservation/[lotId]', params: { lotId: featuredLot.id, mode: 'walkin' } }),
+              onPress: () => router.push({ pathname: '/walkin-confirm', params: { lotId: featuredLot.id } }),
             }
           : null;
 
@@ -167,6 +169,24 @@ export default function HomeScreen() {
 
   const authReturnTo = pendingLot ? `/reservation/${pendingLot.id}` : '/home';
 
+  if (isInitialLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingPage}>
+          <View style={styles.loadingHeader}>
+            <AuthLogo height={32} />
+          </View>
+          <View style={styles.loadingBody}>
+            <ActivityIndicator size="small" color="#0F766E" />
+            <Text style={styles.loadingTitle}>Loading parking data</Text>
+            <Text style={styles.loadingCopy}>Fetching live lot availability and layout.</Text>
+          </View>
+          <BottomNav activeTab="search" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.page}>
@@ -178,22 +198,22 @@ export default function HomeScreen() {
         >
           <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
             <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View
-              style={[
-                styles.headerShell,
-                {
-                  marginHorizontal: -horizontalPadding,
-                  paddingHorizontal: horizontalPadding + 20,
-                },
-              ]}
-            >
+              <View
+                style={[
+                  styles.headerShell,
+                  {
+                    marginHorizontal: -horizontalPadding,
+                    paddingHorizontal: horizontalPadding,
+                  },
+                ]}
+              >
               <View style={styles.headerTopRow}>
                 <View style={styles.headerBrandRow}>
                   <AuthLogo height={32} />
                   {isGuest ? <GuestBadge label="Guest" /> : null}
                 </View>
 
-                <Pressable onPress={() => setShowDrawer(true)} style={styles.headerIconButton} hitSlop={8}>
+                <Pressable onPress={() => router.push('/menu')} style={styles.headerIconButton} hitSlop={8}>
                   <Menu color="#1E293B" size={22} strokeWidth={2.2} />
                 </Pressable>
               </View>
@@ -290,7 +310,7 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <BottomNav activeTab="search" onMenuPress={() => setShowDrawer(true)} />
+        <BottomNav activeTab="search" />
       </View>
 
       <Modal animationType="fade" transparent visible={showDrawer} onRequestClose={() => setShowDrawer(false)}>
@@ -450,6 +470,39 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAF9',
   },
+  loadingPage: {
+    flex: 1,
+    backgroundColor: '#FAFAF9',
+  },
+  loadingHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 32,
+  },
+  loadingTitle: {
+    color: '#1E293B',
+    fontSize: 17,
+    lineHeight: 23,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+  },
+  loadingCopy: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
+  },
   scrollContent: {
     paddingBottom: 24,
   },
@@ -508,7 +561,7 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1,
-    height: 46,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -521,7 +574,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: '#1E293B',
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     paddingVertical: 0,
   },
@@ -544,8 +597,8 @@ const styles = StyleSheet.create({
   },
   filterEyebrow: {
     color: '#94A3B8',
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.6,
   },
@@ -602,14 +655,14 @@ const styles = StyleSheet.create({
   },
   walkInTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: 'Poppins_700Bold',
   },
   walkInCopy: {
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
   },
   resultsHeader: {
@@ -621,8 +674,8 @@ const styles = StyleSheet.create({
   },
   resultsCopy: {
     color: '#64748B',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     flex: 1,
   },
@@ -642,8 +695,8 @@ const styles = StyleSheet.create({
   },
   nearYouText: {
     color: '#0F766E',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     fontFamily: 'Poppins_500Medium',
   },
   dataModeBadge: {
@@ -658,8 +711,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7ED',
   },
   dataModeText: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 13,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.05,
   },
@@ -703,8 +756,8 @@ const styles = StyleSheet.create({
   },
   lotCardTitle: {
     color: '#1E293B',
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 21,
     fontFamily: 'Poppins_600SemiBold',
   },
   lotAddressRow: {
@@ -715,8 +768,8 @@ const styles = StyleSheet.create({
   },
   lotAddress: {
     color: '#64748B',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
     flex: 1,
   },
@@ -728,8 +781,8 @@ const styles = StyleSheet.create({
   },
   distanceBadgeText: {
     color: '#16A34A',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_600SemiBold',
   },
   metricCardsRow: {
@@ -744,7 +797,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     paddingHorizontal: 10,
     paddingVertical: 10,
-    minHeight: 74,
+    minHeight: 80,
     justifyContent: 'space-between',
   },
   metricLabelRow: {
@@ -755,14 +808,14 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: '#94A3B8',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: 'Poppins_400Regular',
   },
   metricLabelStandalone: {
     color: '#94A3B8',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: 'Poppins_400Regular',
     marginBottom: 4,
   },
@@ -773,22 +826,22 @@ const styles = StyleSheet.create({
     columnGap: 2,
   },
   metricValue: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 24,
     fontFamily: 'Poppins_700Bold',
     includeFontPadding: false,
   },
   metricValuePrice: {
     color: '#0F766E',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 24,
     fontFamily: 'Poppins_700Bold',
     includeFontPadding: false,
   },
   metricValueSuffix: {
     color: '#94A3B8',
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 11,
+    lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
     includeFontPadding: false,
   },
@@ -803,8 +856,8 @@ const styles = StyleSheet.create({
   },
   viewDetailsText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontFamily: 'Poppins_500Medium',
   },
   emptyCard: {
@@ -817,14 +870,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: '#1E293B',
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 22,
     fontFamily: 'Poppins_600SemiBold',
   },
   emptyCopy: {
     color: '#64748B',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
   },
   drawerBackdrop: {
@@ -856,8 +909,8 @@ const styles = StyleSheet.create({
   },
   drawerEyebrow: {
     color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.6,
     marginTop: 8,
@@ -890,14 +943,14 @@ const styles = StyleSheet.create({
   },
   drawerItemTitle: {
     color: '#1E293B',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
   },
   drawerItemSubtitle: {
     color: '#94A3B8',
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
     marginTop: 1,
   },
@@ -928,15 +981,15 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: '#1E293B',
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 23,
     textAlign: 'center',
     fontFamily: 'Poppins_600SemiBold',
   },
   modalCopy: {
     color: '#64748B',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     marginTop: 4,
@@ -953,8 +1006,8 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     color: '#64748B',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
   },
 });

@@ -2,7 +2,7 @@
   "name": "@parking/mobile",
   "private": true,
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "scripts": {
     "start": "expo start --clear",
     "android": "expo run:android",
@@ -10,6 +10,10 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --experimental-specifier-resolution=node --test tests/*.test.mjs",
+    "build:android:tester": "node ./scripts/android-build.mjs tester",
+    "build:android:tester:universal": "node ./scripts/android-build.mjs tester-universal",
+    "build:android:bundle": "node ./scripts/android-build.mjs production",
+    "build:android:apk": "eas build --platform android --profile apk",
     "build:android": "eas build --platform android --profile production",
     "build:ios": "eas build --platform ios --profile production"
   },
@@ -28,6 +32,7 @@
     "expo-router": "~4.0.22",
     "expo-secure-store": "~14.0.1",
     "expo-sharing": "~13.0.1",
+    "expo-splash-screen": "~0.29.24",
     "lucide-react-native": "^1.8.0",
     "react": "18.3.1",
     "react-native": "0.76.9",

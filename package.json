@@ -14,6 +14,9 @@
     "test": "npm run test:mobile",
     "android": "npm --workspace apps/mobile run android",
     "ios": "npm --workspace apps/mobile run ios",
+    "build:android:tester": "npm --workspace apps/mobile run build:android:tester",
+    "build:android:bundle": "npm --workspace apps/mobile run build:android:bundle",
+    "build:android:apk": "npm --workspace apps/mobile run build:android:apk",
     "build:android": "npm --workspace apps/mobile run build:android",
     "build:ios": "npm --workspace apps/mobile run build:ios",
     "typecheck:mobile": "npm --workspace apps/mobile run typecheck"

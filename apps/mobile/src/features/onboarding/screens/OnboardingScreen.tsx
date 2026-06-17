@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     color: '#64748B',
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins_500Medium',
     letterSpacing: 0.08,
   },
@@ -644,8 +644,8 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#1E293B',
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 30,
+    lineHeight: 36,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: -0.3,
     textAlign: 'center',
@@ -653,8 +653,8 @@ const styles = StyleSheet.create({
   description: {
     maxWidth: 300,
     color: '#64748B',
-    fontSize: 15,
-    lineHeight: 25,
+    fontSize: 16,
+    lineHeight: 27,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
     textAlign: 'center',
@@ -731,13 +731,13 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: colors.surface,
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: 'Poppins_500Medium',
     letterSpacing: 0.08,
   },
   signInCopy: {
     color: '#64748B',
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.04,
     textAlign: 'center',
@@ -812,7 +812,7 @@ const styles = StyleSheet.create({
   },
   pinText: {
     color: colors.primaryDark,
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.05,
   },
@@ -873,12 +873,12 @@ const styles = StyleSheet.create({
   },
   nearbyTitle: {
     color: '#1E293B',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Poppins_600SemiBold',
   },
   nearbyStatus: {
     color: '#34D399',
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Poppins_500Medium',
   },
   nearbyGrid: {
@@ -894,12 +894,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_700Bold',
   },
   statLabel: {
     color: '#64748B',
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'Poppins_500Medium',
     marginTop: 2,
     letterSpacing: 0.04,
@@ -914,13 +914,13 @@ const styles = StyleSheet.create({
   },
   reserveEyebrow: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.5,
   },
   reserveTitle: {
     color: colors.surface,
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
   },
   reserveLegend: {
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     color: 'rgba(255,255,255,0.86)',
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_500Medium',
   },
   reserveBody: {
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
   },
   laneText: {
     color: '#94A3B8',
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'Poppins_500Medium',
     letterSpacing: 0.04,
   },
@@ -976,7 +976,7 @@ const styles = StyleSheet.create({
   slotRowLabel: {
     width: 12,
     color: '#94A3B8',
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Poppins_600SemiBold',
   },
   slotGrid: {
@@ -993,12 +993,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   slotCardText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Poppins_700Bold',
   },
   slotCardTag: {
     color: colors.surface,
-    fontSize: 7,
+    fontSize: 8,
     fontFamily: 'Poppins_600SemiBold',
   },
   reserveFooterCard: {
@@ -1017,12 +1017,12 @@ const styles = StyleSheet.create({
   },
   reserveFooterTitle: {
     color: '#1E293B',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Poppins_600SemiBold',
   },
   reserveFooterCopy: {
     color: '#64748B',
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_400Regular',
     marginTop: 2,
   },
@@ -1034,7 +1034,7 @@ const styles = StyleSheet.create({
   },
   reserveFooterButtonText: {
     color: colors.surface,
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Poppins_600SemiBold',
   },
   successHeader: {
@@ -1060,13 +1060,13 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     color: '#0F766E',
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: 'Poppins_700Bold',
     letterSpacing: -0.1,
   },
   successCopy: {
     color: '#64748B',
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Poppins_400Regular',
     marginTop: 2,
   },
@@ -1102,7 +1102,7 @@ const styles = StyleSheet.create({
   },
   activeSlotBadgeText: {
     color: colors.surface,
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins_700Bold',
   },
   activeSlotTextBlock: {
@@ -1110,12 +1110,12 @@ const styles = StyleSheet.create({
   },
   activeSlotTitle: {
     color: '#1E293B',
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins_600SemiBold',
   },
   activeSlotSubtitle: {
     color: '#64748B',
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_400Regular',
     marginTop: 2,
   },
@@ -1127,7 +1127,7 @@ const styles = StyleSheet.create({
   },
   activePillText: {
     color: '#064E3B',
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: 'Poppins_700Bold',
     letterSpacing: 0.06,
   },
@@ -1148,12 +1148,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: '#94A3B8',
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_500Medium',
   },
   infoValue: {
     color: '#1E293B',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Poppins_600SemiBold',
   },
   currencyChip: {
@@ -1165,7 +1165,7 @@ const styles = StyleSheet.create({
   },
   currencyChipText: {
     color: colors.primaryDark,
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_700Bold',
   },
   accessCard: {
@@ -1183,7 +1183,7 @@ const styles = StyleSheet.create({
   },
   accessTitle: {
     color: colors.primaryDark,
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Poppins_600SemiBold',
   },
   barrierRow: {
@@ -1211,7 +1211,8 @@ const styles = StyleSheet.create({
   },
   accessCopy: {
     color: '#64748B',
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: 'Poppins_400Regular',
   },
 });
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CircleAlert, User } from 'lucide-react-native';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -18,6 +18,16 @@ export default function RegisterScreen() {
   const returnTo = getRouteParam(params.returnTo, '/home');
   const normalizedPhone = formatPhilippinePhoneE164(phone);
   const isValid = displayName.trim().length >= 2 && normalizedPhone.length === 13;
+
+  useEffect(() => {
+    if (auth.isLoading) {
+      return;
+    }
+
+    if (auth.user || auth.isGuest) {
+      router.replace(returnTo as Parameters<typeof router.replace>[0]);
+    }
+  }, [auth.isGuest, auth.isLoading, auth.user, returnTo, router]);
 
   const handleContinue = async () => {
     if (!isValid || busy) {
@@ -127,16 +137,16 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#1E293B',
-    fontSize: 24,
-    lineHeight: 29,
+    fontSize: 26,
+    lineHeight: 31,
     textAlign: 'center',
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: -0.28,
   },
   heroCopy: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
@@ -146,7 +156,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     color: '#374151',
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins_500Medium',
   },
   nameField: {
@@ -166,7 +176,7 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
     color: '#1E293B',
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Poppins_500Medium',
     paddingVertical: 0,
   },
@@ -185,15 +195,15 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.03,
   },
   infoCopy: {
     color: '#0F766E',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     marginTop: 3,
     opacity: 0.82,
@@ -201,15 +211,15 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#DC2626',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.02,
   },
   footerCopy: {
     color: '#64748B',
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     marginTop: 6,
@@ -220,3 +230,4 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
   },
 });
+

@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   heroCopy: {
     color: '#D7F3E8',
     fontSize: typography.body,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   segmentRow: {
     flexDirection: 'row',
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   guestCopy: {
     color: colors.muted,
     fontSize: typography.body,
-    lineHeight: 22,
+    lineHeight: 23,
     flex: 1,
   },
   backLink: {
@@ -317,3 +317,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

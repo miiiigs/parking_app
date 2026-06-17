@@ -30,6 +30,16 @@ export default function OtpScreen() {
   const inputs = useRef<Array<TextInput | null>>([]);
 
   useEffect(() => {
+    if (auth.isLoading) {
+      return;
+    }
+
+    if (auth.user || auth.isGuest) {
+      router.replace(returnTo as Parameters<typeof router.replace>[0]);
+    }
+  }, [auth.isGuest, auth.isLoading, auth.user, returnTo, router]);
+
+  useEffect(() => {
     if (!phone) {
       router.replace(mode === 'register' ? '/register' : '/login');
       return;
@@ -69,7 +79,12 @@ export default function OtpScreen() {
     try {
       setBusy(true);
       setErrorMessage(null);
-      await auth.verifyPhoneCode({ phone, token: digits.join('') });
+      if (mode === 'change-phone') {
+        await auth.verifyPhoneChange({ phone, token: digits.join('') });
+      } else {
+        await auth.verifyPhoneCode({ phone, token: digits.join('') });
+      }
+
       if (mode === 'register' && displayName.trim()) {
         await auth.updateProfile({ displayName: displayName.trim() });
       }
@@ -89,7 +104,11 @@ export default function OtpScreen() {
     try {
       setResending(true);
       setErrorMessage(null);
-      await auth.sendPhoneCode(phone);
+      if (mode === 'change-phone') {
+        await auth.requestPhoneChange(phone);
+      } else {
+        await auth.sendPhoneCode(phone);
+      }
       setDigits(['', '', '', '', '', '']);
       setTimer(60);
       inputs.current[0]?.focus();
@@ -199,16 +218,16 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#1E293B',
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 24,
+    lineHeight: 30,
     textAlign: 'center',
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: -0.2,
   },
   heroCopy: {
     color: '#64748B',
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 23,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
@@ -229,7 +248,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
     color: '#1E293B',
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Poppins_700Bold',
     letterSpacing: -0.25,
   },
@@ -252,8 +271,8 @@ const styles = StyleSheet.create({
   errorText: {
     alignSelf: 'stretch',
     color: '#DC2626',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.02,
   },
@@ -263,14 +282,14 @@ const styles = StyleSheet.create({
   },
   resendLink: {
     color: '#0F766E',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: 0.04,
   },
   resendCopy: {
     color: '#64748B',
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
   },
@@ -280,10 +299,11 @@ const styles = StyleSheet.create({
   },
   resendHint: {
     color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     fontFamily: 'Poppins_400Regular',
     letterSpacing: 0.03,
   },
 });
+
