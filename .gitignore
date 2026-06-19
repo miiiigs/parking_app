@@ -17,6 +17,7 @@ node_modules/
 **/build/
 **/coverage/
 **/*.tsbuildinfo
+.pnpm-store/
 
 # Logs and OS clutter
 *.log

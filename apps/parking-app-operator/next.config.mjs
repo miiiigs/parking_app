@@ -8,7 +8,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ['@parking/shared'],
   turbopack: {
     root: path.resolve(appDirectory, '../..'),
   },

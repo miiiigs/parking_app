@@ -175,6 +175,13 @@ Notes:
 
 ## Local Development
 
+From the operator app directory:
+
+```bash
+npm install
+npm run dev
+```
+
 From the repo root:
 
 ```bash
@@ -209,6 +216,13 @@ Tests live under:
 - [tests](./tests)
 
 ## Deployment Notes
+
+Recommended production deployment:
+
+1. set the Vercel project Root Directory to `apps/parking-app-operator`
+2. use the default install command: `npm install`
+3. use the default build command: `npm run build`
+4. do not override the package manager with custom pnpm commands
 
 For production deployment:
 
@@ -257,7 +271,6 @@ Reset actions are location-scoped and confirmed with preview summaries before ex
 
 ## Known Non-Blocking Issues
 
-- Next.js warns about multiple lockfiles because the repo root uses `package-lock.json` while this app also has `pnpm-lock.yaml`
 - test execution currently uses `node --test --experimental-strip-types`, which emits a Node experimental warning
 
 ## Next Production Items
