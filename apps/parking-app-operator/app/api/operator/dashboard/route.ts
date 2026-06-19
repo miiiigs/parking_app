@@ -21,6 +21,7 @@ import {
   type ParkingLotDefinition,
 } from '@/lib/parkingMap';
 import { normalizeParkingPricingConfig } from '@/lib/parkingPricing';
+import { DEFAULT_RESERVATION_PRICING, normalizeReservationPricingConfig } from '@parking/shared';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
 import { deriveReservationPaymentStatus, deriveReservationStatus } from '@/lib/operatorReservationStatus';
@@ -142,6 +143,7 @@ export async function GET(request: Request) {
       const payload = {
         location: null,
         locationPricing: null,
+        locationReservationPricing: null,
         parkingMap: { id: 'map-empty', name: 'Parking Map', totalSlots: 0, slots: [], layout: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
         reservations: [],
         sessions: [],
@@ -624,17 +626,27 @@ export async function GET(request: Request) {
     const locationPricing = normalizeParkingPricingConfig({
       mode: location.pricing_mode,
       flatRateAmount: location.flat_rate_amount,
-      fixedHourlyRate: location.fixed_hourly_rate,
-      firstPeriodHours: location.first_period_hours,
+      fixedRateAmount: location.fixed_rate_amount ?? location.fixed_hourly_rate,
+      fixedRateIntervalMinutes: location.fixed_rate_interval_minutes,
+      firstPeriodMinutes:
+        location.first_period_minutes
+        ?? (location.first_period_hours ? location.first_period_hours * 60 : undefined),
       firstPeriodRate: location.first_period_rate,
-      succeedingHourlyRate: location.succeeding_hourly_rate,
+      succeedingRateAmount: location.succeeding_rate_amount ?? location.succeeding_hourly_rate,
+      succeedingRateIntervalMinutes: location.succeeding_rate_interval_minutes,
       entryGraceMinutes: location.entry_grace_minutes,
       exitGraceMinutes: location.exit_grace_minutes,
+    });
+    const locationReservationPricing = normalizeReservationPricingConfig({
+      fee30Minutes: location.reservation_fee_30_minutes ?? DEFAULT_RESERVATION_PRICING.fee30Minutes,
+      fee60Minutes: location.reservation_fee_60_minutes ?? DEFAULT_RESERVATION_PRICING.fee60Minutes,
+      fee120Minutes: location.reservation_fee_120_minutes ?? DEFAULT_RESERVATION_PRICING.fee120Minutes,
     });
 
     const payload: OperatorDashboardData = {
       location,
       locationPricing,
+      locationReservationPricing,
       parkingMap,
       reservations,
       sessions,

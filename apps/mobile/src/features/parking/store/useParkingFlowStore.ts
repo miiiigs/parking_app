@@ -11,6 +11,7 @@ import {
   scheduleReservationReminderNotifications,
 } from '../../../lib/notifications';
 import {
+  cancelParkingReservation,
   createParkingReservation,
   endParkingSession,
   getCurrentMobileWorkflowState,
@@ -56,14 +57,17 @@ interface ParkingFlowState {
   validationQrToken: string;
   scheduledNotificationIds: string[];
   isRestoring: boolean;
+  hasHydrated: boolean;
   reserveSlot: (input: ReserveSlotInput) => Promise<Booking | null>;
   setReservationDraft: (draft: ReservationDraft) => void;
   clearReservationDraft: () => void;
   startSession: (slotQrToken?: string) => Promise<ParkingSession | null>;
   startWalkInSession: (input: StartWalkInSessionInput) => Promise<ParkingSession | null>;
   finishSession: (durationSeconds: number) => Promise<CompletedSession | null>;
+  cancelReservation: () => Promise<void>;
   restoreWorkflow: (lots: ParkingLot[]) => Promise<void>;
   setValidationQrToken: (value: string) => void;
+  setHasHydrated: (value: boolean) => void;
   resetFlow: () => Promise<void>;
 }
 
@@ -80,6 +84,7 @@ const initialState = {
   validationQrToken: '',
   scheduledNotificationIds: [] as string[],
   isRestoring: false,
+  hasHydrated: false,
 };
 
 function findResolvedSlot(lots: ParkingLot[], slotId: string | undefined | null, slotLabel?: string | null): ResolvedSlot | null {
@@ -122,6 +127,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
       },
       clearReservationDraft: () => {
         set({ reservationDraft: null });
+      },
+      setHasHydrated: (value: boolean) => {
+        set({ hasHydrated: value });
       },
       reserveSlot: async ({ lot, slot, arrivalWindowMinutes, plateNumber }) => {
         const booking = await createParkingReservation({
@@ -178,6 +186,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
                       expires_at: booking.expiresAt ?? booking.createdAt,
                       arrival_window_minutes: booking.arrivalWindowMinutes,
                       plate_number: booking.plateNumber,
+                      reservation_fee: booking.reservationFee,
                       pricing_config: booking.pricingConfig,
                     } satisfies ReservationResult)
                 : null,
@@ -261,6 +270,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
                       expires_at: booking.expiresAt ?? booking.createdAt,
                       arrival_window_minutes: booking.arrivalWindowMinutes,
                       plate_number: booking.plateNumber,
+                      reservation_fee: booking.reservationFee,
                     } satisfies ReservationResult)
                 : null,
               activeParkingSession: sessionRecords && sessionRecords.length > 0
@@ -277,7 +287,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
                     validated_at: session.validatedAt ?? session.startedAt ?? session.startTime,
                     ended_at: null,
                     plate_number: booking.plateNumber,
-                    reservation_fee: booking.pricePerHour,
+                    reservation_fee: booking.reservationFee,
                     billed_minutes: session.billedMinutes ?? null,
                     billed_amount: session.billedAmount ?? null,
                     payment_status: session.paymentStatus ?? null,
@@ -305,6 +315,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           slot,
           arrivalWindowMinutes: 0,
           plateNumber,
+          reservationFee: 0,
           pricePerHour: lot.pricePerHour,
           pricingConfig: lot.pricingConfig,
           qrToken: slot.qrToken ?? null,
@@ -389,6 +400,38 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
 
         await clearStoredWorkflowSnapshot();
         return completedSession;
+      },
+      cancelReservation: async () => {
+        const { booking, scheduledNotificationIds } = get();
+
+        if (!booking) {
+          return;
+        }
+
+        if (booking.reservationId && !booking.reservationCode.startsWith('WIN-')) {
+          await cancelParkingReservation({
+            reservationId: booking.reservationId,
+          });
+        }
+
+        if (booking.reservationId || booking.reservationCode) {
+          await cancelReservationNotifications(
+            booking.reservationId ?? booking.reservationCode,
+            scheduledNotificationIds,
+          );
+        }
+
+        set({
+          booking: null,
+          session: null,
+          completedSession: null,
+          reservationDraft: null,
+          validationQrToken: '',
+          scheduledNotificationIds: [],
+          isRestoring: false,
+        });
+
+        await clearStoredWorkflowSnapshot();
       },
       restoreWorkflow: async (lots) => {
         set({ isRestoring: true });
@@ -521,6 +564,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
     {
       name: '@parking/mobile-flow',
       storage: createJSONStorage(() => secureStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
       partialize: (state) => ({
         booking: state.booking,
         session: state.session,

@@ -21,9 +21,9 @@ import {
 import { BottomNav } from '../../../components/navigation/BottomNav';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
+import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
 import { formatParkingPricingSummary } from '@parking/shared';
 import { AuthLogo } from '../../auth/components/AuthPrimitives';
-import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { calculateBill } from '../lib/flow';
 import { formatTimer, formatTime } from '../../../utils/format';
@@ -36,10 +36,11 @@ export default function SessionScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const { lots } = useMobileParkingData();
+  const { selectedVehicle: savedVehicle } = useMobileVehicles();
   const session = useParkingFlowStore((state) => state.session);
   const finishSession = useParkingFlowStore((state) => state.finishSession);
-  const savedVehicle = useWalkInPreferencesStore((state) => state.vehicle);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [graceRemainingSeconds, setGraceRemainingSeconds] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -47,12 +48,16 @@ export default function SessionScreen() {
   useEffect(() => {
     if (!session) {
       setElapsedSeconds(0);
+      setGraceRemainingSeconds(0);
       return;
     }
 
     const update = () => {
       const startTime = new Date(session.startTime).getTime();
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startTime) / 1000)));
+      const rawElapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+      const graceSeconds = Math.max(0, session.pricingConfig.entryGraceMinutes) * 60;
+      setElapsedSeconds(rawElapsedSeconds);
+      setGraceRemainingSeconds(Math.max(0, graceSeconds - rawElapsedSeconds));
     };
 
     update();
@@ -68,10 +73,21 @@ export default function SessionScreen() {
     return calculateBill(elapsedSeconds, session.pricingConfig);
   }, [elapsedSeconds, session]);
 
+  const activeElapsedSeconds = useMemo(() => {
+    if (!session) {
+      return 0;
+    }
+
+    const graceSeconds = Math.max(0, session.pricingConfig.entryGraceMinutes) * 60;
+    return Math.max(0, elapsedSeconds - graceSeconds);
+  }, [elapsedSeconds, session]);
+
   const isWalkIn = Boolean(session?.reservationCode.startsWith('WIN-'));
-  const reservationFee = !session || isWalkIn ? 0 : Number(session.pricePerHour ?? 0);
+  const reservationFee = !session || isWalkIn ? 0 : Number(session.reservationFee ?? 0);
   const estimatedTotal = runningFee + reservationFee;
   const walkInLot = lots[0] ?? null;
+  const inEntryGracePeriod = graceRemainingSeconds > 0;
+  const pricingSummary = formatParkingPricingSummary(session?.pricingConfig);
 
   const vehicleTitle = savedVehicle?.model ?? 'Registered vehicle';
   const vehicleSubtitle = savedVehicle
@@ -181,15 +197,24 @@ export default function SessionScreen() {
 
               <View style={styles.content}>
                 <View style={styles.timerCard}>
-                  <Text style={styles.timerEyebrow}>PARKING DURATION</Text>
-                  <Text style={styles.timerValue}>{formatTimer(elapsedSeconds)}</Text>
+                  <Text style={styles.timerEyebrow}>{inEntryGracePeriod ? 'ENTRY GRACE PERIOD' : 'PARKING DURATION'}</Text>
+                  <Text style={styles.timerValue}>{formatTimer(inEntryGracePeriod ? graceRemainingSeconds : activeElapsedSeconds)}</Text>
                   <View style={styles.timerMetaRow}>
                     <Clock3 color="rgba(255,255,255,0.7)" size={13} strokeWidth={2.2} />
-                    <Text style={styles.timerMetaText}>Started at {formatTime(session.startTime)}</Text>
+                    <Text style={styles.timerMetaText}>
+                      {inEntryGracePeriod
+                        ? `Parking timer starts at ${formatTime(new Date(new Date(session.startTime).getTime() + Math.max(0, session.pricingConfig.entryGraceMinutes) * 60 * 1000).toISOString())}`
+                        : `Started at ${formatTime(session.startTime)}`}
+                    </Text>
                   </View>
                   <View style={styles.runningFeeChip}>
                     <Text style={styles.runningFeeText}>Running fee: {formatCurrency(runningFee)}</Text>
                   </View>
+                  {inEntryGracePeriod ? (
+                    <Text style={styles.timerHintText}>
+                      Your session is already active. Use this grace period to park before the visible parking timer begins.
+                    </Text>
+                  ) : null}
                 </View>
 
                 <View style={styles.infoCard}>
@@ -219,6 +244,7 @@ export default function SessionScreen() {
 
                 <View style={styles.summaryCard}>
                   <Text style={styles.summaryTitle}>Fee Summary</Text>
+                  <FeeRow label="Pricing model" amount={pricingSummary} />
                   {!isWalkIn ? <FeeRow label="Reservation Fee" amount={formatCurrency(reservationFee)} /> : null}
                   <FeeRow label="Parking Fee (running)" amount={formatCurrency(runningFee)} />
                   <View style={styles.summaryTotalRow}>
@@ -227,7 +253,7 @@ export default function SessionScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.rateCopy}>{formatParkingPricingSummary(session.pricingConfig)}</Text>
+                <Text style={styles.rateCopy}>{pricingSummary}</Text>
                 {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
                 <Pressable onPress={() => setShowModal(true)} style={styles.endButton}>
@@ -392,6 +418,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
+  },
+  timerHintText: {
+    marginTop: 12,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   runningFeeChip: {
     marginTop: 14,

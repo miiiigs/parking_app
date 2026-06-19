@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import { ChevronLeft, Phone } from 'lucide-react-native';
 
 import { colors, radius, spacing } from '../../../theme/tokens';
@@ -22,6 +23,13 @@ type AuthLogoProps = {
   size?: number;
   stacked?: boolean;
   showTagline?: boolean;
+  animated?: boolean;
+};
+
+type AppScreenHeaderProps = {
+  title: string;
+  onBack?: () => void;
+  rightAccessory?: ReactNode;
 };
 
 type AuthPhoneFieldProps = {
@@ -37,12 +45,48 @@ type AuthTextFieldProps = TextInputProps & {
   helper?: string;
 };
 
-export function AuthLogo({ height = 30, size = 80, stacked = false, showTagline = false }: AuthLogoProps) {
+const staticLogoSource = require('../../../../assets/branding/app-logo.png');
+const animatedLogoSource = require('../../../../assets/branding/app-logo-splash.gif');
+
+export const HEADER_LOGO_HEIGHT = 28;
+
+export function AuthLogo({
+  height = HEADER_LOGO_HEIGHT,
+  size = 80,
+  stacked = false,
+  showTagline = false,
+  animated = false,
+}: AuthLogoProps) {
+  const logoSource = animated ? animatedLogoSource : staticLogoSource;
+  const [animatedReady, setAnimatedReady] = useState(false);
+
+  useEffect(() => {
+    if (!animated) {
+      setAnimatedReady(false);
+    }
+  }, [animated]);
+
   if (stacked) {
     return (
       <View style={styles.logoStack}>
-        <View style={[styles.logoBadgeLarge, { width: size * 0.86, height: size * 0.86, borderRadius: size * 0.24 }]}>
-          <Text style={styles.logoBadgeLargeText}>P</Text>
+        <View style={[styles.logoStackMedia, { width: size, height: size }]}>
+          <Image source={staticLogoSource} style={{ width: size, height: size }} resizeMode="contain" />
+          {animated ? (
+            <Image
+              source={logoSource}
+              style={[
+                styles.animatedOverlay,
+                {
+                  width: size,
+                  height: size,
+                  opacity: animatedReady ? 1 : 0,
+                },
+              ]}
+              resizeMode="contain"
+              onLoad={() => setAnimatedReady(true)}
+              onError={() => setAnimatedReady(false)}
+            />
+          ) : null}
         </View>
         <Text style={styles.logoWordmarkLarge}>ParkingPH</Text>
         {showTagline ? <Text style={styles.logoTagline}>Smart Parking Made Easy</Text> : null}
@@ -52,26 +96,33 @@ export function AuthLogo({ height = 30, size = 80, stacked = false, showTagline 
 
   return (
     <View style={styles.logoInline}>
-      <View style={[styles.logoBadgeSmall, { width: height, height: height, borderRadius: height * 0.28 }]}>
-        <Text style={styles.logoBadgeSmallText}>P</Text>
-      </View>
+      <Image source={staticLogoSource} style={{ width: height, height }} resizeMode="contain" />
       <Text style={styles.logoWordmarkSmall}>ParkingPH</Text>
     </View>
   );
 }
 
-export function AuthHeaderBar({ title, onBack }: AuthHeaderBarProps) {
+export function AppScreenHeader({ title, onBack, rightAccessory }: AppScreenHeaderProps) {
   return (
     <View style={styles.headerBar}>
       <View style={styles.headerLeading}>
-        <Pressable onPress={onBack} hitSlop={8} style={styles.headerBackButton}>
-          <ChevronLeft color="#1E293B" size={24} strokeWidth={2.2} />
-        </Pressable>
-        <AuthLogo height={28} />
+        {onBack ? (
+          <Pressable onPress={onBack} hitSlop={8} style={styles.headerBackButton}>
+            <ChevronLeft color="#1E293B" size={24} strokeWidth={2.2} />
+          </Pressable>
+        ) : null}
+        <AuthLogo height={HEADER_LOGO_HEIGHT} />
       </View>
-      <Text style={styles.headerTitle}>{title}</Text>
+      <View style={styles.headerTitleWrap}>
+        <Text numberOfLines={1} style={styles.headerTitle}>{title}</Text>
+        {rightAccessory ? <View style={styles.headerAccessoryWrap}>{rightAccessory}</View> : null}
+      </View>
     </View>
   );
+}
+
+export function AuthHeaderBar({ title, onBack }: AuthHeaderBarProps) {
+  return <AppScreenHeader title={title} onBack={onBack} />;
 }
 
 export function AuthActionButton({
@@ -162,21 +213,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  logoBadgeLarge: {
-    backgroundColor: '#0F766E',
+  logoStackMedia: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0F766E',
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
+    backgroundColor: colors.canvas,
   },
-  logoBadgeLargeText: {
-    color: '#FFFFFF',
-    fontSize: 42,
-    fontFamily: 'Poppins_700Bold',
-    letterSpacing: -0.9,
+  animatedOverlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
   logoWordmarkLarge: {
     color: '#0F766E',
@@ -195,17 +240,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-  },
-  logoBadgeSmall: {
-    backgroundColor: '#0F766E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoBadgeSmallText: {
-    color: '#FFFFFF',
-    fontSize: 19,
-    fontFamily: 'Poppins_700Bold',
-    letterSpacing: -0.25,
   },
   logoWordmarkSmall: {
     color: '#0F766E',
@@ -230,6 +264,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   headerBackButton: {
     padding: 4,
   },
@@ -238,6 +278,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins_600SemiBold',
     letterSpacing: -0.08,
+    textAlign: 'right',
+  },
+  headerAccessoryWrap: {
+    alignItems: 'flex-end',
   },
   buttonBase: {
     height: 52,

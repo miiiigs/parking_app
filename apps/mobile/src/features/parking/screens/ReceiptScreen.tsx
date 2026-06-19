@@ -9,6 +9,8 @@ import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { formatDateTime, formatDuration } from '../../../utils/format';
+import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 function formatCurrency(amount: number) {
   return `PHP ${amount.toFixed(2)}`;
@@ -18,6 +20,7 @@ export default function ReceiptScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const resetFlow = useParkingFlowStore((state) => state.resetFlow);
   const paymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
   const receiptRef = useRef<View>(null);
@@ -25,18 +28,19 @@ export default function ReceiptScreen() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!completedSession) {
+    if (hasHydrated && !completedSession) {
       router.replace('/home');
     }
-  }, [completedSession, router]);
+  }, [completedSession, hasHydrated, router]);
 
-  if (!completedSession) {
+  if (!hasHydrated || !completedSession) {
     return null;
   }
 
   const isWalkIn = completedSession.reservationCode.startsWith('WIN-');
-  const reservationFee = isWalkIn ? 0 : Number(completedSession.pricePerHour ?? 0);
+  const reservationFee = isWalkIn ? 0 : Number(completedSession.reservationFee ?? 0);
   const totalPaid = completedSession.totalBill + reservationFee;
+  const pricingSummary = formatParkingPricingSummary(completedSession.pricingConfig);
 
   async function saveReceipt() {
     if (isWorking) {
@@ -92,14 +96,17 @@ export default function ReceiptScreen() {
                 styles.header,
                 {
                   marginHorizontal: -horizontalPadding,
-                  paddingHorizontal: horizontalPadding,
                 },
               ]}
             >
-              <Text style={styles.headerTitle}>Official Receipt</Text>
-              <Pressable onPress={() => void saveReceipt()} disabled={isWorking} style={styles.printButton}>
-                <Printer color="#0F766E" size={18} strokeWidth={2.2} />
-              </Pressable>
+              <AppScreenHeader
+                title="Official Receipt"
+                rightAccessory={
+                  <Pressable onPress={() => void saveReceipt()} disabled={isWorking} style={styles.printButton}>
+                    <Printer color="#0F766E" size={18} strokeWidth={2.2} />
+                  </Pressable>
+                }
+              />
             </View>
 
             <View style={styles.content}>
@@ -136,6 +143,7 @@ export default function ReceiptScreen() {
                 <View style={styles.dashedDivider} />
 
                 <View style={styles.receiptSection}>
+                  <ReceiptAmountRow label="Pricing Model" amount={pricingSummary} />
                   {!isWalkIn ? <ReceiptAmountRow label="Reservation Fee" amount={formatCurrency(reservationFee)} /> : null}
                   <ReceiptAmountRow label={`Parking Fee (${formatDuration(completedSession.durationSeconds)})`} amount={formatCurrency(completedSession.totalBill)} />
 
@@ -215,22 +223,7 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 18,
-    lineHeight: 23,
-    fontFamily: 'Poppins_600SemiBold',
-  },
+  header: {},
   printButton: {
     width: 36,
     height: 36,

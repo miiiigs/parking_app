@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Check, ChevronLeft, CreditCard, Smartphone } from 'lucide-react-native';
+import { Check, CreditCard, Smartphone } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
-import { AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { formatDuration } from '../../../utils/format';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 type PaymentMethodOption = {
   id: string;
@@ -25,6 +26,7 @@ export default function PaymentScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const wallets = usePaymentMethodsStore((state) => state.wallets);
   const cards = usePaymentMethodsStore((state) => state.cards);
   const savedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
@@ -60,10 +62,10 @@ export default function PaymentScreen() {
   const [selectedMethod, setSelectedMethod] = useState<string>(savedPaymentMethod ?? methodOptions[0]?.label ?? '');
 
   useEffect(() => {
-    if (!completedSession) {
+    if (hasHydrated && !completedSession) {
       router.replace('/home');
     }
-  }, [completedSession, router]);
+  }, [completedSession, hasHydrated, router]);
 
   useEffect(() => {
     if (!selectedMethod && methodOptions[0]) {
@@ -71,14 +73,15 @@ export default function PaymentScreen() {
     }
   }, [methodOptions, selectedMethod]);
 
-  if (!completedSession) {
+  if (!hasHydrated || !completedSession) {
     return null;
   }
 
   const isWalkIn = completedSession.reservationCode.startsWith('WIN-');
-  const reservationFee = isWalkIn ? 0 : Number(completedSession.pricePerHour ?? 0);
+  const reservationFee = isWalkIn ? 0 : Number(completedSession.reservationFee ?? 0);
   const parkingFee = completedSession.totalBill;
   const totalAmount = reservationFee + parkingFee;
+  const pricingSummary = formatParkingPricingSummary(completedSession.pricingConfig);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -90,17 +93,10 @@ export default function PaymentScreen() {
                 styles.header,
                 {
                   marginHorizontal: -horizontalPadding,
-                  paddingHorizontal: horizontalPadding,
                 },
               ]}
             >
-              <View style={styles.headerLeading}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                  <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
-                </Pressable>
-                <AuthLogo height={28} />
-              </View>
-              <Text style={styles.headerTitle}>Complete Payment</Text>
+              <AppScreenHeader title="Complete Payment" onBack={() => router.back()} />
             </View>
 
             <View style={styles.content}>
@@ -110,6 +106,7 @@ export default function PaymentScreen() {
                   <Text style={styles.breakdownMeta}>{formatDuration(completedSession.durationSeconds)}</Text>
                 </View>
 
+                <FeeRow label="Pricing model" amount={pricingSummary} />
                 <FeeRow label={`Parking Fee (${formatDuration(completedSession.durationSeconds)})`} amount={formatCurrency(parkingFee)} />
                 {!isWalkIn ? <FeeRow label="Reservation Fee" amount={formatCurrency(reservationFee)} /> : null}
 
@@ -189,33 +186,7 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
-    gap: 14,
-  },
-  headerLeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 18,
-    lineHeight: 23,
-    fontFamily: 'Poppins_600SemiBold',
-  },
+  header: {},
   content: {
     gap: 18,
     paddingTop: 20,

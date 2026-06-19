@@ -4,6 +4,7 @@
     "slug": "parkeasy-mobile",
     "scheme": "parkeasymobile",
     "version": "1.0.0",
+    "icon": "./assets/branding/app-logo.png",
     "orientation": "default",
     "userInterfaceStyle": "light",
     "platforms": [
@@ -13,7 +14,13 @@
     "plugins": [
       "expo-router",
       "expo-camera",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FAFAF9"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -23,7 +30,11 @@
       "bundleIdentifier": "com.parking.mobile"
     },
     "android": {
-      "package": "com.parking.mobile"
+      "package": "com.parking.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/branding/app-logo.png",
+        "backgroundColor": "#FFFFFF"
+      }
     }
   }
 }

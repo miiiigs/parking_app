@@ -15,9 +15,11 @@ import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text,
 
 import { ParkingLotLayoutMap } from '../../../components/parking/ParkingLotLayoutMap';
 import { ParkingMap } from '../../../components/parking/ParkingMap';
+import { VehiclePickerSheet } from '../../../components/parking/VehiclePickerSheet';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
-import { calculateParkingCharge, formatParkingPricingSummary } from '@parking/shared';
+import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
+import { formatParkingPricingSummary, getReservationFeeForWindow } from '@parking/shared';
 import { getRouteParam } from '../../auth/utils';
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
@@ -47,9 +49,9 @@ export default function ReservationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string; mode?: string }>();
   const auth = useMobileAuth();
+  const { vehicles, selectedVehicle, selectedVehicleId, selectVehicle } = useMobileVehicles();
   const { lots, isLoading } = useMobileParkingData();
   const storedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
-  const storedVehicle = useWalkInPreferencesStore((state) => state.vehicle);
   const setPaymentMethod = useWalkInPreferencesStore((state) => state.setPaymentMethod);
   const wallets = usePaymentMethodsStore((state) => state.wallets);
   const cards = usePaymentMethodsStore((state) => state.cards);
@@ -64,10 +66,11 @@ export default function ReservationScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
+  const [showVehicleSheet, setShowVehicleSheet] = useState(false);
   const lot = lots.find((entry) => entry.id === String(params.lotId ?? '')) ?? lots[0] ?? null;
   const lotId = lot?.id ?? null;
   const selectedSlotId = selectedSlot?.id ?? null;
-  const normalizedPlateNumber = (storedVehicle?.plate ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  const normalizedPlateNumber = (selectedVehicle?.plate ?? '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
   const requiresAuth = !auth.user || auth.isGuest;
   const currentExpandedHeight =
     mode === 'reserve'
@@ -81,14 +84,14 @@ export default function ReservationScreen() {
   const sheetVisible = Boolean(selectedSlot);
   const collapsedOffset = Math.max(0, currentExpandedHeight - SHEET_COLLAPSED_HEIGHT);
   const slotStatusLabel = selectedSlot?.status === 'available' || selectedSlot?.isAvailable ? 'Open now' : 'Unavailable';
-  const hourlyRateLabel = useMemo(() => (lot ? formatParkingPricingSummary(lot.pricingConfig) : 'PHP 0/hr'), [lot]);
+  const hourlyRateLabel = useMemo(() => (lot ? formatParkingPricingSummary(lot.pricingConfig) : 'PHP 0.00/hr'), [lot]);
   const displayHours = useMemo(() => getHoursLabel(lot), [lot]);
   const arrivalWindowOptions = useMemo(
     () =>
       arrivalWindows.map((minutes) => ({
         minutes,
         label: minutes === 30 ? '30 min' : minutes === 60 ? '1 Hour' : '2 Hours',
-        fee: lot ? calculateParkingCharge(minutes * 60, lot.pricingConfig).amount : 0,
+        fee: lot ? getReservationFeeForWindow(minutes, lot.reservationPricing) : 0,
       })),
     [lot],
   );
@@ -249,7 +252,7 @@ export default function ReservationScreen() {
           <Pressable onPress={() => router.replace('/home')} style={styles.backButton}>
             <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
           </Pressable>
-          <AuthLogo height={26} />
+          <AuthLogo />
           <View style={styles.headerTitleBlock}>
             <Text numberOfLines={1} style={styles.headerTitle}>{lot.name}</Text>
             <View style={styles.headerAddressRow}>
@@ -449,15 +452,38 @@ export default function ReservationScreen() {
                 <ChevronDown color="#94A3B8" size={16} strokeWidth={2.2} />
               </Pressable>
 
-              <Pressable onPress={() => router.push('/edit-vehicle')} style={[styles.selectorSummaryCard, styles.selectorSummaryCardActive]}>
+              <Pressable
+                onPress={() => setShowVehicleSheet(true)}
+                style={[
+                  styles.selectorSummaryCard,
+                  selectedVehicle ? styles.selectorSummaryCardActive : styles.selectorSummaryCardWarning,
+                ]}
+              >
                 <View style={styles.selectorSummaryLeading}>
-                  <View style={[styles.selectorSummaryIconWrap, styles.selectorSummaryIconWrapActive]}>
-                    <CarFront color="#0F766E" size={15} strokeWidth={2.2} />
+                  <View
+                    style={[
+                      styles.selectorSummaryIconWrap,
+                      selectedVehicle ? styles.selectorSummaryIconWrapActive : styles.selectorSummaryIconWrapWarning,
+                    ]}
+                  >
+                    <CarFront color={selectedVehicle ? '#0F766E' : '#F97316'} size={15} strokeWidth={2.2} />
                   </View>
                   <View style={styles.selectorSummaryCopy}>
                     <Text style={styles.selectorSummaryLabel}>Vehicle</Text>
-                    <Text numberOfLines={1} style={styles.selectorSummaryValueActive}>
-                      {storedVehicle ? storedVehicle.plate : 'Add vehicle'}
+                    <Text
+                      numberOfLines={1}
+                      style={selectedVehicle ? styles.selectorSummaryValueActive : styles.selectorSummaryValueWarning}
+                    >
+                      {selectedVehicle ? selectedVehicle.plate : 'Add vehicle'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.selectorSummaryMeta}>
+                      {selectedVehicle
+                        ? vehicles.length > 1
+                          ? `${vehicles.length} saved vehicles`
+                          : selectedVehicle.model
+                        : auth.user && !auth.isGuest
+                          ? 'Save one or more vehicles'
+                          : 'Stored on this device'}
                     </Text>
                   </View>
                 </View>
@@ -479,6 +505,17 @@ export default function ReservationScreen() {
 
             {mode === 'reserve' ? (
               <>
+                <View style={styles.walkInRateCard}>
+                  <Text style={styles.walkInRateLabel}>Parking Rate</Text>
+                  <Text style={styles.walkInRateValue}>{hourlyRateLabel}</Text>
+                  <View style={styles.walkInRateDivider} />
+                  <View style={styles.walkInRateRow}>
+                    <Text style={styles.walkInRateTitle}>Reservation hold</Text>
+                    <Text style={styles.walkInRateMeta}>
+                      PHP {selectedWindowOption?.fee.toFixed(2) ?? '0.00'}
+                    </Text>
+                  </View>
+                </View>
                 <Text style={styles.sectionEyebrow}>RESERVATION WINDOW</Text>
                 <View style={styles.windowGrid}>
                   {arrivalWindows.map((minutes) => {
@@ -593,6 +630,16 @@ export default function ReservationScreen() {
           </View>
         </View>
       </Modal>
+
+      <VehiclePickerSheet
+        visible={showVehicleSheet}
+        onClose={() => setShowVehicleSheet(false)}
+        vehicles={vehicles}
+        selectedVehicleId={selectedVehicleId}
+        onSelectVehicle={(vehicleId) => void selectVehicle(vehicleId)}
+        onAddAnother={() => router.push('/edit-vehicle?mode=new')}
+        onManageVehicles={() => router.push('/edit-vehicle')}
+      />
     </View>
   );
 }
@@ -681,7 +728,7 @@ const styles = StyleSheet.create({
   headerTitleBlock: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 2,
   },
   headerTitle: {
@@ -689,6 +736,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'right',
   },
   headerAddressRow: {
     flexDirection: 'row',
@@ -701,6 +749,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
+    textAlign: 'right',
   },
   modeTabsSection: {
     backgroundColor: '#FFFFFF',
@@ -1031,6 +1080,13 @@ const styles = StyleSheet.create({
   },
   selectorSummaryValueWarning: {
     color: '#F97316',
+  },
+  selectorSummaryMeta: {
+    marginTop: 2,
+    color: '#64748B',
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: 'Poppins_400Regular',
   },
   walkInRateCard: {
     borderRadius: 14,

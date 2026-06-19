@@ -28,8 +28,8 @@ import {
 import { BottomNav } from '../../../components/navigation/BottomNav';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
-import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
-import { useWalkInPreferencesStore } from '../../parking/store/useWalkInPreferencesStore';
+import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
+import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
 
 type SectionId = 'profile' | 'wallet' | 'settings' | 'about';
 
@@ -42,7 +42,7 @@ type SectionItem = {
 export default function MenuScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
-  const vehicle = useWalkInPreferencesStore((state) => state.vehicle);
+  const { vehicles, selectedVehicle: vehicle } = useMobileVehicles();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const [expanded, setExpanded] = useState<SectionId | null>('profile');
   const [notificationsOn, setNotificationsOn] = useState(true);
@@ -78,7 +78,7 @@ export default function MenuScreen() {
     { label: 'Change Phone Number', onPress: () => router.push('/change-phone') },
     {
       label: 'Vehicle Information',
-      sublabel: vehicle ? `${vehicle.model} · ${vehicle.plate}` : 'No saved vehicle yet',
+      sublabel: vehicle ? `${vehicle.model} - ${vehicle.plate}${vehicles.length > 1 ? ` (${vehicles.length} saved)` : ''}` : 'No saved vehicle yet',
       onPress: () => router.push('/edit-vehicle'),
     },
   ];
@@ -131,17 +131,13 @@ export default function MenuScreen() {
             <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
               <View
                 style={[
-                  styles.header,
-                  {
-                    marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding,
-                  },
-                ]}
-              >
-                <View style={styles.headerRow}>
-                  <AuthLogo height={30} />
-                  <Text numberOfLines={1} style={styles.headerTitle}>Menu</Text>
-                </View>
+                styles.header,
+                {
+                  marginHorizontal: -horizontalPadding,
+                },
+              ]}
+            >
+                <AppScreenHeader title="Menu" />
               </View>
 
               <View style={styles.content}>
@@ -360,27 +356,7 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 19,
-    lineHeight: 24,
-    fontFamily: 'Poppins_600SemiBold',
-    flex: 1,
-    textAlign: 'right',
-  },
+  header: {},
   content: {
     gap: 16,
     paddingTop: 20,

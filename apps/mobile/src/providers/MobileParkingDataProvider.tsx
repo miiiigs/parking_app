@@ -89,6 +89,8 @@ export function MobileParkingDataProvider({ children }: { children: React.ReactN
     if (supabase) {
       channel = supabase
         .channel('mobile-live-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, scheduleRefresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_lot_layouts' }, scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_slots' }, scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, scheduleRefresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'parking_sessions' }, scheduleRefresh)

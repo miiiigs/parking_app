@@ -8,12 +8,17 @@ create table if not exists locations (
   city text not null default 'Bonifacio Global City',
   pricing_mode text not null default 'fixed_rate' check (pricing_mode in ('flat_rate', 'fixed_rate', 'tiered')),
   flat_rate_amount numeric(10,2) not null default 50,
-  fixed_hourly_rate numeric(10,2) not null default 50,
-  first_period_hours integer not null default 3 check (first_period_hours >= 1),
+  fixed_rate_amount numeric(10,2) not null default 50,
+  fixed_rate_interval_minutes integer not null default 60 check (fixed_rate_interval_minutes >= 1 and fixed_rate_interval_minutes <= 1440),
+  first_period_minutes integer not null default 180 check (first_period_minutes >= 1 and first_period_minutes <= 1440),
   first_period_rate numeric(10,2) not null default 50,
-  succeeding_hourly_rate numeric(10,2) not null default 20,
+  succeeding_rate_amount numeric(10,2) not null default 20,
+  succeeding_rate_interval_minutes integer not null default 60 check (succeeding_rate_interval_minutes >= 1 and succeeding_rate_interval_minutes <= 1440),
   entry_grace_minutes integer not null default 15 check (entry_grace_minutes >= 0 and entry_grace_minutes <= 120),
   exit_grace_minutes integer not null default 15 check (exit_grace_minutes >= 0 and exit_grace_minutes <= 120),
+  reservation_fee_30_minutes numeric(10,2) not null default 25,
+  reservation_fee_60_minutes numeric(10,2) not null default 40,
+  reservation_fee_120_minutes numeric(10,2) not null default 60,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -75,6 +80,22 @@ create table if not exists payments (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists user_vehicles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  model text not null,
+  color text not null,
+  plate_number text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, plate_number)
+);
+
+create unique index if not exists user_vehicles_single_default_idx
+  on user_vehicles (user_id)
+  where is_default = true;
+
 create table if not exists operator_events (
   id uuid primary key default gen_random_uuid(),
   slot_id uuid references parking_slots(id) on delete set null,
@@ -91,6 +112,35 @@ language plpgsql
 as $$
 begin
   new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function normalize_user_vehicle_plate()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.model = trim(new.model);
+  new.color = trim(new.color);
+  new.plate_number = upper(regexp_replace(trim(new.plate_number), '[^A-Z0-9 -]', '', 'g'));
+  return new;
+end;
+$$;
+
+create or replace function clear_other_default_user_vehicles()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.is_default then
+    update user_vehicles
+    set is_default = false
+    where user_id = new.user_id
+      and id <> new.id
+      and is_default = true;
+  end if;
+
   return new;
 end;
 $$;
@@ -135,15 +185,17 @@ declare
   v_config jsonb := coalesce(p_pricing_config, '{}'::jsonb);
   v_mode text := coalesce(v_config->>'mode', 'fixed_rate');
   v_flat_rate numeric(10,2) := greatest(0, coalesce((v_config->>'flatRateAmount')::numeric, 50));
-  v_fixed_hourly_rate numeric(10,2) := greatest(0, coalesce((v_config->>'fixedHourlyRate')::numeric, 50));
-  v_first_period_hours integer := greatest(1, coalesce((v_config->>'firstPeriodHours')::integer, 3));
+  v_fixed_rate_amount numeric(10,2) := greatest(0, coalesce((v_config->>'fixedRateAmount')::numeric, (v_config->>'fixedHourlyRate')::numeric, 50));
+  v_fixed_rate_interval_minutes integer := greatest(1, coalesce((v_config->>'fixedRateIntervalMinutes')::integer, 60));
+  v_first_period_minutes integer := greatest(1, coalesce((v_config->>'firstPeriodMinutes')::integer, ((v_config->>'firstPeriodHours')::integer * 60), 180));
   v_first_period_rate numeric(10,2) := greatest(0, coalesce((v_config->>'firstPeriodRate')::numeric, 50));
-  v_succeeding_hourly_rate numeric(10,2) := greatest(0, coalesce((v_config->>'succeedingHourlyRate')::numeric, 20));
+  v_succeeding_rate_amount numeric(10,2) := greatest(0, coalesce((v_config->>'succeedingRateAmount')::numeric, (v_config->>'succeedingHourlyRate')::numeric, 20));
+  v_succeeding_rate_interval_minutes integer := greatest(1, coalesce((v_config->>'succeedingRateIntervalMinutes')::integer, 60));
   v_entry_grace_minutes integer := greatest(0, coalesce((v_config->>'entryGraceMinutes')::integer, 15));
   v_elapsed_minutes integer := greatest(0, coalesce(p_elapsed_minutes, 0));
   v_billable_minutes integer := greatest(0, v_elapsed_minutes - v_entry_grace_minutes);
   v_extra_minutes integer;
-  v_extra_hours integer;
+  v_extra_units integer;
   v_amount numeric(10,2);
 begin
   if v_mode = 'flat_rate' then
@@ -151,13 +203,13 @@ begin
   end if;
 
   if v_mode = 'tiered' then
-    v_extra_minutes := greatest(0, v_billable_minutes - (v_first_period_hours * 60));
-    v_extra_hours := case when v_extra_minutes > 0 then ceil(v_extra_minutes / 60.0)::integer else 0 end;
-    v_amount := v_first_period_rate + (v_extra_hours * v_succeeding_hourly_rate);
+    v_extra_minutes := greatest(0, v_billable_minutes - v_first_period_minutes);
+    v_extra_units := case when v_extra_minutes > 0 then ceil(v_extra_minutes / v_succeeding_rate_interval_minutes::numeric)::integer else 0 end;
+    v_amount := v_first_period_rate + (v_extra_units * v_succeeding_rate_amount);
     return round(v_amount, 2);
   end if;
 
-  v_amount := greatest(1, ceil(greatest(1, v_billable_minutes) / 60.0)::integer) * v_fixed_hourly_rate;
+  v_amount := greatest(1, ceil(greatest(1, v_billable_minutes) / v_fixed_rate_interval_minutes::numeric)::integer) * v_fixed_rate_amount;
   return round(v_amount, 2);
 end;
 $$;
@@ -170,11 +222,24 @@ create trigger set_payments_updated_at
 before update on payments
 for each row execute function set_updated_at();
 
+create trigger set_user_vehicles_updated_at
+before update on user_vehicles
+for each row execute function set_updated_at();
+
+create trigger normalize_user_vehicle_plate_before_write
+before insert or update on user_vehicles
+for each row execute function normalize_user_vehicle_plate();
+
+create trigger clear_other_default_user_vehicles_before_write
+before insert or update on user_vehicles
+for each row execute function clear_other_default_user_vehicles();
+
 alter table locations enable row level security;
 alter table parking_slots enable row level security;
 alter table reservations enable row level security;
 alter table parking_sessions enable row level security;
 alter table payments enable row level security;
+alter table user_vehicles enable row level security;
 alter table operator_events enable row level security;
 
 drop policy if exists locations_read_public on locations;
@@ -234,6 +299,31 @@ create policy payments_read_own on payments
     where reservations.id = payments.reservation_id
       and reservations.user_id = auth.uid()
   ));
+
+drop policy if exists user_vehicles_read_own on user_vehicles;
+create policy user_vehicles_read_own on user_vehicles
+  for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists user_vehicles_insert_own on user_vehicles;
+create policy user_vehicles_insert_own on user_vehicles
+  for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists user_vehicles_update_own on user_vehicles;
+create policy user_vehicles_update_own on user_vehicles
+  for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists user_vehicles_delete_own on user_vehicles;
+create policy user_vehicles_delete_own on user_vehicles
+  for delete
+  to authenticated
+  using (auth.uid() = user_id);
 
 drop policy if exists operator_events_admin_only on operator_events;
 create policy operator_events_admin_only on operator_events
@@ -316,10 +406,12 @@ begin
     jsonb_build_object(
       'mode', 'fixed_rate',
       'flatRateAmount', coalesce(v_reservation.parking_rate, 50),
-      'fixedHourlyRate', coalesce(v_reservation.parking_rate, 50),
-      'firstPeriodHours', 3,
+      'fixedRateAmount', coalesce(v_reservation.parking_rate, 50),
+      'fixedRateIntervalMinutes', 60,
+      'firstPeriodMinutes', 180,
       'firstPeriodRate', coalesce(v_reservation.parking_rate, 50),
-      'succeedingHourlyRate', 20,
+      'succeedingRateAmount', 20,
+      'succeedingRateIntervalMinutes', 60,
       'entryGraceMinutes', 15,
       'exitGraceMinutes', 15
     )

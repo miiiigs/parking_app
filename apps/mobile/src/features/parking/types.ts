@@ -1,5 +1,6 @@
 import type { ParkingLotDefinition } from '@parking/shared';
 import type { ParkingPricingConfig } from '@parking/shared';
+import type { ReservationPricingConfig } from '@parking/shared';
 
 export interface ParkingSlot {
   id: string;
@@ -21,6 +22,7 @@ export interface ParkingLot {
   distanceKm: number;
   pricePerHour: number;
   pricingConfig: ParkingPricingConfig;
+  reservationPricing: ReservationPricingConfig;
   features: string[];
   slots: ParkingSlot[];
   locationId?: string;
@@ -38,6 +40,7 @@ export interface Booking {
   slot: ParkingSlot;
   arrivalWindowMinutes: number;
   plateNumber: string;
+  reservationFee: number;
   pricePerHour: number;
   pricingConfig: ParkingPricingConfig;
   reservationStatus?: string;

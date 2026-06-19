@@ -2,8 +2,6 @@ const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 
 const projectRoot = __dirname;
-const workspaceRoot = path.resolve(projectRoot, '../..');
-const sharedPackageRoot = path.resolve(workspaceRoot, 'packages/shared');
 const gradlePluginRoot = path.resolve(
   projectRoot,
   '../../node_modules/@react-native/gradle-plugin'
@@ -15,16 +13,12 @@ const gradlePluginPattern = new RegExp(
 );
 
 const config = getDefaultConfig(projectRoot);
+const defaultBlockList = config.resolver.blockList;
 
-config.resolver.blockList = gradlePluginPattern;
-config.watchFolders = [sharedPackageRoot];
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
-];
-config.resolver.disableHierarchicalLookup = true;
-config.resolver.extraNodeModules = {
-  '@parking/shared': sharedPackageRoot,
-};
+// Keep Expo's workspace-aware defaults intact and only exclude the Gradle plugin
+// sources from Metro's file graph.
+config.resolver.blockList = new RegExp(
+  `${defaultBlockList.source}|${gradlePluginPattern.source}`
+);
 
 module.exports = config;

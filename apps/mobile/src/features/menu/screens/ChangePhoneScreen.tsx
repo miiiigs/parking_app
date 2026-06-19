@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Phone } from 'lucide-react-native';
+import { Phone } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
 import { extractPhoneDigits, formatPhoneInput, formatPhilippinePhoneDisplay, formatPhilippinePhoneE164 } from '../../auth/utils';
-import { AuthLogo } from '../../auth/components/AuthPrimitives';
+import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
 
 export default function ChangePhoneScreen() {
   const router = useRouter();
@@ -60,20 +60,13 @@ export default function ChangePhoneScreen() {
           <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
               <View
                 style={[
-                  styles.header,
-                  {
-                    marginHorizontal: -horizontalPadding,
-                    paddingHorizontal: horizontalPadding,
-                  },
-                ]}
-              >
-              <View style={styles.headerLeading}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                  <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
-                </Pressable>
-                <AuthLogo height={28} />
-              </View>
-              <Text style={styles.headerTitle}>Change Phone Number</Text>
+                styles.header,
+                {
+                  marginHorizontal: -horizontalPadding,
+                },
+              ]}
+            >
+              <AppScreenHeader title="Change Phone Number" onBack={() => router.back()} />
             </View>
 
             <View style={styles.content}>
@@ -134,33 +127,7 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
-    gap: 14,
-  },
-  headerLeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: '#1E293B',
-    fontSize: 17,
-    lineHeight: 20,
-    fontFamily: 'Poppins_600SemiBold',
-  },
+  header: {},
   content: {
     gap: 20,
     paddingTop: 24,

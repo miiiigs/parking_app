@@ -11,6 +11,7 @@ import { LocationSwitcher } from './location-switcher';
 import {
   BarChart3,
   Clock,
+  CreditCard,
   Eye,
   Map,
   Zap,
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
   { name: 'Parking Map', href: '/dashboard/map', icon: Map, capability: 'view-parking-map' as const },
   { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap, capability: 'edit-map-layout' as const },
+  { name: 'Parking Setup', href: '/dashboard/parking-setup', icon: CreditCard, capability: 'manage-pricing' as const },
   { name: 'Admin Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
 ];
 
