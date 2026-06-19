@@ -20,8 +20,11 @@ import {
   buildParkingLotDefinitionFromSlots,
   type ParkingLotDefinition,
 } from '@/lib/parkingMap';
-import { normalizeParkingPricingConfig } from '@/lib/parkingPricing';
-import { DEFAULT_RESERVATION_PRICING, normalizeReservationPricingConfig } from '@parking/shared';
+import {
+  DEFAULT_RESERVATION_PRICING,
+  normalizeParkingPricingConfig,
+  normalizeReservationPricingConfig,
+} from '@/lib/parkingPricing';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
 import { deriveReservationPaymentStatus, deriveReservationStatus } from '@/lib/operatorReservationStatus';

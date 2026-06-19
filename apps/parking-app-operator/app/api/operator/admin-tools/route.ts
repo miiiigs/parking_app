@@ -4,11 +4,16 @@ import { resolveOperatorLocationContext } from '@/lib/operatorLocationServer';
 import { formatRouteValidationIssues, operatorAdminToolsRouteRequestSchema } from '@/lib/operatorRouteSchemas';
 import { getCurrentOperatorUser } from '@/lib/operatorAuth';
 import { hasOperatorCapability } from '@/lib/operatorPermissions';
-import { formatParkingPricingSummary, normalizeParkingPricingConfig } from '@/lib/parkingPricing';
+import {
+  DEFAULT_RESERVATION_PRICING,
+  formatParkingPricingSummary,
+  formatReservationPricingSummary,
+  normalizeParkingPricingConfig,
+  normalizeReservationPricingConfig,
+} from '@/lib/parkingPricing';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 import { findIdempotentOperatorEvent } from '@/lib/operatorIdempotency';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
-import { DEFAULT_RESERVATION_PRICING, formatReservationPricingSummary, normalizeReservationPricingConfig } from '@parking/shared';
 
 function getHeaders(serviceRoleKey: string) {
   return {
