@@ -1,28 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Car, ChevronDown, ChevronLeft, Check, CreditCard, Hash, MapPin, Palette, Zap } from 'lucide-react-native';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Car, ChevronDown, ChevronLeft, Check, CreditCard, MapPin, Zap } from 'lucide-react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
 import { getRouteParam } from '../../auth/utils';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
+import { VehiclePickerSheet } from '../../../components/parking/VehiclePickerSheet';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
+import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
-
-const VEHICLE_MODELS = [
-  'Toyota Vios', 'Toyota Innova', 'Toyota Fortuner', 'Honda Civic', 'Honda City', 'Honda CR-V',
-  'Mitsubishi Xpander', 'Mitsubishi Montero Sport', 'Ford Everest', 'Ford Ranger', 'Nissan Navara', 'Others',
-];
-const COLORS = ['Pearl White', 'Metallic Silver', 'Jet Black', 'Midnight Blue', 'Red', 'Gray', 'Beige / Cream', 'Green', 'Others'];
+import { formatParkingPricingSummary } from '@parking/shared';
 
 export default function WalkInConfirmScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string; slotId?: string }>();
   const { lots } = useMobileParkingData();
+  const { vehicles, selectedVehicle, selectedVehicleId, selectVehicle } = useMobileVehicles();
   const storedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
-  const storedVehicle = useWalkInPreferencesStore((state) => state.vehicle);
   const setPaymentMethod = useWalkInPreferencesStore((state) => state.setPaymentMethod);
-  const setVehicle = useWalkInPreferencesStore((state) => state.setVehicle);
   const wallets = usePaymentMethodsStore((state) => state.wallets);
   const cards = usePaymentMethodsStore((state) => state.cards);
   const lotId = getRouteParam(params.lotId);
@@ -30,15 +26,9 @@ export default function WalkInConfirmScreen() {
   const lot = lots.find((entry) => entry.id === lotId) ?? null;
   const slot = lot?.slots.find((entry) => entry.id === slotId) ?? null;
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
-  const [colorOpen, setColorOpen] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState(!storedVehicle);
-  const [selectedModel, setSelectedModel] = useState(storedVehicle?.model ?? '');
-  const [selectedColor, setSelectedColor] = useState(storedVehicle?.color ?? '');
-  const [plateNumber, setPlateNumber] = useState(storedVehicle?.plate ?? '');
-  const [customModel, setCustomModel] = useState('');
-  const [customColor, setCustomColor] = useState('');
+  const [showVehicleSheet, setShowVehicleSheet] = useState(false);
   const hasSelectedSlot = Boolean(slot);
+  const parkingRateSummary = useMemo(() => (lot ? formatParkingPricingSummary(lot.pricingConfig) : 'PHP 0.00/hr'), [lot]);
 
   useEffect(() => {
     if (!lot) {
@@ -46,13 +36,15 @@ export default function WalkInConfirmScreen() {
     }
   }, [lot, router]);
 
-  const displayModel = selectedModel === 'Others' ? customModel : selectedModel;
-  const displayColor = selectedColor === 'Others' ? customColor : selectedColor;
-  const normalizedPlate = plateNumber.toUpperCase().replace(/[^A-Z0-9- ]/g, '');
-  const vehicleValid = displayModel.trim().length >= 2 && displayColor.trim().length >= 2 && normalizedPlate.trim().length >= 3;
-  const canProceed = hasSelectedSlot && Boolean(storedPaymentMethod) && (!editingVehicle || vehicleValid);
+  const canProceed = hasSelectedSlot && Boolean(storedPaymentMethod) && Boolean(selectedVehicle);
 
   const selectedPaymentLabel = useMemo(() => storedPaymentMethod ?? 'Tap to select', [storedPaymentMethod]);
+  const selectedVehicleLabel = selectedVehicle?.plate ?? 'Tap to choose';
+  const selectedVehicleMeta = selectedVehicle
+    ? `${selectedVehicle.model} - ${selectedVehicle.color}${vehicles.length > 1 ? ` - ${vehicles.length} saved` : ''}`
+    : vehicles.length > 0
+      ? `${vehicles.length} saved vehicle${vehicles.length > 1 ? 's' : ''}`
+      : 'Add your vehicle details';
   const paymentOptions = useMemo(() => {
     const cardOptions = cards.map((card) => ({
       id: `card-${card.id}`,
@@ -162,113 +154,39 @@ export default function WalkInConfirmScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>VEHICLE INFORMATION</Text>
-
-          {!editingVehicle && storedVehicle ? (
-            <View style={styles.savedVehicleCard}>
-              <VehicleInfoRow label="Model" value={storedVehicle.model} />
-              <VehicleInfoRow label="Color" value={storedVehicle.color} />
-              <VehicleInfoRow label="Plate" value={storedVehicle.plate} />
-              <Pressable onPress={() => setEditingVehicle(true)} style={styles.editVehicleButton}>
-                <Text style={styles.editVehicleText}>Use a different vehicle</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.vehicleForm}>
-              {!storedVehicle ? (
-                <View style={styles.noticeCardWarning}>
-                  <Text style={styles.noticeCopyWarning}>
-                    No vehicle is saved yet. Add your vehicle details to continue. This will stay available for future walk-in sessions.
-                  </Text>
-                </View>
-              ) : null}
-
-              <Pressable
-                onPress={() => {
-                  setModelOpen((value) => !value);
-                  setColorOpen(false);
-                }}
-                style={[styles.inputShell, selectedModel ? styles.inputShellActive : null]}
+          <Pressable onPress={() => setShowVehicleSheet(true)} style={styles.vehicleSelectorCard}>
+            <View style={styles.selectorLeading}>
+              <View
+                style={[
+                  styles.selectorIconWrap,
+                  selectedVehicle ? styles.selectorIconWrapActive : styles.selectorIconWrapWarning,
+                ]}
               >
-                <View style={styles.inputLeading}>
-                  <Car color="#94A3B8" size={15} strokeWidth={2.2} />
-                  <Text style={[styles.inputValue, !selectedModel ? styles.inputPlaceholder : null]}>{selectedModel || 'Select vehicle model'}</Text>
-                </View>
-                <ChevronDown color="#64748B" size={15} strokeWidth={2.2} style={{ transform: [{ rotate: modelOpen ? '180deg' : '0deg' }] }} />
-              </Pressable>
-              {modelOpen ? (
-                <DropdownList
-                  items={VEHICLE_MODELS}
-                  activeValue={selectedModel}
-                  onSelect={(value) => {
-                    setSelectedModel(value);
-                    setModelOpen(false);
-                  }}
-                />
-              ) : null}
-              {selectedModel === 'Others' ? (
-                <TextInput
-                  value={customModel}
-                  onChangeText={setCustomModel}
-                  placeholder="Enter vehicle model"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.textField, styles.textFieldActive]}
-                />
-              ) : null}
-
-              <Pressable
-                onPress={() => {
-                  setColorOpen((value) => !value);
-                  setModelOpen(false);
-                }}
-                style={[styles.inputShell, selectedColor ? styles.inputShellActive : null]}
-              >
-                <View style={styles.inputLeading}>
-                  <Palette color="#94A3B8" size={15} strokeWidth={2.2} />
-                  <Text style={[styles.inputValue, !selectedColor ? styles.inputPlaceholder : null]}>{selectedColor || 'Select vehicle color'}</Text>
-                </View>
-                <ChevronDown color="#64748B" size={15} strokeWidth={2.2} style={{ transform: [{ rotate: colorOpen ? '180deg' : '0deg' }] }} />
-              </Pressable>
-              {colorOpen ? (
-                <DropdownList
-                  items={COLORS}
-                  activeValue={selectedColor}
-                  onSelect={(value) => {
-                    setSelectedColor(value);
-                    setColorOpen(false);
-                  }}
-                />
-              ) : null}
-              {selectedColor === 'Others' ? (
-                <TextInput
-                  value={customColor}
-                  onChangeText={setCustomColor}
-                  placeholder="Enter vehicle color"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.textField, styles.textFieldActive]}
-                />
-              ) : null}
-
-              <View style={[styles.inputShell, normalizedPlate.trim().length >= 3 ? styles.inputShellActive : null]}>
-                <View style={styles.inputLeading}>
-                  <Hash color="#94A3B8" size={15} strokeWidth={2.2} />
-                  <TextInput
-                    value={normalizedPlate}
-                    onChangeText={setPlateNumber}
-                    placeholder="Plate number (e.g. ABC 1234)"
-                    placeholderTextColor="#94A3B8"
-                    style={styles.inlineTextInput}
-                    autoCapitalize="characters"
-                  />
-                </View>
+                <Car color={selectedVehicle ? '#FFFFFF' : '#F97316'} size={18} strokeWidth={2.2} />
               </View>
-
-              {storedVehicle ? (
-                <Pressable onPress={() => setEditingVehicle(false)} style={styles.editVehicleButton}>
-                  <Text style={styles.editVehicleText}>Cancel and use saved vehicle</Text>
-                </Pressable>
-              ) : null}
+              <View style={styles.vehicleSelectorCopy}>
+                <Text style={styles.selectorLabel}>{selectedVehicle ? 'Selected Vehicle' : 'Vehicle Required'}</Text>
+                <Text style={[styles.selectorValue, !selectedVehicle ? styles.selectorValueWarning : null]}>
+                  {selectedVehicleLabel}
+                </Text>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.vehicleSelectorMeta, !selectedVehicle ? styles.vehicleSelectorMetaWarning : null]}
+                >
+                  {selectedVehicleMeta}
+                </Text>
+              </View>
             </View>
-          )}
+            <ChevronDown color="#94A3B8" size={18} strokeWidth={2.2} />
+          </Pressable>
+
+          {!selectedVehicle ? (
+            <View style={styles.noticeCardWarning}>
+              <Text style={styles.noticeCopyWarning}>
+                Add or choose a saved vehicle before generating your entrance QR. Your saved vehicles stay available for future walk-in sessions.
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.noticeCardSuccess}>
@@ -277,20 +195,16 @@ export default function WalkInConfirmScreen() {
           </Text>
         </View>
 
+        <View style={styles.noticeCardInfo}>
+          <Text style={styles.noticeCopyInfo}>Parking rate: {parkingRateSummary}</Text>
+        </View>
+
         <AuthActionButton
           label={slot ? 'Generate Entrance QR' : 'Choose Walk-In Slot'}
-          onPress={() => {
+          onPress={() => void (async () => {
             if (!slot) {
               router.push({ pathname: '/reservation/[lotId]', params: { lotId: lot.id, mode: 'walkin' } });
               return;
-            }
-
-            if (editingVehicle && vehicleValid) {
-              setVehicle({
-                model: displayModel.trim(),
-                color: displayColor.trim(),
-                plate: normalizedPlate.trim(),
-              });
             }
 
             router.push({
@@ -300,7 +214,7 @@ export default function WalkInConfirmScreen() {
                 slotId: slot.id,
               },
             });
-          }}
+          })()}
           disabled={!slot ? false : !canProceed}
         />
       </ScrollView>
@@ -339,47 +253,16 @@ export default function WalkInConfirmScreen() {
           </View>
         </View>
       </Modal>
-    </View>
-  );
-}
 
-function DropdownList({
-  items,
-  activeValue,
-  onSelect,
-}: {
-  items: string[];
-  activeValue: string;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <View style={styles.dropdownCard}>
-      {items.map((item, index) => {
-        const active = activeValue === item;
-        return (
-          <Pressable
-            key={item}
-            onPress={() => onSelect(item)}
-            style={[styles.dropdownItem, index < items.length - 1 ? styles.dropdownItemBorder : null, active ? styles.dropdownItemActive : null]}
-          >
-            <Text style={[styles.dropdownText, active ? styles.dropdownTextActive : null]}>{item}</Text>
-            {active ? (
-              <View style={styles.dropdownCheck}>
-                <Check color="#FFFFFF" size={12} strokeWidth={3} />
-              </View>
-            ) : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function VehicleInfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.vehicleInfoRow}>
-      <Text style={styles.vehicleInfoLabel}>{label}</Text>
-      <Text style={styles.vehicleInfoValue}>{value}</Text>
+      <VehiclePickerSheet
+        visible={showVehicleSheet}
+        onClose={() => setShowVehicleSheet(false)}
+        vehicles={vehicles}
+        selectedVehicleId={selectedVehicleId}
+        onSelectVehicle={(vehicleId) => void selectVehicle(vehicleId)}
+        onAddAnother={() => router.push('/edit-vehicle?mode=new')}
+        onManageVehicles={() => router.push('/edit-vehicle')}
+      />
     </View>
   );
 }
@@ -574,38 +457,6 @@ const styles = StyleSheet.create({
   selectorValueWarning: {
     color: '#F97316',
   },
-  dropdownCard: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-  },
-  dropdownItem: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dropdownItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  dropdownItemActive: {
-    backgroundColor: '#F0FDFA',
-  },
-  dropdownText: {
-    color: '#1E293B',
-    fontSize: 14,
-    lineHeight: 19,
-    fontFamily: 'Poppins_400Regular',
-  },
-  dropdownTextActive: {
-    color: '#0F766E',
-    fontFamily: 'Poppins_600SemiBold',
-  },
   dropdownCheck: {
     width: 20,
     height: 20,
@@ -614,50 +465,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  savedVehicleCard: {
+  vehicleSelectorCard: {
+    minHeight: 82,
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#A7F3D0',
     backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-  },
-  vehicleInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0FDFA',
+    paddingVertical: 14,
   },
-  vehicleInfoLabel: {
-    color: '#94A3B8',
-    fontSize: 13,
+  vehicleSelectorCopy: {
+    flex: 1,
+  },
+  vehicleSelectorMeta: {
+    color: '#64748B',
+    fontSize: 12,
     lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
+    marginTop: 3,
   },
-  vehicleInfoValue: {
-    color: '#1E293B',
-    fontSize: 14,
-    lineHeight: 19,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  editVehicleButton: {
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F0FDFA',
-  },
-  editVehicleText: {
-    color: '#64748B',
-    fontSize: 13,
-    lineHeight: 17,
-    fontFamily: 'Poppins_500Medium',
-  },
-  vehicleForm: {
-    gap: 10,
+  vehicleSelectorMetaWarning: {
+    color: '#C2410C',
   },
   noticeCardWarning: {
     borderRadius: 16,
@@ -671,58 +503,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
-  },
-  inputShell: {
-    minHeight: 50,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  inputShellActive: {
-    borderColor: '#0F766E',
-  },
-  inputLeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  inputValue: {
-    color: '#1E293B',
-    fontSize: 15,
-    lineHeight: 20,
-    fontFamily: 'Poppins_400Regular',
-    flex: 1,
-  },
-  inputPlaceholder: {
-    color: '#94A3B8',
-  },
-  inlineTextInput: {
-    flex: 1,
-    color: '#1E293B',
-    fontSize: 15,
-    fontFamily: 'Poppins_400Regular',
-    paddingVertical: 0,
-  },
-  textField: {
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    color: '#1E293B',
-    fontSize: 15,
-    fontFamily: 'Poppins_400Regular',
-  },
-  textFieldActive: {
-    borderColor: '#0F766E',
   },
   noticeCardSuccess: {
     borderRadius: 18,
@@ -821,3 +601,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+

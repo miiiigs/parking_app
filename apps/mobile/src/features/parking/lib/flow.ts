@@ -9,10 +9,12 @@ export function calculateBill(durationSeconds: number, pricing: ParkingPricingCo
     return calculateParkingCharge(durationSeconds, {
       mode: 'fixed_rate',
       flatRateAmount: pricing,
-      fixedHourlyRate: pricing,
-      firstPeriodHours: 3,
+      fixedRateAmount: pricing,
+      fixedRateIntervalMinutes: 60,
+      firstPeriodMinutes: 180,
       firstPeriodRate: pricing,
-      succeedingHourlyRate: 20,
+      succeedingRateAmount: 20,
+      succeedingRateIntervalMinutes: 60,
       entryGraceMinutes: 15,
       exitGraceMinutes: 15,
     }).amount;

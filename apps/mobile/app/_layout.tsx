@@ -9,6 +9,7 @@ import SplashScreen from '../src/features/onboarding/screens/SplashScreen';
 import { useMobileAuth } from '../src/providers/MobileAuthProvider';
 import { MobileAuthProvider } from '../src/providers/MobileAuthProvider';
 import { MobileParkingDataProvider } from '../src/providers/MobileParkingDataProvider';
+import { MobileVehicleProvider } from '../src/providers/MobileVehicleProvider';
 import { colors } from '../src/theme/tokens';
 
 const APP_SPLASH_DURATION_MS = 1650;
@@ -36,9 +37,11 @@ export default function RootLayout() {
 
   return (
     <MobileAuthProvider>
-      <MobileParkingDataProvider>
-        <AppBootstrap />
-      </MobileParkingDataProvider>
+      <MobileVehicleProvider>
+        <MobileParkingDataProvider>
+          <AppBootstrap />
+        </MobileParkingDataProvider>
+      </MobileVehicleProvider>
     </MobileAuthProvider>
   );
 }

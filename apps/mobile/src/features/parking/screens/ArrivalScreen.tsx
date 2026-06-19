@@ -1,24 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Check, Clock3, MapPin, Timer, X } from 'lucide-react-native';
+import { Check, Timer, X } from 'lucide-react-native';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
+import { AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { formatParkingPricingSummary } from '@parking/shared';
 import { formatTime } from '../../../utils/format';
 
-type ArrivalStage = 'qr' | 'grace' | 'cancelled';
-
-const GRACE_PERIOD_SECONDS = 10 * 60;
-
-function formatCountdown(totalSeconds: number) {
-  const clamped = Math.max(0, totalSeconds);
-  const minutes = Math.floor(clamped / 60);
-  const seconds = clamped % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
+type ArrivalStage = 'qr' | 'cancelled';
 
 function formatCurrency(amount: number) {
   return `PHP ${amount.toFixed(2)}`;
@@ -28,46 +19,25 @@ export default function ArrivalScreen() {
   const router = useRouter();
   const booking = useParkingFlowStore((state) => state.booking);
   const session = useParkingFlowStore((state) => state.session);
+  const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const startSession = useParkingFlowStore((state) => state.startSession);
-  const resetFlow = useParkingFlowStore((state) => state.resetFlow);
-  const [stage, setStage] = useState<ArrivalStage>(session ? 'grace' : 'qr');
+  const cancelReservation = useParkingFlowStore((state) => state.cancelReservation);
+  const [stage, setStage] = useState<ArrivalStage>('qr');
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(GRACE_PERIOD_SECONDS);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!booking && !session) {
+    if (hasHydrated && !booking && !session) {
       router.replace('/home');
     }
-  }, [booking, router, session]);
+  }, [booking, hasHydrated, router, session]);
 
   useEffect(() => {
     if (session) {
-      setStage((current) => (current === 'cancelled' ? 'cancelled' : 'grace'));
+      router.replace('/session');
     }
-  }, [session]);
-
-  useEffect(() => {
-    if (stage !== 'grace' || !session) {
-      return;
-    }
-
-    const updateTimer = () => {
-      const startedAt = new Date(session.startTime).getTime();
-      const graceEndsAt = startedAt + GRACE_PERIOD_SECONDS * 1000;
-      const nextSeconds = Math.max(0, Math.floor((graceEndsAt - Date.now()) / 1000));
-      setRemainingSeconds(nextSeconds);
-
-      if (nextSeconds === 0) {
-        router.replace('/session');
-      }
-    };
-
-    updateTimer();
-    const intervalId = setInterval(updateTimer, 1000);
-    return () => clearInterval(intervalId);
-  }, [router, session, stage]);
+  }, [router, session]);
 
   const reservation = booking ?? session;
 
@@ -83,10 +53,10 @@ export default function ArrivalScreen() {
     return null;
   }
 
-  const reservationFee = Number(reservation.pricePerHour ?? 0);
+  const reservationFee = Number(reservation.reservationFee ?? 0);
   const cancellationCharge = reservationFee / 2;
   const releaseAmount = reservationFee - cancellationCharge;
-  const isUrgent = remainingSeconds <= 120;
+  const pricingSummary = formatParkingPricingSummary(reservation.pricingConfig);
   const reservationStartTime = formatTime(reservation.createdAt);
   const reservationExpiryTime = reservation.expiresAt
     ? formatTime(reservation.expiresAt)
@@ -98,7 +68,7 @@ export default function ArrivalScreen() {
 
     try {
       await startSession(entryQrValue);
-      setStage('grace');
+      router.replace('/session');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to activate the reservation right now.');
     } finally {
@@ -107,9 +77,17 @@ export default function ArrivalScreen() {
   }
 
   async function handleCancelReservation() {
-    setShowCancelModal(false);
-    await resetFlow();
-    setStage('cancelled');
+    try {
+      setShowCancelModal(false);
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      await cancelReservation();
+      setStage('cancelled');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to cancel the reservation right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (stage === 'cancelled') {
@@ -128,80 +106,6 @@ export default function ArrivalScreen() {
           <InfoRow label="Status" value="Released" valueTone="danger" />
         </View>
         <AuthActionButton label="Back to Home" onPress={() => router.replace('/home')} style={styles.fullWidthButton} />
-      </View>
-    );
-  }
-
-  if (stage === 'grace' && session) {
-    return (
-      <View style={styles.safeArea}>
-        <AppScreenHeader title="Grace Period" />
-
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.graceBanner}>
-            <View style={styles.graceBannerIcon}>
-              <Check color="#FFFFFF" size={20} strokeWidth={2.6} />
-            </View>
-            <View style={styles.graceBannerCopy}>
-              <Text style={styles.graceBannerTitle}>QR scanned successfully</Text>
-              <Text style={styles.graceBannerText}>Entrance gate access granted</Text>
-            </View>
-          </View>
-
-          <View style={[styles.graceTimerCard, isUrgent ? styles.graceTimerCardUrgent : null]}>
-            <View style={styles.graceTimerHeader}>
-              <Clock3 color={isUrgent ? '#DC2626' : '#0F766E'} size={16} strokeWidth={2.2} />
-              <Text style={[styles.graceTimerLabel, isUrgent ? styles.graceTimerLabelUrgent : null]}>TIME TO OCCUPY SLOT</Text>
-            </View>
-            <Text style={[styles.graceTimerValue, isUrgent ? styles.graceTimerValueUrgent : null]}>{formatCountdown(remainingSeconds)}</Text>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${((GRACE_PERIOD_SECONDS - remainingSeconds) / GRACE_PERIOD_SECONDS) * 100}%`,
-                    backgroundColor: isUrgent ? '#EF4444' : '#0F766E',
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.graceTimerCopy}>
-              Proceed to your assigned slot. The parking session continues after this grace window.
-            </Text>
-          </View>
-
-          <View style={styles.assignedSlotCard}>
-            <View style={styles.assignedSlotRow}>
-              <View style={styles.slotBadge}>
-                <Text style={styles.slotBadgeText}>{session.slot.number}</Text>
-              </View>
-              <View style={styles.assignedSlotCopy}>
-                <Text style={styles.assignedSlotTitle}>Slot {session.slot.number}</Text>
-                <View style={styles.assignedSlotAddressRow}>
-                  <MapPin color="#94A3B8" size={11} strokeWidth={2.2} />
-                  <Text style={styles.assignedSlotAddress}>{session.lotName}</Text>
-                </View>
-              </View>
-              <View style={styles.assignedSlotStatus}>
-                <Text style={styles.assignedSlotStatusText}>RESERVED</Text>
-              </View>
-            </View>
-          </View>
-
-          {isUrgent ? (
-            <View style={styles.warningCard}>
-              <Clock3 color="#DC2626" size={14} strokeWidth={2.2} style={{ marginTop: 1 }} />
-              <Text style={styles.warningCopy}>
-                Time is running out. If you do not occupy the slot, your reservation may be released.
-              </Text>
-            </View>
-          ) : null}
-        </ScrollView>
-
-        <View style={styles.footerArea}>
-          <AuthActionButton label="I Am Parked" onPress={() => router.replace('/session')} style={styles.fullWidthButton} />
-          <Text style={styles.footerHint}>The session will also continue automatically when the countdown ends.</Text>
-        </View>
       </View>
     );
   }
@@ -232,6 +136,7 @@ export default function ArrivalScreen() {
             <InfoRow label="Parking Lot" value={reservation.lotName} />
             <InfoRow label="Parking Slot" value={reservation.slot.number} />
             <InfoRow label="Reservation Window" value={`${reservation.arrivalWindowMinutes} min`} />
+            <InfoRow label="Pricing" value={pricingSummary} />
             <InfoRow label="Start Time" value={reservationStartTime} />
             <InfoRow label="Expiration Time" value={reservationExpiryTime} />
             <InfoRow label="Reservation Fee" value={`${formatCurrency(reservationFee)} held`} valueTone="success" last />
@@ -245,7 +150,7 @@ export default function ArrivalScreen() {
 
           <View style={styles.noticeCardWarning}>
             <Text style={styles.noticeCopyWarning}>
-              After scanning, you have 10 minutes to occupy your slot before it may be released.
+              After scanning, your active session begins immediately and uses the lot&apos;s entry grace period while you proceed to your slot.
             </Text>
           </View>
 
@@ -276,7 +181,7 @@ export default function ArrivalScreen() {
 
             <View style={styles.modalBreakdown}>
               <InfoRow label="Reference" value={reservation.reservationCode} />
-              <InfoRow label="Rate reference" value={`PHP ${reservationFee.toFixed(2)}`} />
+              <InfoRow label="Rate reference" value={pricingSummary} />
               <InfoRow label="Partial hold preview" value={`PHP ${cancellationCharge.toFixed(2)}`} valueTone="danger" />
               <InfoRow label="Release preview" value={`PHP ${releaseAmount.toFixed(2)}`} valueTone="success" />
             </View>

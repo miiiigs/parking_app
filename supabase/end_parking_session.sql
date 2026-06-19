@@ -81,10 +81,12 @@ begin
     jsonb_build_object(
       'mode', 'fixed_rate',
       'flatRateAmount', coalesce(v_reservation.parking_rate, 50),
-      'fixedHourlyRate', coalesce(v_reservation.parking_rate, 50),
-      'firstPeriodHours', 3,
+      'fixedRateAmount', coalesce(v_reservation.parking_rate, 50),
+      'fixedRateIntervalMinutes', 60,
+      'firstPeriodMinutes', 180,
       'firstPeriodRate', coalesce(v_reservation.parking_rate, 50),
-      'succeedingHourlyRate', 20,
+      'succeedingRateAmount', 20,
+      'succeedingRateIntervalMinutes', 60,
       'entryGraceMinutes', 15,
       'exitGraceMinutes', 15
     )

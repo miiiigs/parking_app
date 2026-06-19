@@ -2,9 +2,12 @@ import type { ParkingLotDefinition, ParkingSlotStatus } from '@parking/shared';
 import { applyLiveSlotStatuses, buildParkingLotDefinitionFromSlots } from '@parking/shared';
 import {
   DEFAULT_PARKING_PRICING,
+  DEFAULT_RESERVATION_PRICING,
   formatParkingPricingSummary,
+  normalizeReservationPricingConfig,
   normalizeParkingPricingConfig,
   type ParkingPricingConfig,
+  type ReservationPricingConfig,
 } from '@parking/shared';
 
 import { parkingLots as sampleParkingLots } from '../features/parking/data/parkingLots';
@@ -19,12 +22,20 @@ type LiveLocationRow = {
   code: string;
   pricing_mode?: string | null;
   flat_rate_amount?: number | null;
-  fixed_hourly_rate?: number | null;
-  first_period_hours?: number | null;
+  fixed_rate_amount?: number | null;
+  fixed_rate_interval_minutes?: number | null;
+  first_period_minutes?: number | null;
   first_period_rate?: number | null;
-  succeeding_hourly_rate?: number | null;
+  succeeding_rate_amount?: number | null;
+  succeeding_rate_interval_minutes?: number | null;
   entry_grace_minutes?: number | null;
   exit_grace_minutes?: number | null;
+  reservation_fee_30_minutes?: number | null;
+  reservation_fee_60_minutes?: number | null;
+  reservation_fee_120_minutes?: number | null;
+  fixed_hourly_rate?: number | null;
+  first_period_hours?: number | null;
+  succeeding_hourly_rate?: number | null;
 };
 
 type LiveSlotRow = {
@@ -53,12 +64,20 @@ function isMissingPricingColumnError(message: string | undefined) {
   return [
     'pricing_mode',
     'flat_rate_amount',
-    'fixed_hourly_rate',
-    'first_period_hours',
+    'fixed_rate_amount',
+    'fixed_rate_interval_minutes',
+    'first_period_minutes',
     'first_period_rate',
-    'succeeding_hourly_rate',
+    'succeeding_rate_amount',
+    'succeeding_rate_interval_minutes',
     'entry_grace_minutes',
     'exit_grace_minutes',
+    'reservation_fee_30_minutes',
+    'reservation_fee_60_minutes',
+    'reservation_fee_120_minutes',
+    'fixed_hourly_rate',
+    'first_period_hours',
+    'succeeding_hourly_rate',
   ].some((column) => message.includes(column));
 }
 
@@ -66,12 +85,24 @@ function buildLocationPricingConfig(location: LiveLocationRow): ParkingPricingCo
   return normalizeParkingPricingConfig({
     mode: location.pricing_mode ?? DEFAULT_PARKING_PRICING.mode,
     flatRateAmount: location.flat_rate_amount ?? DEFAULT_PARKING_PRICING.flatRateAmount,
-    fixedHourlyRate: location.fixed_hourly_rate ?? DEFAULT_PARKING_PRICING.fixedHourlyRate,
-    firstPeriodHours: location.first_period_hours ?? DEFAULT_PARKING_PRICING.firstPeriodHours,
+    fixedRateAmount: location.fixed_rate_amount ?? location.fixed_hourly_rate ?? DEFAULT_PARKING_PRICING.fixedRateAmount,
+    fixedRateIntervalMinutes: location.fixed_rate_interval_minutes ?? DEFAULT_PARKING_PRICING.fixedRateIntervalMinutes,
+    firstPeriodMinutes:
+      location.first_period_minutes
+      ?? (location.first_period_hours ? location.first_period_hours * 60 : DEFAULT_PARKING_PRICING.firstPeriodMinutes),
     firstPeriodRate: location.first_period_rate ?? DEFAULT_PARKING_PRICING.firstPeriodRate,
-    succeedingHourlyRate: location.succeeding_hourly_rate ?? DEFAULT_PARKING_PRICING.succeedingHourlyRate,
+    succeedingRateAmount: location.succeeding_rate_amount ?? location.succeeding_hourly_rate ?? DEFAULT_PARKING_PRICING.succeedingRateAmount,
+    succeedingRateIntervalMinutes: location.succeeding_rate_interval_minutes ?? DEFAULT_PARKING_PRICING.succeedingRateIntervalMinutes,
     entryGraceMinutes: location.entry_grace_minutes ?? DEFAULT_PARKING_PRICING.entryGraceMinutes,
     exitGraceMinutes: location.exit_grace_minutes ?? DEFAULT_PARKING_PRICING.exitGraceMinutes,
+  });
+}
+
+function buildLocationReservationPricingConfig(location: LiveLocationRow): ReservationPricingConfig {
+  return normalizeReservationPricingConfig({
+    fee30Minutes: location.reservation_fee_30_minutes ?? DEFAULT_RESERVATION_PRICING.fee30Minutes,
+    fee60Minutes: location.reservation_fee_60_minutes ?? DEFAULT_RESERVATION_PRICING.fee60Minutes,
+    fee120Minutes: location.reservation_fee_120_minutes ?? DEFAULT_RESERVATION_PRICING.fee120Minutes,
   });
 }
 
@@ -90,6 +121,7 @@ function parseLotLayout(value: unknown): ParkingLotDefinition | null {
 
 function mapLayoutToParkingLot(location: LiveLocationRow, layout: ParkingLotDefinition, liveSlots: LiveSlotRow[]): ParkingLot {
   const pricingConfig = buildLocationPricingConfig(location);
+  const reservationPricing = buildLocationReservationPricingConfig(location);
   const appliedLayout = applyLiveSlotStatuses(
     layout,
     liveSlots.map((slot) => ({
@@ -125,8 +157,9 @@ function mapLayoutToParkingLot(location: LiveLocationRow, layout: ParkingLotDefi
     availableSlots,
     totalSlots: slots.length,
     distanceKm: 0,
-    pricePerHour: pricingConfig.mode === 'flat_rate' ? pricingConfig.flatRateAmount : pricingConfig.mode === 'tiered' ? pricingConfig.firstPeriodRate : pricingConfig.fixedHourlyRate,
+    pricePerHour: pricingConfig.mode === 'flat_rate' ? pricingConfig.flatRateAmount : pricingConfig.mode === 'tiered' ? pricingConfig.firstPeriodRate : pricingConfig.fixedRateAmount,
     pricingConfig,
+    reservationPricing,
     features: ['Live data', formatParkingPricingSummary(pricingConfig)],
     slots,
     lotLayout: appliedLayout,
@@ -140,14 +173,17 @@ function buildFallbackLots() {
       lot.pricingConfig ?? {
         mode: 'fixed_rate',
         flatRateAmount: lot.pricePerHour,
-        fixedHourlyRate: lot.pricePerHour,
-        firstPeriodHours: 3,
+        fixedRateAmount: lot.pricePerHour,
+        fixedRateIntervalMinutes: 60,
+        firstPeriodMinutes: 180,
         firstPeriodRate: lot.pricePerHour,
-        succeedingHourlyRate: 20,
+        succeedingRateAmount: 20,
+        succeedingRateIntervalMinutes: 60,
         entryGraceMinutes: 15,
         exitGraceMinutes: 15,
       },
     ),
+    reservationPricing: normalizeReservationPricingConfig(lot.reservationPricing ?? DEFAULT_RESERVATION_PRICING),
     lotLayout: null,
   }));
 }
@@ -168,7 +204,7 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
   {
     const response = await supabase
       .from('locations')
-      .select('id, name, address, city, code, pricing_mode, flat_rate_amount, fixed_hourly_rate, first_period_hours, first_period_rate, succeeding_hourly_rate, entry_grace_minutes, exit_grace_minutes')
+      .select('id, name, address, city, code, pricing_mode, flat_rate_amount, fixed_rate_amount, fixed_rate_interval_minutes, first_period_minutes, first_period_rate, succeeding_rate_amount, succeeding_rate_interval_minutes, entry_grace_minutes, exit_grace_minutes, reservation_fee_30_minutes, reservation_fee_60_minutes, reservation_fee_120_minutes')
       .eq('is_active', true)
       .order('created_at', { ascending: true });
 
@@ -179,7 +215,7 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
   if (locationError && isMissingPricingColumnError(locationError.message)) {
     const response = await supabase
       .from('locations')
-      .select('id, name, address, city, code')
+      .select('id, name, address, city, code, pricing_mode, flat_rate_amount, fixed_hourly_rate, first_period_hours, first_period_rate, succeeding_hourly_rate, entry_grace_minutes, exit_grace_minutes, reservation_fee_30_minutes, reservation_fee_60_minutes, reservation_fee_120_minutes')
       .eq('is_active', true)
       .order('created_at', { ascending: true });
 

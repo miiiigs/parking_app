@@ -101,19 +101,28 @@ export const operatorAdminToolsRouteRequestSchema = z.object({
     .object({
       mode: z.enum(['flat_rate', 'fixed_rate', 'tiered']),
       flatRateAmount: nonNegativeMoney,
-      fixedHourlyRate: nonNegativeMoney,
-      firstPeriodHours: z.number().int().min(1),
+      fixedRateAmount: nonNegativeMoney,
+      fixedRateIntervalMinutes: z.number().int().min(1).max(1440),
+      firstPeriodMinutes: z.number().int().min(1).max(1440),
       firstPeriodRate: nonNegativeMoney,
-      succeedingHourlyRate: nonNegativeMoney,
+      succeedingRateAmount: nonNegativeMoney,
+      succeedingRateIntervalMinutes: z.number().int().min(1).max(1440),
       entryGraceMinutes: z.number().int().min(0).max(120),
       exitGraceMinutes: z.number().int().min(0).max(120),
     })
     .optional(),
+  reservationPricingConfig: z
+    .object({
+      fee30Minutes: nonNegativeMoney,
+      fee60Minutes: nonNegativeMoney,
+      fee120Minutes: nonNegativeMoney,
+    })
+    .optional(),
 }).superRefine((value, context) => {
-  if (value.action === 'update-pricing' && !value.pricingConfig) {
+  if (value.action === 'update-pricing' && (!value.pricingConfig || !value.reservationPricingConfig)) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'pricingConfig is required for update-pricing.',
+      message: 'pricingConfig and reservationPricingConfig are required for update-pricing.',
       path: ['pricingConfig'],
     });
   }

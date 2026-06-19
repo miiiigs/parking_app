@@ -9,6 +9,7 @@ import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore'
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { formatDuration } from '../../../utils/format';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 type PaymentMethodOption = {
   id: string;
@@ -25,6 +26,7 @@ export default function PaymentScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const wallets = usePaymentMethodsStore((state) => state.wallets);
   const cards = usePaymentMethodsStore((state) => state.cards);
   const savedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
@@ -60,10 +62,10 @@ export default function PaymentScreen() {
   const [selectedMethod, setSelectedMethod] = useState<string>(savedPaymentMethod ?? methodOptions[0]?.label ?? '');
 
   useEffect(() => {
-    if (!completedSession) {
+    if (hasHydrated && !completedSession) {
       router.replace('/home');
     }
-  }, [completedSession, router]);
+  }, [completedSession, hasHydrated, router]);
 
   useEffect(() => {
     if (!selectedMethod && methodOptions[0]) {
@@ -71,14 +73,15 @@ export default function PaymentScreen() {
     }
   }, [methodOptions, selectedMethod]);
 
-  if (!completedSession) {
+  if (!hasHydrated || !completedSession) {
     return null;
   }
 
   const isWalkIn = completedSession.reservationCode.startsWith('WIN-');
-  const reservationFee = isWalkIn ? 0 : Number(completedSession.pricePerHour ?? 0);
+  const reservationFee = isWalkIn ? 0 : Number(completedSession.reservationFee ?? 0);
   const parkingFee = completedSession.totalBill;
   const totalAmount = reservationFee + parkingFee;
+  const pricingSummary = formatParkingPricingSummary(completedSession.pricingConfig);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -103,6 +106,7 @@ export default function PaymentScreen() {
                   <Text style={styles.breakdownMeta}>{formatDuration(completedSession.durationSeconds)}</Text>
                 </View>
 
+                <FeeRow label="Pricing model" amount={pricingSummary} />
                 <FeeRow label={`Parking Fee (${formatDuration(completedSession.durationSeconds)})`} amount={formatCurrency(parkingFee)} />
                 {!isWalkIn ? <FeeRow label="Reservation Fee" amount={formatCurrency(reservationFee)} /> : null}
 

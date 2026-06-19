@@ -7,6 +7,7 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'rea
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 function formatCurrency(amount: number) {
   return `PHP ${amount.toFixed(2)}`;
@@ -16,20 +17,22 @@ export default function ExitScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const paymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
 
   useEffect(() => {
-    if (!completedSession) {
+    if (hasHydrated && !completedSession) {
       router.replace('/home');
     }
-  }, [completedSession, router]);
+  }, [completedSession, hasHydrated, router]);
 
-  if (!completedSession) {
+  if (!hasHydrated || !completedSession) {
     return null;
   }
 
   const isWalkIn = completedSession.reservationCode.startsWith('WIN-');
-  const totalPaid = completedSession.totalBill + (isWalkIn ? 0 : Number(completedSession.pricePerHour ?? 0));
+  const totalPaid = completedSession.totalBill + (isWalkIn ? 0 : Number(completedSession.reservationFee ?? 0));
+  const pricingSummary = formatParkingPricingSummary(completedSession.pricingConfig);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -63,6 +66,7 @@ export default function ExitScreen() {
                 <Text style={styles.ticketTitle}>Parking Ticket</Text>
                 <TicketRow label="Parking Lot" value={completedSession.lotName} />
                 <TicketRow label="Slot Number" value={completedSession.slot.number} />
+                <TicketRow label="Pricing Model" value={pricingSummary} />
                 <TicketRow label="Payment Method" value={paymentMethod ?? 'Mobile payment'} />
                 <TicketRow label="Total Paid" value={formatCurrency(totalPaid)} highlight last />
               </View>

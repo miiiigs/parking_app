@@ -8,6 +8,7 @@ import { formatParkingPricingSummary, normalizeParkingPricingConfig } from '@/li
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
 import { findIdempotentOperatorEvent } from '@/lib/operatorIdempotency';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
+import { DEFAULT_RESERVATION_PRICING, formatReservationPricingSummary, normalizeReservationPricingConfig } from '@parking/shared';
 
 function getHeaders(serviceRoleKey: string) {
   return {
@@ -34,16 +35,18 @@ function buildPricingPreviewCounts(pricingConfig: ReturnType<typeof normalizePar
 
   if (pricingConfig.mode === 'fixed_rate') {
     return {
-      fixedHourlyRate: pricingConfig.fixedHourlyRate,
+      fixedRateAmount: pricingConfig.fixedRateAmount,
+      fixedRateIntervalMinutes: pricingConfig.fixedRateIntervalMinutes,
       entryGraceMinutes: pricingConfig.entryGraceMinutes,
       exitGraceMinutes: pricingConfig.exitGraceMinutes,
     };
   }
 
   return {
-    firstPeriodHours: pricingConfig.firstPeriodHours,
+    firstPeriodMinutes: pricingConfig.firstPeriodMinutes,
     firstPeriodRate: pricingConfig.firstPeriodRate,
-    succeedingHourlyRate: pricingConfig.succeedingHourlyRate,
+    succeedingRateAmount: pricingConfig.succeedingRateAmount,
+    succeedingRateIntervalMinutes: pricingConfig.succeedingRateIntervalMinutes,
     entryGraceMinutes: pricingConfig.entryGraceMinutes,
     exitGraceMinutes: pricingConfig.exitGraceMinutes,
   };
@@ -80,12 +83,21 @@ export async function GET(request: Request) {
     const pricingConfig = normalizeParkingPricingConfig({
       mode: location.pricing_mode,
       flatRateAmount: location.flat_rate_amount,
-      fixedHourlyRate: location.fixed_hourly_rate,
-      firstPeriodHours: location.first_period_hours,
+      fixedRateAmount: location.fixed_rate_amount ?? location.fixed_hourly_rate,
+      fixedRateIntervalMinutes: location.fixed_rate_interval_minutes,
+      firstPeriodMinutes:
+        location.first_period_minutes
+        ?? (location.first_period_hours ? location.first_period_hours * 60 : undefined),
       firstPeriodRate: location.first_period_rate,
-      succeedingHourlyRate: location.succeeding_hourly_rate,
+      succeedingRateAmount: location.succeeding_rate_amount ?? location.succeeding_hourly_rate,
+      succeedingRateIntervalMinutes: location.succeeding_rate_interval_minutes,
       entryGraceMinutes: location.entry_grace_minutes,
       exitGraceMinutes: location.exit_grace_minutes,
+    });
+    const reservationPricingConfig = normalizeReservationPricingConfig({
+      fee30Minutes: location.reservation_fee_30_minutes ?? DEFAULT_RESERVATION_PRICING.fee30Minutes,
+      fee60Minutes: location.reservation_fee_60_minutes ?? DEFAULT_RESERVATION_PRICING.fee60Minutes,
+      fee120Minutes: location.reservation_fee_120_minutes ?? DEFAULT_RESERVATION_PRICING.fee120Minutes,
     });
 
     return jsonWithRequestContext(routeContext, {
@@ -93,7 +105,9 @@ export async function GET(request: Request) {
       locationId: location.id,
       locationName: location.name,
       pricingConfig,
+      reservationPricingConfig,
       pricingSummary: formatParkingPricingSummary(pricingConfig),
+      reservationPricingSummary: formatReservationPricingSummary(reservationPricingConfig),
     });
   } catch (error) {
     logOperatorRouteError(routeContext, 'Failed to load pricing settings', error);
@@ -132,7 +146,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { action, preview, pricingConfig: rawPricingConfig } = parsedBody.data;
+  const { action, preview, pricingConfig: rawPricingConfig, reservationPricingConfig: rawReservationPricingConfig } = parsedBody.data;
 
   const requiredCapability =
     action === 'reconcile'
@@ -383,11 +397,17 @@ export async function POST(request: Request) {
 
     if (action === 'update-pricing') {
       const pricingConfig = normalizeParkingPricingConfig(rawPricingConfig ?? null);
+      const reservationPricingConfig = normalizeReservationPricingConfig(rawReservationPricingConfig ?? null);
       const previewPayload: AdminToolPreview = {
         action: 'update-pricing',
         title: 'Update Parking Pricing',
-        summary: `${location.name} will use ${formatParkingPricingSummary(pricingConfig)} with ${pricingConfig.entryGraceMinutes} min entry grace and ${pricingConfig.exitGraceMinutes} min exit grace.`,
-        counts: buildPricingPreviewCounts(pricingConfig),
+        summary: `${location.name} will use ${formatParkingPricingSummary(pricingConfig)} with ${formatReservationPricingSummary(reservationPricingConfig)} reservation fees and ${pricingConfig.entryGraceMinutes} min entry grace / ${pricingConfig.exitGraceMinutes} min exit grace.`,
+        counts: {
+          ...buildPricingPreviewCounts(pricingConfig),
+          fee30Minutes: reservationPricingConfig.fee30Minutes,
+          fee60Minutes: reservationPricingConfig.fee60Minutes,
+          fee120Minutes: reservationPricingConfig.fee120Minutes,
+        },
       };
 
       if (preview) {
@@ -400,18 +420,29 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           pricing_mode: pricingConfig.mode,
           flat_rate_amount: pricingConfig.flatRateAmount,
-          fixed_hourly_rate: pricingConfig.fixedHourlyRate,
-          first_period_hours: pricingConfig.firstPeriodHours,
+          fixed_rate_amount: pricingConfig.fixedRateAmount,
+          fixed_rate_interval_minutes: pricingConfig.fixedRateIntervalMinutes,
+          first_period_minutes: pricingConfig.firstPeriodMinutes,
           first_period_rate: pricingConfig.firstPeriodRate,
-          succeeding_hourly_rate: pricingConfig.succeedingHourlyRate,
+          succeeding_rate_amount: pricingConfig.succeedingRateAmount,
+          succeeding_rate_interval_minutes: pricingConfig.succeedingRateIntervalMinutes,
           entry_grace_minutes: pricingConfig.entryGraceMinutes,
           exit_grace_minutes: pricingConfig.exitGraceMinutes,
+          reservation_fee_30_minutes: reservationPricingConfig.fee30Minutes,
+          reservation_fee_60_minutes: reservationPricingConfig.fee60Minutes,
+          reservation_fee_120_minutes: reservationPricingConfig.fee120Minutes,
         }),
       });
 
       if (!updateResponse.ok) {
         const rawMessage = await updateResponse.text();
-        if (rawMessage.includes('PGRST204') || rawMessage.includes('entry_grace_minutes') || rawMessage.includes('pricing_mode')) {
+        if (
+          rawMessage.includes('PGRST204')
+          || rawMessage.includes('entry_grace_minutes')
+          || rawMessage.includes('pricing_mode')
+          || rawMessage.includes('fixed_rate_interval_minutes')
+          || rawMessage.includes('reservation_fee_30_minutes')
+        ) {
           throw new Error(buildMissingPricingSchemaMessage(rawMessage));
         }
 
@@ -422,7 +453,9 @@ export async function POST(request: Request) {
         ok: true,
         message: `Pricing updated for ${location.name}.`,
         pricingConfig,
+        reservationPricingConfig,
         pricingSummary: formatParkingPricingSummary(pricingConfig),
+        reservationPricingSummary: formatReservationPricingSummary(reservationPricingConfig),
       };
 
       await fetch(`${config.url}/rest/v1/operator_events`, {
@@ -440,6 +473,8 @@ export async function POST(request: Request) {
             actor_role: operatorUser.role,
             pricing_config: pricingConfig,
             pricing_summary: formatParkingPricingSummary(pricingConfig),
+            reservation_pricing_config: reservationPricingConfig,
+            reservation_pricing_summary: formatReservationPricingSummary(reservationPricingConfig),
             impact_summary: previewPayload.counts,
             action_scope: 'location',
             confirmed_at: new Date().toISOString(),

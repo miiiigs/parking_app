@@ -6,7 +6,8 @@ import { getResolvedSupabaseConfig, getSupabaseConfigStatus } from './supabaseCo
 let cachedClient: SupabaseClient | null = null;
 let cachedUser: User | null = null;
 const guestModeStorageKey = 'parking_mobile_guest_mode';
-const mobileAuthSessionStorageKey = 'parking_mobile_auth_session';
+const mobileAuthAccessTokenStorageKey = 'parking_mobile_auth_access_token';
+const mobileAuthRefreshTokenStorageKey = 'parking_mobile_auth_refresh_token';
 const authStorageCache = new Map<string, string>();
 
 type PersistedSessionSnapshot = {
@@ -16,30 +17,13 @@ type PersistedSessionSnapshot = {
 
 const supabaseAuthStorage = {
   async getItem(key: string) {
-    try {
-      const storedValue = await SecureStore.getItemAsync(key);
-      return storedValue ?? authStorageCache.get(key) ?? null;
-    } catch {
-      return authStorageCache.get(key) ?? null;
-    }
+    return authStorageCache.get(key) ?? null;
   },
   async setItem(key: string, value: string) {
     authStorageCache.set(key, value);
-
-    try {
-      await SecureStore.setItemAsync(key, value);
-    } catch {
-      // Keep the in-memory copy so the session still works during this runtime.
-    }
   },
   async removeItem(key: string) {
     authStorageCache.delete(key);
-
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch {
-      // Ignore storage cleanup failures and fall back to the in-memory cache.
-    }
   },
 };
 
@@ -66,21 +50,18 @@ async function setGuestModeEnabled(enabled: boolean) {
 
 async function readPersistedSessionSnapshot(): Promise<PersistedSessionSnapshot | null> {
   try {
-    const raw = await SecureStore.getItemAsync(mobileAuthSessionStorageKey);
+    const [accessToken, refreshToken] = await Promise.all([
+      SecureStore.getItemAsync(mobileAuthAccessTokenStorageKey),
+      SecureStore.getItemAsync(mobileAuthRefreshTokenStorageKey),
+    ]);
 
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<PersistedSessionSnapshot>;
-
-    if (!parsed.accessToken || !parsed.refreshToken) {
+    if (!accessToken || !refreshToken) {
       return null;
     }
 
     return {
-      accessToken: parsed.accessToken,
-      refreshToken: parsed.refreshToken,
+      accessToken,
+      refreshToken,
     };
   } catch {
     return null;
@@ -90,17 +71,17 @@ async function readPersistedSessionSnapshot(): Promise<PersistedSessionSnapshot 
 async function writePersistedSessionSnapshot(session: Session | null) {
   try {
     if (!session?.access_token || !session.refresh_token) {
-      await SecureStore.deleteItemAsync(mobileAuthSessionStorageKey);
+      await Promise.all([
+        SecureStore.deleteItemAsync(mobileAuthAccessTokenStorageKey),
+        SecureStore.deleteItemAsync(mobileAuthRefreshTokenStorageKey),
+      ]);
       return;
     }
 
-    await SecureStore.setItemAsync(
-      mobileAuthSessionStorageKey,
-      JSON.stringify({
-        accessToken: session.access_token,
-        refreshToken: session.refresh_token,
-      } satisfies PersistedSessionSnapshot),
-    );
+    await Promise.all([
+      SecureStore.setItemAsync(mobileAuthAccessTokenStorageKey, session.access_token),
+      SecureStore.setItemAsync(mobileAuthRefreshTokenStorageKey, session.refresh_token),
+    ]);
   } catch {
     // Keep auth usable even if the extra snapshot write fails.
   }

@@ -62,3 +62,15 @@ test('reservations and audit pages use server-backed pagination and export paths
   assert.equal(auditPage.includes('Export'), true);
   assert.equal(auditPage.includes('Page Size'), true);
 });
+
+test('parking setup lives on its own page instead of the admin tools screen', () => {
+  const adminToolsPage = readSource('../app/dashboard/admin-tools/page.tsx');
+  const parkingSetupPage = readSource('../app/dashboard/parking-setup/page.tsx');
+  const pricingPanel = readSource('../components/dashboard/pricing-settings-panel.tsx');
+
+  assert.equal(adminToolsPage.includes('Parking Pricing'), false);
+  assert.equal(parkingSetupPage.includes('Parking Setup'), true);
+  assert.equal(parkingSetupPage.includes('PricingSettingsPanel'), true);
+  assert.equal(pricingPanel.includes('/api/operator/admin-tools'), true);
+  assert.equal(pricingPanel.includes('Grace Periods'), true);
+});

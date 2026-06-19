@@ -69,4 +69,28 @@ test('admin tools schema allows only production-supported actions', () => {
     }).success,
     true,
   );
+
+  assert.equal(
+    operatorAdminToolsRouteRequestSchema.safeParse({
+      action: 'update-pricing',
+      pricingConfig: {
+        mode: 'fixed_rate',
+        flatRateAmount: 50,
+        fixedRateAmount: 25,
+        fixedRateIntervalMinutes: 30,
+        firstPeriodMinutes: 180,
+        firstPeriodRate: 50,
+        succeedingRateAmount: 20,
+        succeedingRateIntervalMinutes: 30,
+        entryGraceMinutes: 10,
+        exitGraceMinutes: 15,
+      },
+      reservationPricingConfig: {
+        fee30Minutes: 25,
+        fee60Minutes: 40,
+        fee120Minutes: 60,
+      },
+    }).success,
+    true,
+  );
 });

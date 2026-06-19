@@ -1,5 +1,5 @@
 import type { ParkingLot } from '../types';
-import { DEFAULT_PARKING_PRICING } from '@parking/shared';
+import { DEFAULT_PARKING_PRICING, DEFAULT_RESERVATION_PRICING } from '@parking/shared';
 
 const sharedSlots: ParkingLot['slots'] = [
   { id: 'A1', number: 'A1', isAvailable: true, status: 'available', x: 20, y: 20 },
@@ -25,7 +25,8 @@ export const parkingLots: ParkingLot[] = [
     totalSlots: 100,
     distanceKm: 0.3,
     pricePerHour: 5,
-    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedHourlyRate: 5, flatRateAmount: 5, firstPeriodRate: 5 },
+    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedRateAmount: 5, flatRateAmount: 5, firstPeriodRate: 5 },
+    reservationPricing: DEFAULT_RESERVATION_PRICING,
     features: ['Covered', 'CCTV', 'EV ready'],
     slots: sharedSlots,
   },
@@ -37,7 +38,8 @@ export const parkingLots: ParkingLot[] = [
     totalSlots: 200,
     distanceKm: 0.8,
     pricePerHour: 4,
-    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedHourlyRate: 4, flatRateAmount: 4, firstPeriodRate: 4 },
+    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedRateAmount: 4, flatRateAmount: 4, firstPeriodRate: 4 },
+    reservationPricing: DEFAULT_RESERVATION_PRICING,
     features: ['Mall access', '24/7', 'Women-only bays'],
     slots: sharedSlots.map((slot, index) => ({
       ...slot,
@@ -55,7 +57,8 @@ export const parkingLots: ParkingLot[] = [
     totalSlots: 150,
     distanceKm: 1.2,
     pricePerHour: 6,
-    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedHourlyRate: 6, flatRateAmount: 6, firstPeriodRate: 6 },
+    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedRateAmount: 6, flatRateAmount: 6, firstPeriodRate: 6 },
+    reservationPricing: DEFAULT_RESERVATION_PRICING,
     features: ['Valet lane', 'Wide bays', 'Weatherproof'],
     slots: sharedSlots.map((slot, index) => ({
       ...slot,
@@ -73,7 +76,8 @@ export const parkingLots: ParkingLot[] = [
     totalSlots: 180,
     distanceKm: 1.5,
     pricePerHour: 7,
-    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedHourlyRate: 7, flatRateAmount: 7, firstPeriodRate: 7 },
+    pricingConfig: { ...DEFAULT_PARKING_PRICING, fixedRateAmount: 7, flatRateAmount: 7, firstPeriodRate: 7 },
+    reservationPricing: DEFAULT_RESERVATION_PRICING,
     features: ['Invoice ready', 'Fast entry', 'Security desk'],
     slots: sharedSlots.map((slot, index) => ({
       ...slot,

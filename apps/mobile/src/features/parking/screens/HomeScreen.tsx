@@ -38,6 +38,7 @@ import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives
 import { BottomNav } from '../../../components/navigation/BottomNav';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import type { ParkingLot } from '../types';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 type BuildingType = 'All' | 'Mall' | 'Commercial' | 'Office';
 
@@ -380,6 +381,7 @@ export default function HomeScreen() {
 
 function HomeLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void }) {
   const availabilityColor = getAvailabilityColor(lot.availableSlots, lot.totalSlots);
+  const pricingSummary = formatParkingPricingSummary(lot.pricingConfig);
 
   return (
     <View style={styles.lotCard}>
@@ -412,11 +414,8 @@ function HomeLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void })
           </View>
 
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabelStandalone}>Starting at</Text>
-            <View style={styles.metricValueRow}>
-              <Text style={styles.metricValuePrice}>PHP {lot.pricePerHour}</Text>
-              <Text style={styles.metricValueSuffix}>/hr</Text>
-            </View>
+            <Text style={styles.metricLabelStandalone}>Pricing</Text>
+            <Text style={styles.metricSummaryValue}>{pricingSummary}</Text>
           </View>
         </View>
 
@@ -837,6 +836,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontFamily: 'Poppins_700Bold',
     includeFontPadding: false,
+  },
+  metricSummaryValue: {
+    color: '#0F766E',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
   },
   metricValueSuffix: {
     color: '#94A3B8',

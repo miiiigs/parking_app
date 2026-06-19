@@ -15,6 +15,7 @@ returns table (
   reserved_at timestamptz,
   expires_at timestamptz,
   arrival_window_minutes integer,
+  reservation_fee numeric,
   parking_rate numeric,
   pricing_config jsonb
 )
@@ -45,17 +46,6 @@ begin
     raise exception 'Arrival window must be greater than zero';
   end if;
 
-  v_reservation_fee := case p_arrival_window_minutes
-    when 30 then 25.00
-    when 60 then 40.00
-    when 120 then 60.00
-    else null
-  end;
-
-  if v_reservation_fee is null then
-    raise exception 'Unsupported arrival window';
-  end if;
-
   select *
     into v_slot
     from parking_slots
@@ -79,13 +69,26 @@ begin
     raise exception 'Parking location not found';
   end if;
 
+  v_reservation_fee := case p_arrival_window_minutes
+    when 30 then coalesce(v_location.reservation_fee_30_minutes, 25.00)
+    when 60 then coalesce(v_location.reservation_fee_60_minutes, 40.00)
+    when 120 then coalesce(v_location.reservation_fee_120_minutes, 60.00)
+    else null
+  end;
+
+  if v_reservation_fee is null then
+    raise exception 'Unsupported arrival window';
+  end if;
+
   v_pricing_config := jsonb_build_object(
     'mode', coalesce(v_location.pricing_mode, 'fixed_rate'),
     'flatRateAmount', coalesce(v_location.flat_rate_amount, 50),
-    'fixedHourlyRate', coalesce(v_location.fixed_hourly_rate, 50),
-    'firstPeriodHours', greatest(1, coalesce(v_location.first_period_hours, 3)),
+    'fixedRateAmount', coalesce(v_location.fixed_rate_amount, 50),
+    'fixedRateIntervalMinutes', greatest(1, coalesce(v_location.fixed_rate_interval_minutes, 60)),
+    'firstPeriodMinutes', greatest(1, coalesce(v_location.first_period_minutes, 180)),
     'firstPeriodRate', coalesce(v_location.first_period_rate, 50),
-    'succeedingHourlyRate', coalesce(v_location.succeeding_hourly_rate, 20),
+    'succeedingRateAmount', coalesce(v_location.succeeding_rate_amount, 20),
+    'succeedingRateIntervalMinutes', greatest(1, coalesce(v_location.succeeding_rate_interval_minutes, 60)),
     'entryGraceMinutes', greatest(0, coalesce(v_location.entry_grace_minutes, 15)),
     'exitGraceMinutes', greatest(0, coalesce(v_location.exit_grace_minutes, 15))
   );
@@ -93,7 +96,7 @@ begin
   v_parking_rate := case coalesce(v_location.pricing_mode, 'fixed_rate')
     when 'flat_rate' then coalesce(v_location.flat_rate_amount, 50)
     when 'tiered' then coalesce(v_location.first_period_rate, 50)
-    else coalesce(v_location.fixed_hourly_rate, 50)
+    else coalesce(v_location.fixed_rate_amount, 50)
   end;
 
   insert into reservations (
@@ -154,6 +157,7 @@ begin
       v_reserved_at,
       v_expires_at,
       p_arrival_window_minutes,
+      v_reservation_fee,
       v_parking_rate,
       v_pricing_config;
 end;

@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, Clock3, DollarSign, MapPin } from 'lucide-react-native';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 import type { ParkingLot } from '../../features/parking/types';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
@@ -13,6 +14,7 @@ interface ParkingLotCardProps {
 
 export function ParkingLotCard({ lot, onPress }: ParkingLotCardProps) {
   const occupancy = Math.round((lot.availableSlots / lot.totalSlots) * 100);
+  const pricingSummary = formatParkingPricingSummary(lot.pricingConfig);
 
   return (
     <Pressable onPress={onPress} accessibilityRole="button">
@@ -36,7 +38,7 @@ export function ParkingLotCard({ lot, onPress }: ParkingLotCardProps) {
             </View>
             <View style={styles.metricItem}>
               <DollarSign stroke={colors.muted} size={14} />
-              <Text style={styles.metricText}>PHP {lot.pricePerHour}/hr</Text>
+              <Text style={styles.metricText}>{pricingSummary}</Text>
             </View>
           </View>
 

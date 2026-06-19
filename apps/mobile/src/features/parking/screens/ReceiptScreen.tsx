@@ -10,6 +10,7 @@ import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { formatDateTime, formatDuration } from '../../../utils/format';
 import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
+import { formatParkingPricingSummary } from '@parking/shared';
 
 function formatCurrency(amount: number) {
   return `PHP ${amount.toFixed(2)}`;
@@ -19,6 +20,7 @@ export default function ReceiptScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
+  const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const resetFlow = useParkingFlowStore((state) => state.resetFlow);
   const paymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
   const receiptRef = useRef<View>(null);
@@ -26,18 +28,19 @@ export default function ReceiptScreen() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!completedSession) {
+    if (hasHydrated && !completedSession) {
       router.replace('/home');
     }
-  }, [completedSession, router]);
+  }, [completedSession, hasHydrated, router]);
 
-  if (!completedSession) {
+  if (!hasHydrated || !completedSession) {
     return null;
   }
 
   const isWalkIn = completedSession.reservationCode.startsWith('WIN-');
-  const reservationFee = isWalkIn ? 0 : Number(completedSession.pricePerHour ?? 0);
+  const reservationFee = isWalkIn ? 0 : Number(completedSession.reservationFee ?? 0);
   const totalPaid = completedSession.totalBill + reservationFee;
+  const pricingSummary = formatParkingPricingSummary(completedSession.pricingConfig);
 
   async function saveReceipt() {
     if (isWorking) {
@@ -140,6 +143,7 @@ export default function ReceiptScreen() {
                 <View style={styles.dashedDivider} />
 
                 <View style={styles.receiptSection}>
+                  <ReceiptAmountRow label="Pricing Model" amount={pricingSummary} />
                   {!isWalkIn ? <ReceiptAmountRow label="Reservation Fee" amount={formatCurrency(reservationFee)} /> : null}
                   <ReceiptAmountRow label={`Parking Fee (${formatDuration(completedSession.durationSeconds)})`} amount={formatCurrency(completedSession.totalBill)} />
 

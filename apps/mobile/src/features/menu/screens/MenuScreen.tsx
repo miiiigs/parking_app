@@ -28,8 +28,8 @@ import {
 import { BottomNav } from '../../../components/navigation/BottomNav';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
+import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
 import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
-import { useWalkInPreferencesStore } from '../../parking/store/useWalkInPreferencesStore';
 
 type SectionId = 'profile' | 'wallet' | 'settings' | 'about';
 
@@ -42,7 +42,7 @@ type SectionItem = {
 export default function MenuScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
-  const vehicle = useWalkInPreferencesStore((state) => state.vehicle);
+  const { vehicles, selectedVehicle: vehicle } = useMobileVehicles();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const [expanded, setExpanded] = useState<SectionId | null>('profile');
   const [notificationsOn, setNotificationsOn] = useState(true);
@@ -78,7 +78,7 @@ export default function MenuScreen() {
     { label: 'Change Phone Number', onPress: () => router.push('/change-phone') },
     {
       label: 'Vehicle Information',
-      sublabel: vehicle ? `${vehicle.model} · ${vehicle.plate}` : 'No saved vehicle yet',
+      sublabel: vehicle ? `${vehicle.model} - ${vehicle.plate}${vehicles.length > 1 ? ` (${vehicles.length} saved)` : ''}` : 'No saved vehicle yet',
       onPress: () => router.push('/edit-vehicle'),
     },
   ];
