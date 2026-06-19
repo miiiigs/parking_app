@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/poppins": "^0.4.1",
-    "@parking/shared": "1.0.0",
+    "@parking/shared": "workspace:*",
     "@supabase/supabase-js": "^2.49.0",
     "axios": "^1.15.0",
     "expo": "~52.0.49",
