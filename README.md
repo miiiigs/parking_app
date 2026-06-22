@@ -9,6 +9,17 @@ Monorepo scaffold for the Smart Parking Reservation System startup idea.
 - `packages/shared` - shared TypeScript types
 - `supabase` - backend planning and schema notes
 
+## Core operational docs
+
+- [workflow/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](./workflow/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md) - full planner, developer, reviewer operating cycle
+- [workflow/MASTER_PRODUCTION_PLAN_INITIALIZER.md](./workflow/MASTER_PRODUCTION_PLAN_INITIALIZER.md) - bootstrap guide for creating the master production plan from prompts or partial context
+- [workflow/MASTER_PRODUCTION_PLAN.md](./workflow/MASTER_PRODUCTION_PLAN.md) - master production sequence and launch gates
+- [workflow/ACTIVE_EXECUTION_TRACKER.md](./workflow/ACTIVE_EXECUTION_TRACKER.md) - current execution order and active progress tracking
+- [workflow/AI_DEVELOPER_EXECUTION_LOG.md](./workflow/AI_DEVELOPER_EXECUTION_LOG.md) - running log of what the active developer actually completed and validated
+- [workflow/personas/PLANNER_PERSONA.md](./workflow/personas/PLANNER_PERSONA.md) - reusable planner persona prompt
+- [workflow/personas/DEVELOPER_PERSONA.md](./workflow/personas/DEVELOPER_PERSONA.md) - reusable developer persona prompt
+- [workflow/personas/REVIEWER_PERSONA.md](./workflow/personas/REVIEWER_PERSONA.md) - reusable reviewer persona prompt
+
 ## Next build step
 
 1. Keep the mobile app on Expo Router, but use `expo run:android` for local native testing and EAS builds for release instead of Expo Go for native features.

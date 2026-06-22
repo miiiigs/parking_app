@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AlertTriangle, CheckCircle2, Clock3, Database, Radio, RefreshCcw, WifiOff } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SystemHealthSkeleton } from '@/components/dashboard/loading-skeletons';
 import { useOperatorData } from '@/lib/useOperatorData';
 import type { HealthState } from '@/lib/types';
 
@@ -42,7 +43,12 @@ function formatTimestamp(value: string | null) {
 }
 
 export function SystemHealth({ compact = false }: { compact?: boolean }) {
-  const { data } = useOperatorData();
+  const { data, loading } = useOperatorData();
+
+  if (loading && !data) {
+    return <SystemHealthSkeleton compact={compact} />;
+  }
+
   const health = data?.systemHealth ?? null;
 
   const overallState = health?.overall ?? 'unknown';

@@ -23,7 +23,7 @@ import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { applyOptimisticSlotStatus, recordOperatorActionFailure, recordOperatorActionSuccess, refreshOperatorData } from '@/lib/operatorDataStore';
+import { applyOptimisticSlotStatus, recordOperatorActionFailure, recordOperatorActionSuccess } from '@/lib/operatorDataStore';
 import {
   buildRoadShape,
   type ParkingLotDefinition,
@@ -233,10 +233,6 @@ export default function ParkingMapPage() {
       }),
     };
   }, [map.layout, map.name, map.slots]);
-
-  useEffect(() => {
-    void refreshOperatorData({ silent: true });
-  }, []);
 
   useEffect(() => {
     if (selectedSlot && !map.slots.some((slot: ParkingSlot) => slot.id === selectedSlot)) {

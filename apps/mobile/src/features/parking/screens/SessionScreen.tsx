@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 
 import { BottomNav } from '../../../components/navigation/BottomNav';
+import { ParkingDataStatusCard } from '../../../components/parking/ParkingDataStatusCard';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
@@ -35,7 +36,7 @@ function formatCurrency(amount: number) {
 export default function SessionScreen() {
   const router = useRouter();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
-  const { lots } = useMobileParkingData();
+  const { lots, isRefreshing, status, error: dataError, lastSyncedAt, refresh } = useMobileParkingData();
   const { selectedVehicle: savedVehicle } = useMobileVehicles();
   const session = useParkingFlowStore((state) => state.session);
   const finishSession = useParkingFlowStore((state) => state.finishSession);
@@ -196,6 +197,14 @@ export default function SessionScreen() {
               </View>
 
               <View style={styles.content}>
+                <ParkingDataStatusCard
+                  status={status}
+                  error={dataError}
+                  isRefreshing={isRefreshing}
+                  lastSyncedAt={lastSyncedAt}
+                  onRetry={() => void refresh()}
+                />
+
                 <View style={styles.timerCard}>
                   <Text style={styles.timerEyebrow}>{inEntryGracePeriod ? 'ENTRY GRACE PERIOD' : 'PARKING DURATION'}</Text>
                   <Text style={styles.timerValue}>{formatTimer(inEntryGracePeriod ? graceRemainingSeconds : activeElapsedSeconds)}</Text>

@@ -15,10 +15,12 @@ import {
   createParkingReservation,
   endParkingSession,
   getCurrentMobileWorkflowState,
+  issueWalkInEntryPass as issueWalkInEntryPassRequest,
   mapCompletedSession,
   mapReservationToBooking,
   mapSessionToParkingSession,
   startParkingSession,
+  startWalkInParkingSession,
   type ParkingSessionResult,
   type ReservationResult,
 } from '../../../lib/reservations';
@@ -42,6 +44,13 @@ interface StartWalkInSessionInput {
   plateNumber: string;
 }
 
+interface IssueWalkInEntryPassInput {
+  lot: ParkingLot;
+  slot: ParkingSlot;
+  plateNumber: string;
+  holdMinutes?: number;
+}
+
 type ReservationDraft = {
   lotId: string;
   slotId: string | null;
@@ -59,6 +68,7 @@ interface ParkingFlowState {
   isRestoring: boolean;
   hasHydrated: boolean;
   reserveSlot: (input: ReserveSlotInput) => Promise<Booking | null>;
+  issueWalkInEntryPass: (input: IssueWalkInEntryPassInput) => Promise<Booking | null>;
   setReservationDraft: (draft: ReservationDraft) => void;
   clearReservationDraft: () => void;
   startSession: (slotQrToken?: string) => Promise<ParkingSession | null>;
@@ -199,6 +209,57 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
 
         return booking;
       },
+      issueWalkInEntryPass: async ({ lot, slot, plateNumber, holdMinutes = 10 }) => {
+        const booking = await issueWalkInEntryPassRequest({
+          lot,
+          slot,
+          plateNumber,
+          holdMinutes,
+        });
+
+        set({
+          booking,
+          session: null,
+          completedSession: null,
+          reservationDraft: null,
+          validationQrToken: slot.qrToken ?? '',
+          scheduledNotificationIds: [],
+          isRestoring: false,
+        });
+
+        await saveStoredWorkflowSnapshot(
+          buildStoredWorkflowSnapshot(
+            {
+              stage: 'arrival',
+              selectedSlotId: booking.slotId ?? booking.slot.id,
+              selectedArrivalWindowMinutes: booking.arrivalWindowMinutes,
+              plateNumber,
+              validationQrToken: slot.qrToken ?? '',
+              createdReservation: booking.reservationId
+                ? ({
+                    reservation_id: booking.reservationId,
+                    slot_id: booking.slotId ?? booking.slot.id,
+                    slot_label: booking.slot.number,
+                    slot_status: booking.slot.status ?? 'reserved',
+                    reservation_status: booking.reservationStatus ?? 'confirmed',
+                    source: 'walk_in',
+                    reserved_at: booking.createdAt,
+                    expires_at: booking.expiresAt ?? booking.createdAt,
+                    arrival_window_minutes: booking.arrivalWindowMinutes,
+                    plate_number: booking.plateNumber,
+                    reservation_fee: booking.reservationFee,
+                    pricing_config: booking.pricingConfig,
+                  } satisfies ReservationResult)
+                : null,
+              activeParkingSession: null,
+              scheduledNotificationIds: [],
+            },
+            booking.reservationId ?? booking.reservationCode,
+          ),
+        );
+
+        return booking;
+      },
       startSession: async (slotQrToken?: string) => {
         const booking = get().booking;
 
@@ -302,11 +363,78 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
         return session;
       },
       startWalkInSession: async ({ lot, slot, plateNumber }) => {
+        const existingBooking = get().booking;
+
+        if (existingBooking?.source === 'walk_in' && existingBooking.reservationId && existingBooking.slot.id === slot.id) {
+          const sessionRecords = await startWalkInParkingSession({
+            reservationId: existingBooking.reservationId,
+            slotQrToken: slot.qrToken ?? existingBooking.qrToken ?? null,
+          });
+
+          if (sessionRecords && sessionRecords.length > 0) {
+            const current = sessionRecords[0];
+            const session: ParkingSession = {
+              ...existingBooking,
+              sessionId: current.session_id,
+              sessionStatus: current.session_status,
+              startTime: current.started_at,
+              startedAt: current.started_at,
+              validatedAt: current.validated_at,
+              billedMinutes: current.billed_minutes,
+              billedAmount: current.billed_amount,
+              paymentStatus: current.payment_status,
+            };
+
+            set({
+              booking: existingBooking,
+              session,
+              completedSession: null,
+              reservationDraft: null,
+              validationQrToken: slot.qrToken ?? existingBooking.qrToken ?? '',
+              scheduledNotificationIds: [],
+            });
+
+            await saveStoredWorkflowSnapshot(
+              buildStoredWorkflowSnapshot(
+                {
+                  stage: 'session',
+                  selectedSlotId: existingBooking.slotId ?? existingBooking.slot.id,
+                  selectedArrivalWindowMinutes: existingBooking.arrivalWindowMinutes,
+                  plateNumber: existingBooking.plateNumber,
+                  validationQrToken: slot.qrToken ?? existingBooking.qrToken ?? '',
+                  createdReservation: existingBooking.reservationId
+                    ? ({
+                        reservation_id: existingBooking.reservationId,
+                        slot_id: existingBooking.slotId ?? existingBooking.slot.id,
+                        slot_label: existingBooking.slot.number,
+                        slot_status: existingBooking.slot.status ?? 'occupied',
+                        reservation_status: existingBooking.reservationStatus ?? 'confirmed',
+                        source: 'walk_in',
+                        reserved_at: existingBooking.createdAt,
+                        expires_at: existingBooking.expiresAt ?? existingBooking.createdAt,
+                        arrival_window_minutes: existingBooking.arrivalWindowMinutes,
+                        plate_number: existingBooking.plateNumber,
+                        reservation_fee: existingBooking.reservationFee,
+                        pricing_config: existingBooking.pricingConfig,
+                      } satisfies ReservationResult)
+                    : null,
+                  activeParkingSession: sessionRecords[0],
+                  scheduledNotificationIds: [],
+                },
+                existingBooking.reservationId ?? existingBooking.reservationCode,
+              ),
+            );
+
+            return session;
+          }
+        }
+
         const startTime = new Date().toISOString();
         const reservationCode = createWalkInCode(slot.id);
 
         const session: ParkingSession = {
           reservationCode,
+          source: 'walk_in',
           lotId: lot.id,
           lotName: lot.name,
           address: lot.address,

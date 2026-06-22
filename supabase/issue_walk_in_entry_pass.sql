@@ -1,10 +1,9 @@
-drop function if exists reserve_parking_slot(uuid, text, integer, numeric);
+drop function if exists issue_walk_in_entry_pass(uuid, text, integer);
 
-create or replace function reserve_parking_slot(
+create or replace function issue_walk_in_entry_pass(
   p_slot_id uuid,
   p_plate_number text,
-  p_arrival_window_minutes integer,
-  p_parking_rate numeric default null
+  p_hold_minutes integer default 10
 )
 returns table (
   reservation_id uuid,
@@ -30,8 +29,8 @@ declare
   v_reservation_id uuid := gen_random_uuid();
   v_user_id uuid := auth.uid();
   v_reserved_at timestamptz := now();
-  v_expires_at timestamptz := now() + make_interval(mins => p_arrival_window_minutes);
-  v_reservation_fee numeric(10,2);
+  v_hold_minutes integer := greatest(1, least(coalesce(p_hold_minutes, 10), 30));
+  v_expires_at timestamptz := now() + make_interval(mins => v_hold_minutes);
   v_pricing_config jsonb;
   v_parking_rate numeric(10,2);
 begin
@@ -41,10 +40,6 @@ begin
 
   if trim(coalesce(p_plate_number, '')) = '' then
     raise exception 'Plate number is required';
-  end if;
-
-  if p_arrival_window_minutes <= 0 then
-    raise exception 'Arrival window must be greater than zero';
   end if;
 
   select *
@@ -64,21 +59,34 @@ begin
   select *
     into v_location
     from locations
-    where id = v_slot.location_id;
+    where id = v_slot.location_id
+    for update;
 
   if not found then
     raise exception 'Parking location not found';
   end if;
 
-  v_reservation_fee := case p_arrival_window_minutes
-    when 30 then coalesce(v_location.reservation_fee_30_minutes, 25.00)
-    when 60 then coalesce(v_location.reservation_fee_60_minutes, 40.00)
-    when 120 then coalesce(v_location.reservation_fee_120_minutes, 60.00)
-    else null
-  end;
-
-  if v_reservation_fee is null then
-    raise exception 'Unsupported arrival window';
+  if exists (
+    select 1
+    from reservations r
+    where r.user_id = v_user_id
+      and r.source = 'walk_in'
+      and r.status = 'confirmed'
+      and r.expires_at > now()
+      and exists (
+        select 1
+        from parking_slots ps
+        where ps.id = r.slot_id
+          and ps.location_id = v_location.id
+      )
+      and not exists (
+        select 1
+        from parking_sessions s
+        where s.reservation_id = r.id
+          and s.status = 'active'
+      )
+  ) then
+    raise exception 'You already have an active walk-in entry pass for this location';
   end if;
 
   v_pricing_config := jsonb_build_object(
@@ -104,6 +112,7 @@ begin
     id,
     user_id,
     slot_id,
+    source,
     plate_number,
     arrival_window_minutes,
     reservation_fee,
@@ -116,9 +125,10 @@ begin
     v_reservation_id,
     v_user_id,
     p_slot_id,
+    'walk_in',
     p_plate_number,
-    p_arrival_window_minutes,
-    v_reservation_fee,
+    v_hold_minutes,
+    0,
     v_parking_rate,
     v_pricing_config,
     'confirmed',
@@ -138,10 +148,10 @@ begin
   ) values (
     p_slot_id,
     v_reservation_id,
-    'reservation_created',
+    'walk_in_entry_pass_issued',
     jsonb_build_object(
-      'arrival_window_minutes', p_arrival_window_minutes,
-      'reservation_fee', v_reservation_fee,
+      'source', 'walk_in',
+      'hold_minutes', v_hold_minutes,
       'plate_number', p_plate_number,
       'parking_rate', v_parking_rate,
       'pricing_config', v_pricing_config
@@ -155,14 +165,14 @@ begin
       v_slot.slot_label,
       'reserved',
       'confirmed',
-      'reservation',
+      'walk_in',
       v_reserved_at,
       v_expires_at,
-      p_arrival_window_minutes,
-      v_reservation_fee,
+      v_hold_minutes,
+      0::numeric,
       v_parking_rate,
       v_pricing_config;
 end;
 $$;
 
-grant execute on function reserve_parking_slot(uuid, text, integer, numeric) to anon, authenticated;
+grant execute on function issue_walk_in_entry_pass(uuid, text, integer) to anon, authenticated;

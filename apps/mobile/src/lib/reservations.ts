@@ -1,4 +1,4 @@
-import { calculateBill, createExitCode, createReceiptNumber, createReservationCode, createTransactionId } from '../features/parking/lib/flow';
+import { calculateBill, createExitCode, createReceiptNumber, createReservationCode, createTransactionId, createWalkInCode } from '../features/parking/lib/flow';
 import { ensureMobileAuthSession, getCurrentGuestMode, getSupabaseClient } from './supabaseClient';
 import type { Booking, CompletedSession, ParkingLot, ParkingSession, ParkingSlot } from '../features/parking/types';
 import {
@@ -16,6 +16,7 @@ export type ReservationResult = {
   slot_label: string;
   slot_status: string;
   reservation_status: string;
+  source?: string | null;
   reserved_at: string;
   expires_at: string;
   arrival_window_minutes?: number | null;
@@ -32,6 +33,7 @@ export type ParkingSessionResult = {
   slot_label: string;
   slot_status: string;
   reservation_status: string;
+  source?: string | null;
   session_status: string;
   started_at: string;
   validated_at: string;
@@ -54,6 +56,13 @@ export type ReservationRequest = {
   slot: ParkingSlot;
   arrivalWindowMinutes: number;
   plateNumber: string;
+};
+
+export type WalkInEntryPassRequest = {
+  lot: ParkingLot;
+  slot: ParkingSlot;
+  plateNumber: string;
+  holdMinutes?: number;
 };
 
 function isUuidLike(value: string) {
@@ -107,6 +116,31 @@ function isMissingPricingConfigColumn(message: string | undefined) {
     || message.toLowerCase().includes('column "pricing_config" does not exist');
 }
 
+function isMissingReservationSourceColumn(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return message.toLowerCase().includes("column 'source' does not exist")
+    || message.toLowerCase().includes('column "source" does not exist');
+}
+
+function isMissingIssueWalkInEntryPassSignature(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return message.includes('Could not find the function public.issue_walk_in_entry_pass');
+}
+
+function isMissingStartWalkInSessionSignature(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  return message.includes('Could not find the function public.start_walk_in_session');
+}
+
 function buildExitGraceEndsAt(endTime: string, pricingConfig: ParkingPricingConfig) {
   const durationMs = Math.max(0, pricingConfig.exitGraceMinutes) * 60 * 1000;
   return new Date(new Date(endTime).getTime() + durationMs).toISOString();
@@ -122,6 +156,7 @@ function toBookingFromReservation({
   parkingRate,
   reservationFee,
   pricingConfig,
+  source,
 }: {
   lot: ParkingLot;
   slot: ParkingSlot;
@@ -132,6 +167,7 @@ function toBookingFromReservation({
   parkingRate?: number | null;
   reservationFee?: number | null;
   pricingConfig?: ParkingPricingConfig | null;
+  source?: 'reservation' | 'walk_in' | 'local';
 }): Booking {
   const normalizedPricingConfig = normalizeParkingPricingConfig(
     pricingConfig ?? {
@@ -148,6 +184,7 @@ function toBookingFromReservation({
   return {
     reservationId: reservationId ?? undefined,
     reservationCode: reservationId ?? createReservationCode(slot.id),
+    source: source ?? (reservationId ? 'reservation' : 'local'),
     lotId: lot.id,
     lotName: lot.name,
     address: lot.address,
@@ -163,6 +200,36 @@ function toBookingFromReservation({
     expiresAt: expiresAt ?? null,
     qrToken: slot.qrToken ?? null,
     createdAt: new Date().toISOString(),
+  };
+}
+
+function toLocalWalkInBooking({
+  lot,
+  slot,
+  plateNumber,
+  holdMinutes = 10,
+}: WalkInEntryPassRequest): Booking {
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
+
+  return {
+    reservationCode: createWalkInCode(slot.id),
+    source: 'walk_in',
+    lotId: lot.id,
+    lotName: lot.name,
+    address: lot.address,
+    slotId: slot.id,
+    slotLabel: slot.number,
+    slot,
+    arrivalWindowMinutes: holdMinutes,
+    plateNumber,
+    reservationFee: 0,
+    pricePerHour: lot.pricePerHour,
+    pricingConfig: normalizeParkingPricingConfig(lot.pricingConfig ?? DEFAULT_PARKING_PRICING),
+    reservationStatus: 'confirmed',
+    expiresAt,
+    qrToken: slot.qrToken ?? null,
+    createdAt,
   };
 }
 
@@ -222,6 +289,65 @@ export async function createParkingReservation(request: ReservationRequest) {
     parkingRate: reservation.parking_rate,
     reservationFee: reservation.reservation_fee,
     pricingConfig: reservation.pricing_config ?? request.lot.pricingConfig,
+    source: reservation.source === 'walk_in' ? 'walk_in' : 'reservation',
+  });
+}
+
+export async function issueWalkInEntryPass(request: WalkInEntryPassRequest) {
+  const supabase = getSupabaseClient() as any;
+  const useLocalFlow = await shouldUseLocalFlow();
+  const holdMinutes = request.holdMinutes ?? 10;
+
+  if (!supabase || useLocalFlow) {
+    return toLocalWalkInBooking({ ...request, holdMinutes });
+  }
+
+  if (!isUuidLike(request.slot.id)) {
+    throw new Error('Live parking data is required for walk-in entry passes. Reload the lot map or switch to guest mode for local testing.');
+  }
+
+  try {
+    await ensureMobileAuthSession();
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can issue a walk-in entry pass.');
+  }
+
+  let { data, error } = await supabase.rpc('issue_walk_in_entry_pass', {
+    p_slot_id: request.slot.id,
+    p_plate_number: request.plateNumber,
+    p_hold_minutes: holdMinutes,
+  });
+
+  if (error && isMissingIssueWalkInEntryPassSignature(error.message)) {
+    return toLocalWalkInBooking({ ...request, holdMinutes });
+  }
+
+  if (error || !data) {
+    throw new Error(error?.message ?? 'Unable to issue the walk-in entry pass in Supabase.');
+  }
+
+  const reservation = Array.isArray(data) ? data[0] ?? null : data;
+
+  if (!reservation) {
+    throw new Error('Supabase did not return a walk-in entry pass row.');
+  }
+
+  return toBookingFromReservation({
+    lot: request.lot,
+    slot: request.slot,
+    request: {
+      lot: request.lot,
+      slot: request.slot,
+      arrivalWindowMinutes: reservation.arrival_window_minutes ?? holdMinutes,
+      plateNumber: request.plateNumber,
+    },
+    reservationId: reservation.reservation_id,
+    expiresAt: reservation.expires_at,
+    reservationStatus: reservation.reservation_status,
+    parkingRate: reservation.parking_rate,
+    reservationFee: reservation.reservation_fee,
+    pricingConfig: reservation.pricing_config ?? request.lot.pricingConfig,
+    source: 'walk_in',
   });
 }
 
@@ -242,6 +368,7 @@ export async function getParkingReservationById(reservationId: string) {
       expires_at,
       arrival_window_minutes,
       plate_number,
+      source,
       reservation_fee,
       parking_rate,
       pricing_config,
@@ -255,7 +382,7 @@ export async function getParkingReservationById(reservationId: string) {
 
   let { data, error } = await query;
 
-  if (error && (isMissingParkingRateColumn(error.message) || isMissingPricingConfigColumn(error.message))) {
+  if (error && (isMissingParkingRateColumn(error.message) || isMissingPricingConfigColumn(error.message) || isMissingReservationSourceColumn(error.message))) {
     query = supabase
       .from('reservations')
       .select(`
@@ -293,6 +420,7 @@ export async function getParkingReservationById(reservationId: string) {
     slot_label: parkingSlot?.slot_label ?? 'Assigned slot',
     slot_status: parkingSlot?.status ?? 'available',
     reservation_status: data.status,
+    source: 'source' in data ? data.source ?? null : null,
     reserved_at: data.reserved_at,
     expires_at: data.expires_at,
     arrival_window_minutes: data.arrival_window_minutes ?? null,
@@ -321,11 +449,12 @@ export async function getParkingSessionByReservationId(reservationId: string) {
       billed_minutes,
       billed_amount,
       status,
-      reservations!inner (
-        plate_number,
-        reservation_fee,
-        pricing_config,
-        status,
+        reservations!inner (
+          plate_number,
+          reservation_fee,
+          source,
+          pricing_config,
+          status,
         parking_slots!inner (
           slot_label,
           status
@@ -337,7 +466,7 @@ export async function getParkingSessionByReservationId(reservationId: string) {
 
   let { data, error } = await query;
 
-  if (error && isMissingPricingConfigColumn(error.message)) {
+  if (error && (isMissingPricingConfigColumn(error.message) || isMissingReservationSourceColumn(error.message))) {
     query = supabase
       .from('parking_sessions')
       .select(`
@@ -392,6 +521,7 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     slot_label: parkingSlot?.slot_label ?? 'Assigned slot',
     slot_status: parkingSlot?.status ?? 'occupied',
     reservation_status: reservation?.status ?? 'confirmed',
+    source: 'source' in (reservation ?? {}) ? reservation?.source ?? null : null,
     session_status: data.status,
     started_at: data.started_at,
     validated_at: data.started_at,
@@ -565,6 +695,39 @@ export async function startParkingSession(request: {
   return data as ParkingSessionResult[];
 }
 
+export async function startWalkInParkingSession(request: {
+  reservationId: string;
+  slotQrToken?: string | null;
+}) {
+  const supabase = getSupabaseClient() as any;
+  const useLocalFlow = await shouldUseLocalFlow();
+
+  if (!supabase || useLocalFlow) {
+    return null;
+  }
+
+  try {
+    await ensureMobileAuthSession();
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can start a walk-in parking session.');
+  }
+
+  const { data, error } = await supabase.rpc('start_walk_in_session', {
+    p_reservation_id: request.reservationId,
+    p_slot_qr_token: request.slotQrToken ?? null,
+  });
+
+  if (error && isMissingStartWalkInSessionSignature(error.message)) {
+    return startParkingSession(request);
+  }
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as ParkingSessionResult[];
+}
+
 export function mapReservationToBooking(
   reservation: ReservationResult,
   lot: ParkingLot,
@@ -573,6 +736,7 @@ export function mapReservationToBooking(
   return {
     reservationId: reservation.reservation_id,
     reservationCode: reservation.reservation_id,
+    source: reservation.source === 'walk_in' ? 'walk_in' : 'reservation',
     lotId: lot.id,
     lotName: lot.name,
     address: lot.address,
@@ -605,6 +769,7 @@ export function mapSessionToParkingSession(
     billedMinutes: session.billed_minutes,
     billedAmount: session.billed_amount,
     paymentStatus: session.payment_status,
+    source: session.source === 'walk_in' ? 'walk_in' : booking.source,
     pricingConfig: normalizeParkingPricingConfig(session.pricing_config ?? booking.pricingConfig),
   };
 }

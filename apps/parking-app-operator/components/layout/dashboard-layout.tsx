@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { signOutOperator } from '@/app/actions';
+import { OperatorSyncBanner } from '@/components/dashboard/operator-sync-banner';
 import { useAuth } from '@/lib/auth-context';
 import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { LocationSwitcher } from './location-switcher';
@@ -172,6 +173,8 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
             </div>
           </div>
         </header>
+
+        <OperatorSyncBanner />
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto bg-background">
