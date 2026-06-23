@@ -10,47 +10,46 @@ If you are one of the personas, read this file before doing anything else.
   `2026-06-23-cycle-002-gate-entry-confirmation`
 
 - `Current owner`:
-  `Reviewer`
+  `Planner`
 
 - `Current phase`:
-  `Reviewer assessment`
+  `Planner intake`
 
 - `Status`:
-  `Developer completed the requested rework. Gate confirmation now requires an exact persisted operator-location assignment before service-role mutation, and SQL idempotent replay is restricted to confirmed reservations with active sessions. Reviewer should verify both fixes and their regression coverage.`
+  `Reviewer approved the gate-entry authorization and terminal replay rework with follow-ups. Repo-side blockers are closed; staging SQL execution, operator/location assignment provisioning, scanner-client integration, and live concurrency validation remain manual or future-cycle work.`
 
 - `Primary objective`:
-  `Re-review the gate-entry authorization and terminal replay corrections, confirm they close the recorded findings without regression, and decide whether the cycle can return to Planner.`
+  `Select the next highest-value work cycle from the tracker, using the accepted gate-entry backend slice, retained temp session summary, debugger note, and active operator scan suggestion as planning inputs.`
 
 - `Why this owner has the baton`:
-  `Developer implemented the narrowly scoped reviewer rework, passed the required validation, documented the new manual assignment-provisioning step, and returned the same cycle for independent review.`
+  `Reviewer found no remaining repo-blocking issues in the rework, recorded approval with follow-ups, and returned the baton for roadmap reprioritization.`
 
 - `Required reads for the current owner`:
   1. [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md)
-  2. [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](./AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
-  3. [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
-  4. [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
-  5. [TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md](../planning/TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md)
-  6. [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
-  7. [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
-  8. [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
-  9. [confirm_parking_entry.sql](../../supabase/confirm_parking_entry.sql)
+  2. [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
+  3. [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
+  4. [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
+  5. [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
+  6. [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
+  7. [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
+  8. [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
+  9. [SESSION_UPDATE.md](../temp/SESSION_UPDATE.md)
 
 - `Expected output from current owner`:
-  `A findings-first re-review in AI_REVIEWER_REMARKS.md, explicit disposition of the retained temp update, and a baton handoff to Developer for further rework or Planner if accepted.`
+  `A precise next developer brief in AI_DEVELOPER_PROMPT_NEXT_MOVE.md and baton handoff to Developer, or a blocked clarification if the next cycle depends on external credentials or manual decisions.`
 
 - `Exit criteria for this phase`:
-  - reviewer verifies exact persisted assignment is required before privileged RPC invocation
-  - reviewer verifies missing and cross-location assignments fail closed
-  - reviewer verifies only confirmed-reservation and active-session duplicates replay successfully
-  - reviewer verifies terminal combinations fail and focused tests cover both findings
-  - reviewer confirms assignment provisioning and live staging rehearsal remain explicit manual actions
-  - reviewer records a decision and assigns the next owner
+  - planner reconciles accepted gate-entry status with the master plan and tracker
+  - planner considers retained temp, debugger, and suggestion inputs
+  - planner decides whether the next cycle is repo-executable or blocked by manual staging/device work
+  - planner writes a concrete scoped developer prompt when repo work is available
+  - planner assigns the next owner explicitly
 
 - `Next owner after successful handoff`:
-  `Planner`
+  `Developer`
 
 - `Blocking dependencies`:
-  `No external blocker for repo rework. A non-production Supabase target and credentials remain required after approval for live authorization, terminal-state, duplicate, and concurrency validation.`
+  `No blocker for planning. External credentials and a non-production Supabase target are still required for Track A bootstrap, SQL execution, assignment provisioning proof, live scan rehearsal, and concurrency validation.`
 
 - `Last updated`:
   `2026-06-23`

@@ -46,7 +46,7 @@ The workflow also expects personas to respect the `workflow/temp/` contract:
   `thread`
 
 - `Schedule`:
-  `FREQ=MINUTELY;INTERVAL=20`
+  `FREQ=MINUTELY;INTERVAL=5`
 
 - `Status when configured`:
   `PAUSED`
@@ -57,13 +57,13 @@ The heartbeat interval controls automatic wake-ups on a fixed schedule.
 
 In this workflow, the current schedule is:
 
-- `FREQ=MINUTELY;INTERVAL=20`
+- `FREQ=MINUTELY;INTERVAL=5`
 
 That means the dispatcher is eligible to wake up automatically on the clock pattern implied by the schedule.
 
 Example:
 
-- `10:00 -> 10:20 -> 10:40 -> 11:00`
+- `10:00 -> 10:05 -> 10:10 -> 10:15`
 
 not:
 
