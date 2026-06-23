@@ -8,6 +8,8 @@ Use this document to decide what we do next, what is blocked, and what can be de
 
 - Do not start a lower-priority launch blocker while a higher-priority dependency is unresolved unless parallel work is explicitly safe.
 - Do not mark work done based on code alone when the success gate requires device validation, production data validation, or operator validation.
+- The master production plan is the controlling product contract when workflow docs disagree.
+- The intended customer flow is gate-entry-first: reservation entry QR is validated by the gate or operator, the backend becomes authoritative for session activation after entry confirmation, parking grace applies before metered time, and slot-QR validation is not the target production interaction.
 - Every task must have:
   - an owner
   - a dependency status
@@ -22,7 +24,7 @@ Use this document to decide what we do next, what is blocked, and what can be de
 - Environment and migration control
 - Backend-complete reservation lifecycle
 - Backend-complete walk-in lifecycle
-- Real QR validation flow
+- Gate-entry and exit QR lifecycle
 - Real payment integration and settlement
 - Expiry, no-show, and housekeeping automation
 - Observability and analytics baseline
@@ -74,7 +76,7 @@ Owner:
 - `Backend` + `DevOps`
 
 Why this is next:
-- Every other production step depends on clear environment separation, migration discipline, rollback safety, and release ownership. The rebuilt baseline now exists again, but it still needs a real `staging` bootstrap and rollback rehearsal before later launch-critical work can rely on it fully.
+- Every later production step depends on clear environment separation, migration discipline, rollback safety, and release ownership. The repo already has a rebuilt baseline, but it still needs a real `staging` bootstrap and rollback rehearsal before later launch-critical work can rely on it fully.
 
 Tasks:
 - [x] Rebuild the current environment matrix for `local`, `staging`, `pilot-production`, and `production`.
@@ -96,7 +98,6 @@ Future polish:
 - automated migration validation in CI
 
 Implementation:
-- Current evidence:
 - [TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md](./TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md)
 - [apps/mobile/.env.example](../apps/mobile/.env.example)
 - [apps/parking-app-operator/.env.example](../apps/parking-app-operator/.env.example)
@@ -107,7 +108,7 @@ Validation method:
 - Re-audited current mobile build scripts, EAS profiles, Android release guidance, and operator deployment guidance.
 - Re-audited the committed Supabase SQL artifact set and rebuilt the current bootstrap, compatibility, backup, restore, and reset posture from those files.
 
-Remaining gap before declaring the gate fully closed:
+Remaining gap before success gate:
 - A fresh `staging` bootstrap and one rollback drill still need to be rehearsed against a non-production Supabase project using the rebuilt baseline.
 - Real environment secrets, operator deployment credentials, and Android release signing assets still require manual provisioning outside the repo.
 
@@ -117,23 +118,26 @@ Priority:
 - `P0`
 
 Status:
-- `In progress`
+- `In progress - repo rework now enforces durable operator-location assignment and terminal replay rejection; reviewer acceptance and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
 
 Already true:
 - reservation, arrival, session, exit, and receipt flow already exist
+- the mobile reservation screen now presents an entry-pass-style QR instead of routing users into slot-validation scanning
 
 Tasks:
 - [ ] Remove remaining production-risk fallback assumptions from customer-critical paths.
+- [x] Define the backend-owned gate or operator confirmation contract that transitions a reservation from arrival to active session.
 - [ ] Confirm slot-state race handling under concurrent reservations.
 - [ ] Add clearer server-driven expired and no-show handling.
+- [x] Add backend-owned parking-grace and metered-start behavior after confirmed lot entry.
 - [ ] Add stronger failure UX for stale slot, lost session, and retry paths.
 - [ ] Add release-quality customer-facing copy for all critical states.
 
 Success gate:
-- A signed-in user can complete the reservation-backed lifecycle on live backend data with no manual record fixing.
+- A signed-in user can complete the reservation-backed lifecycle on live backend data from reservation through gate entry, parking grace, payment, and exit without manual record fixing.
 
 Dependencies:
 - Track A
@@ -150,19 +154,19 @@ Priority:
 - `P0`
 
 Status:
-- `In progress`
+- `In progress - backend-native walk-in issuance and cleanup artifacts exist, but staging rollout proof and final inventory safety evidence remain open`
 
 Owner:
 - `Backend` + `Mobile` + `Operator`
 
 Why this is critical:
-- Current walk-in flow is useful, but not strong enough yet for commercial trust and auditability.
+- Current walk-in flow is useful, but it is not strong enough yet for commercial trust and auditability.
 
 Tasks:
 - [x] Decide final walk-in model: reservation-like server flow or operator-issued direct session flow.
 - [x] Persist walk-in entry issuance and session start in backend.
 - [ ] Ensure walk-in inventory does not steal or corrupt reserved inventory.
-- [ ] Surface walk-in state and audit trail in operator dashboard.
+- [x] Surface walk-in state and audit trail in operator dashboard.
 - [ ] Add timeout and invalidation rules for walk-in QR issuance.
 
 Success gate:
@@ -181,51 +185,81 @@ Implementation:
 - [supabase/walk_in_support.sql](../supabase/walk_in_support.sql)
 - [supabase/issue_walk_in_entry_pass.sql](../supabase/issue_walk_in_entry_pass.sql)
 - [supabase/start_walk_in_session.sql](../supabase/start_walk_in_session.sql)
+- [supabase/expire_stale_walk_in_entry_passes.sql](../supabase/expire_stale_walk_in_entry_passes.sql)
+- [supabase/schedule_walk_in_expiry_cleanup.sql](../supabase/schedule_walk_in_expiry_cleanup.sql)
 - [apps/mobile/src/lib/reservations.ts](../apps/mobile/src/lib/reservations.ts)
 - [apps/mobile/src/features/parking/store/useParkingFlowStore.ts](../apps/mobile/src/features/parking/store/useParkingFlowStore.ts)
 - [apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx](../apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx)
 - [apps/mobile/tests/walkInContract.test.mjs](../apps/mobile/tests/walkInContract.test.mjs)
+- [apps/parking-app-operator/app/dashboard/reservations/page.tsx](../apps/parking-app-operator/app/dashboard/reservations/page.tsx)
+- [apps/parking-app-operator/app/api/operator/reservations/route.ts](../apps/parking-app-operator/app/api/operator/reservations/route.ts)
 
 Validation method:
 - `npm --workspace apps/mobile run test`
 - `npm --workspace apps/mobile run typecheck`
 - Verified the mobile walk-in flow now issues backend entry passes first, then starts backend sessions when a walk-in reservation exists.
 - Verified the new SQL layer enforces backend-derived identity, explicit walk-in source tagging, and server-owned slot hold creation.
+- `npm --workspace apps/parking-app-operator run test`
+- `npm --workspace apps/parking-app-operator run build`
+- Verified repo-level contracts for locked stale-hold cleanup, active-session and newer-hold protection, service-role-only execution, audit-event creation, source filtering, and operator list/detail visibility.
 
 Remaining gap before success gate:
-- Walk-in expiry automation still needs a backend cleanup path that releases stale held inventory without relying on the mobile app reopening.
-- Operator dashboard visibility and audit-focused walk-in views are still not implemented.
-- A non-production Supabase rollout rehearsal is still recommended before this is treated as launch-safe.
+- The cleanup function and opt-in scheduler artifact exist, but `pg_cron` activation and observed execution still require a non-production Supabase rollout.
+- Inventory safety is covered by repo-level guards and contract tests, but still needs database-level concurrency rehearsal before that task can be marked complete.
+- Operator source visibility and linked audit history are implemented; real operator acceptance against staging remains open.
 
-## Track D - Real QR Validation
+## Track D - Gate Entry, Grace Periods, and Exit QR Lifecycle
 
 Priority:
 - `P0`
 
 Status:
-- `Ready`
+- `In progress - authorization and terminal replay rework is implemented in repo; reviewer acceptance, assignment provisioning, scanner integration, and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
 
 Tasks:
-- [ ] Add camera-based QR scanner for arrival validation.
-- [ ] Validate slot QR contents against assigned slot and reservation/session state.
-- [ ] Add wrong-slot recovery UX.
-- [ ] Add operator-friendly fallback when scanning fails on weak signal or damaged codes.
-- [ ] Decide whether entry and slot QR are separate concepts or one unified scheme.
+- [x] Present a reservation-backed entry QR ticket in the mobile flow.
+- [x] Remove slot-QR validation as the default mobile activation path.
+- [~] Redirect gate or operator validation into the matching reservation and confirm lot entry in backend state. The authenticated location-scoped API exists; a production gate scanner client still needs to call it.
+- [x] Start the parking lifecycle on confirmed lot entry without requiring a second slot-validation scan.
+- [x] Add a parking grace countdown before the metered timer starts.
+- [ ] Add a paid exit QR and leave-the-slot grace countdown after payment.
+- [ ] Define and implement penalty handling for expired exit grace or wrong-slot behavior.
+- [ ] Define automatic conflict-resolution and compensation behavior with operator visibility.
 
 Success gate:
-- Real-device QR scanning is the default validation path and rejects invalid or mismatched slot scans.
+- A reservation can be fulfilled through gate QR entry, backend-confirmed session activation, parking grace, payment, exit grace, and penalty-safe expiry handling without requiring slot-validation scanning.
 
 Dependencies:
 - Track B
 
 Rollback/fallback:
-- guarded manual validation path for pilot only
+- guarded operator-assisted entry and exit handling for pilot only
 
 Future polish:
-- gate QR and kiosk QR variants
+- kiosk, ANPR, and hardware-gate variants
+
+Implementation:
+- [apps/mobile/app/validate.tsx](../apps/mobile/app/validate.tsx)
+- [apps/mobile/src/features/parking/screens/ArrivalScreen.tsx](../apps/mobile/src/features/parking/screens/ArrivalScreen.tsx)
+- [apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx](../apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx)
+- [apps/mobile/src/features/parking/store/useParkingFlowStore.ts](../apps/mobile/src/features/parking/store/useParkingFlowStore.ts)
+- [apps/mobile/tests/reservationContract.test.mjs](../apps/mobile/tests/reservationContract.test.mjs)
+- [apps/mobile/tests/walkInContract.test.mjs](../apps/mobile/tests/walkInContract.test.mjs)
+
+Validation method:
+- `npm.cmd --workspace apps/mobile run test`
+- `npm.cmd --workspace apps/mobile run typecheck`
+- Verified the reservation arrival flow now presents an entry-pass QR and no longer routes users through slot-QR validation.
+- Verified the walk-in entry-pass flow no longer routes through `/validate` and now continues into the session flow after gate or operator confirmation from the app UX perspective.
+- Verified the repo now contains backend-owned gate confirmation and parking-grace boundaries; exit authorization, automated penalties, compensation handling, scanner-client integration, and staging proof remain open.
+
+Remaining gap before success gate:
+- The current mobile flow still relies on app-side continuation after gate scan instead of a backend-owned gate or operator confirmation event.
+- Backend state transitions for parking grace, metered start, paid exit grace, penalty assessment, and compensation are not yet defined as the authoritative contract in repo code.
+- Operator and support handling for conflicts, compensation, and exit overstay remain open product and implementation gaps.
 
 ## Track E - Payments and Settlement
 
@@ -240,9 +274,10 @@ Owner:
 
 Tasks:
 - [ ] Select payment provider and integration model.
-- [ ] Implement server-side payment intent / charge lifecycle.
+- [ ] Implement server-side payment intent or charge lifecycle.
 - [ ] Add webhook processing and idempotent settlement logic.
 - [ ] Add failed payment, retry, refund, and reversal handling.
+- [ ] Add finance-visible handling for penalties, compensation credits, and fee waivers.
 - [ ] Add finance-visible reports and discrepancy views.
 
 Success gate:
@@ -271,7 +306,9 @@ Owner:
 Tasks:
 - [ ] Add reservation expiry automation.
 - [ ] Add no-show marking rules.
+- [ ] Add parking-grace and exit-grace expiry automation.
 - [ ] Add session timeout or stale-session safeguards if needed.
+- [ ] Add penalty and compensation automation triggers where policy requires them.
 - [ ] Add recurring reconciliation and drift detection jobs.
 - [ ] Define operational thresholds for automatic vs manual correction.
 
@@ -325,7 +362,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress`
+- `In progress - base operator surfaces exist, but gate-entry exceptions, compensation handling, and overstay actions are still missing`
 
 Owner:
 - `Operator` + `Backend`
@@ -335,10 +372,10 @@ Already true:
 
 Tasks:
 - [ ] Split large dashboard data contract into dedicated paginated endpoints.
-- [ ] Add richer detail actions for disputes and manual intervention.
+- [ ] Add richer detail actions for disputes, compensation, and manual intervention.
 - [ ] Add shift handoff notes and unresolved issue log.
 - [ ] Add approval workflow for destructive actions.
-- [ ] Add operational alerts for slot mismatch and realtime degradation.
+- [ ] Add operational alerts for slot mismatch, exit overstay, and realtime degradation.
 
 Success gate:
 - Operators can run a full day of parking operations without engineering opening Supabase directly.
@@ -403,7 +440,7 @@ Tasks:
 - [ ] Add operator typecheck to standard validation flow.
 - [ ] Add route-level and device-level tests where missing.
 - [ ] Validate native notifications in real Android builds.
-- [ ] Validate reservation, arrival, session, payment, exit, and receipt on a real device.
+- [ ] Validate reservation, gate entry, session, payment, exit, and receipt on a real device.
 - [ ] Add release signoff checklist by owner.
 
 Success gate:
@@ -422,20 +459,20 @@ Future polish:
 
 These are the next tasks we should actively execute in order.
 
-1. `Track A`: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline
-2. `Track C`: add walk-in expiry automation and operator visibility, then validate the rollout against `staging`
-3. `Track D`: real QR scanner and validation contract
-4. `Track E`: payment provider decision and backend settlement design
-5. `Track G`: establish the first observability and analytics baseline around the launch-critical flows
+1. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
+2. `Track D`: connect the production gate scanner client to the location-scoped confirmation API, then prove valid, duplicate, expired, cancelled, and wrong-location scans in staging.
+3. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
+4. `Track E`: payment provider decision and backend settlement design.
+5. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
 
 ## Recommended Parallel Work Split
 
 If multiple builders are available, this is the safest split:
 
-- Builder 1: Track A staging bootstrap and rollback rehearsal against the rebuilt baseline
-- Builder 2: Track C walk-in expiry automation and operator visibility path
-- Builder 3: Track D mobile QR scanner integration spike
-- Builder 4: Track G analytics event taxonomy and logging plan
+- Builder 1: Track A staging bootstrap and rollback rehearsal against the rebuilt baseline when credentials and a target are available.
+- Builder 2: Track B plus Track D backend gate-confirmation and grace-period lifecycle design or implementation slice.
+- Builder 3: Track C cleanup deployment, scheduler activation, and operator acceptance in staging.
+- Builder 4: Track G analytics event taxonomy and logging plan.
 
 ## Definition Of Done For This Stage
 

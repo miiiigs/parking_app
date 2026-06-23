@@ -40,6 +40,7 @@ export interface ParkingSlot {
 export interface Reservation {
   id: string;
   reservationId: string;
+  source: 'reservation' | 'walk_in';
   vehicleNumber: string;
   driverName: string;
   slotId: string;

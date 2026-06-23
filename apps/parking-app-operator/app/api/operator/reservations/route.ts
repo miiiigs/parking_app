@@ -44,6 +44,7 @@ export async function GET(request: Request) {
     const pageSize = parsePageSize(searchParams.get('pageSize'), 20, 100);
     const search = searchParams.get('search')?.trim().toLowerCase() ?? '';
     const statusFilter = searchParams.get('status');
+    const sourceFilter = searchParams.get('source');
 
     const slotRows = await fetchScopedSlotRows(config.url, config.serviceRoleKey, location.id);
     const { reservationRows, sessionRows, paymentRows } = await fetchScopedReservationsWithRelations(
@@ -78,6 +79,7 @@ export async function GET(request: Request) {
       return {
         id: reservation.id,
         reservationId: toReservationId(reservation.id),
+        source: reservation.source,
         vehicleNumber: reservation.plate_number ?? '',
         driverName: '',
         slotId: reservation.slot_id,
@@ -101,14 +103,16 @@ export async function GET(request: Request) {
 
     const filteredReservations = reservations.filter((reservation) => {
       const matchesStatus = !statusFilter || reservation.status === statusFilter;
+      const matchesSource = !sourceFilter || reservation.source === sourceFilter;
       const matchesSearch =
         !search ||
         reservation.reservationId.toLowerCase().includes(search) ||
+        reservation.source.toLowerCase().includes(search) ||
         reservation.vehicleNumber.toLowerCase().includes(search) ||
         reservation.slotNumber.toLowerCase().includes(search) ||
         reservation.id.toLowerCase().includes(search);
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesSource && matchesSearch;
     });
 
     const sortedReservations = filteredReservations.sort((left, right) => {

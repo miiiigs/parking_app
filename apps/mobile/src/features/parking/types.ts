@@ -56,6 +56,8 @@ export interface ParkingSession extends Booking {
   startTime: string;
   startedAt?: string | null;
   validatedAt?: string | null;
+  parkingGraceEndsAt?: string | null;
+  meteredStartedAt?: string | null;
   billedMinutes?: number | null;
   billedAmount?: number | null;
   paymentStatus?: string | null;

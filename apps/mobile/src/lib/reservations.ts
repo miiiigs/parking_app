@@ -36,6 +36,9 @@ export type ParkingSessionResult = {
   source?: string | null;
   session_status: string;
   started_at: string;
+  entry_confirmed_at?: string | null;
+  parking_grace_ends_at?: string | null;
+  metered_started_at?: string | null;
   validated_at: string;
   ended_at: string | null;
   plate_number: string;
@@ -116,6 +119,13 @@ function isMissingPricingConfigColumn(message: string | undefined) {
     || message.toLowerCase().includes('column "pricing_config" does not exist');
 }
 
+function isMissingSessionGraceColumn(message: string | undefined) {
+  const normalized = message?.toLowerCase() ?? '';
+  return normalized.includes('entry_confirmed_at')
+    || normalized.includes('parking_grace_ends_at')
+    || normalized.includes('metered_started_at');
+}
+
 function isMissingReservationSourceColumn(message: string | undefined) {
   if (!message) {
     return false;
@@ -131,14 +141,6 @@ function isMissingIssueWalkInEntryPassSignature(message: string | undefined) {
   }
 
   return message.includes('Could not find the function public.issue_walk_in_entry_pass');
-}
-
-function isMissingStartWalkInSessionSignature(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  return message.includes('Could not find the function public.start_walk_in_session');
 }
 
 function buildExitGraceEndsAt(endTime: string, pricingConfig: ParkingPricingConfig) {
@@ -445,6 +447,9 @@ export async function getParkingSessionByReservationId(reservationId: string) {
       reservation_id,
       slot_id,
       started_at,
+      entry_confirmed_at,
+      parking_grace_ends_at,
+      metered_started_at,
       ended_at,
       billed_minutes,
       billed_amount,
@@ -466,7 +471,7 @@ export async function getParkingSessionByReservationId(reservationId: string) {
 
   let { data, error } = await query;
 
-  if (error && (isMissingPricingConfigColumn(error.message) || isMissingReservationSourceColumn(error.message))) {
+  if (error && (isMissingPricingConfigColumn(error.message) || isMissingReservationSourceColumn(error.message) || isMissingSessionGraceColumn(error.message))) {
     query = supabase
       .from('parking_sessions')
       .select(`
@@ -524,7 +529,10 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     source: 'source' in (reservation ?? {}) ? reservation?.source ?? null : null,
     session_status: data.status,
     started_at: data.started_at,
-    validated_at: data.started_at,
+    entry_confirmed_at: 'entry_confirmed_at' in data ? data.entry_confirmed_at ?? data.started_at : data.started_at,
+    parking_grace_ends_at: 'parking_grace_ends_at' in data ? data.parking_grace_ends_at ?? null : null,
+    metered_started_at: 'metered_started_at' in data ? data.metered_started_at ?? null : null,
+    validated_at: 'entry_confirmed_at' in data ? data.entry_confirmed_at ?? data.started_at : data.started_at,
     ended_at: data.ended_at ?? null,
     plate_number: reservation?.plate_number ?? '',
     reservation_fee: Number(reservation?.reservation_fee ?? 0),
@@ -666,68 +674,6 @@ export async function endParkingSession(request: {
   return data as ParkingSessionResult[];
 }
 
-export async function startParkingSession(request: {
-  reservationId: string;
-  slotQrToken?: string | null;
-}) {
-  const supabase = getSupabaseClient() as any;
-  const useLocalFlow = await shouldUseLocalFlow();
-
-  if (!supabase || useLocalFlow) {
-    return null;
-  }
-
-  try {
-    await ensureMobileAuthSession();
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can start a parking session.');
-  }
-
-  const { data, error } = await supabase.rpc('start_parking_session', {
-    p_reservation_id: request.reservationId,
-    p_slot_qr_token: request.slotQrToken ?? null,
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as ParkingSessionResult[];
-}
-
-export async function startWalkInParkingSession(request: {
-  reservationId: string;
-  slotQrToken?: string | null;
-}) {
-  const supabase = getSupabaseClient() as any;
-  const useLocalFlow = await shouldUseLocalFlow();
-
-  if (!supabase || useLocalFlow) {
-    return null;
-  }
-
-  try {
-    await ensureMobileAuthSession();
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Sign in is required before you can start a walk-in parking session.');
-  }
-
-  const { data, error } = await supabase.rpc('start_walk_in_session', {
-    p_reservation_id: request.reservationId,
-    p_slot_qr_token: request.slotQrToken ?? null,
-  });
-
-  if (error && isMissingStartWalkInSessionSignature(error.message)) {
-    return startParkingSession(request);
-  }
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data as ParkingSessionResult[];
-}
-
 export function mapReservationToBooking(
   reservation: ReservationResult,
   lot: ParkingLot,
@@ -766,6 +712,8 @@ export function mapSessionToParkingSession(
     startTime: session.started_at,
     startedAt: session.started_at,
     validatedAt: session.validated_at,
+    parkingGraceEndsAt: session.parking_grace_ends_at ?? null,
+    meteredStartedAt: session.metered_started_at ?? null,
     billedMinutes: session.billed_minutes,
     billedAmount: session.billed_amount,
     paymentStatus: session.payment_status,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Check, Timer, X } from 'lucide-react-native';
+import { Check, X } from 'lucide-react-native';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -20,7 +20,7 @@ export default function ArrivalScreen() {
   const booking = useParkingFlowStore((state) => state.booking);
   const session = useParkingFlowStore((state) => state.session);
   const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
-  const startSession = useParkingFlowStore((state) => state.startSession);
+  const refreshSession = useParkingFlowStore((state) => state.refreshSession);
   const cancelReservation = useParkingFlowStore((state) => state.cancelReservation);
   const [stage, setStage] = useState<ArrivalStage>('qr');
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -38,15 +38,14 @@ export default function ArrivalScreen() {
       router.replace('/session');
     }
   }, [router, session]);
-
   const reservation = booking ?? session;
 
   const entryQrValue = useMemo(() => {
     if (!reservation) {
-      return 'parking-arrival-unavailable';
+      return 'parking-entry-unavailable';
     }
 
-    return reservation.qrToken ?? reservation.slot.qrToken ?? reservation.reservationCode;
+    return `reservation-entry|${reservation.reservationId ?? reservation.reservationCode}`;
   }, [reservation]);
 
   if (!reservation) {
@@ -62,15 +61,19 @@ export default function ArrivalScreen() {
     ? formatTime(reservation.expiresAt)
     : formatTime(new Date(new Date(reservation.createdAt).getTime() + reservation.arrivalWindowMinutes * 60 * 1000).toISOString());
 
-  async function handleStartArrival() {
+  async function handleRefreshArrival() {
     setErrorMessage(null);
     setIsSubmitting(true);
 
     try {
-      await startSession(entryQrValue);
-      router.replace('/session');
+      const confirmedSession = await refreshSession();
+      if (confirmedSession) {
+        router.replace('/session');
+        return;
+      }
+      setErrorMessage('Entry has not been confirmed yet. Present this QR to the gate or operator, then check again.');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to activate the reservation right now.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to check the gate confirmation right now.');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,7 +121,7 @@ export default function ArrivalScreen() {
             <Check color="#FFFFFF" size={24} strokeWidth={2.8} />
           </View>
           <Text style={styles.confirmHeaderTitle}>Reservation Confirmed</Text>
-          <Text style={styles.confirmHeaderCopy}>Your slot is secured and ready for arrival.</Text>
+          <Text style={styles.confirmHeaderCopy}>Your slot is secured and your entry pass is ready for gate validation.</Text>
         </View>
 
         <View style={styles.confirmContent}>
@@ -129,7 +132,7 @@ export default function ArrivalScreen() {
             <View style={styles.qrCodeBadge}>
               <Text style={styles.qrCodeBadgeText}>{reservation.reservationCode}</Text>
             </View>
-            <Text style={styles.qrCaption}>Scan this QR code at the parking entrance to activate your session.</Text>
+            <Text style={styles.qrCaption}>Present this QR at the gate or to the operator so they can confirm your entry.</Text>
           </View>
 
           <View style={styles.detailCard}>
@@ -150,15 +153,15 @@ export default function ArrivalScreen() {
 
           <View style={styles.noticeCardWarning}>
             <Text style={styles.noticeCopyWarning}>
-              After scanning, your active session begins immediately and uses the lot&apos;s entry grace period while you proceed to your slot.
+              After entry is confirmed, your active session begins immediately and uses the lot&apos;s entry grace period while you proceed to your slot.
             </Text>
           </View>
 
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
           <AuthActionButton
-            label={isSubmitting ? 'Activating...' : 'I Have Arrived - Scan QR'}
-            onPress={() => void handleStartArrival()}
+            label={isSubmitting ? 'Checking Entry...' : 'Check Gate Confirmation'}
+            onPress={() => void handleRefreshArrival()}
             loading={isSubmitting}
           />
 

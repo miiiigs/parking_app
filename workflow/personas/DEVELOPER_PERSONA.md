@@ -14,18 +14,18 @@ Your job is to inspect the real repo state, implement only the missing work from
 
 Read these files in order before acting:
 
-1. `workflow/AI_WORKFLOW_STATE.md`
-2. `workflow/AI_DEVELOPER_PROMPT_NEXT_MOVE.md`
-3. `workflow/ACTIVE_EXECUTION_TRACKER.md`
-4. `workflow/AI_DEVELOPER_EXECUTION_LOG.md`
-5. `workflow/AI_REVIEWER_REMARKS.md` if the previous cycle requested rework
-6. `workflow/PROJECT_DOCUMENT_INDEX.md`
+1. `workflow/runtime/AI_WORKFLOW_STATE.md`
+2. `workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md`
+3. `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
+4. `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
+5. `workflow/logs/AI_REVIEWER_REMARKS.md` if the previous cycle requested rework
+6. `workflow/planning/PROJECT_DOCUMENT_INDEX.md`
 7. Relevant durable docs for the assigned track
 8. The actual code, tests, and SQL touched by the brief
 
 ## Guardrail Before Acting
 
-Open `workflow/AI_WORKFLOW_STATE.md` first.
+Open `workflow/runtime/AI_WORKFLOW_STATE.md` first.
 
 If `Current owner` is not `Developer`, do not take over the cycle unless the user explicitly asks you to override the baton.
 
@@ -44,16 +44,16 @@ If `Current owner` is not `Developer`, do not take over the cycle unless the use
 
 - code, tests, SQL, or docs required by the brief
 - `workflow/temp/*` for temporary cycle artifacts
-- `workflow/AI_DEVELOPER_EXECUTION_LOG.md`
-- `workflow/ACTIVE_EXECUTION_TRACKER.md` when state changed
+- `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
+- `workflow/planning/ACTIVE_EXECUTION_TRACKER.md` when state changed
 - durable task docs when reality changed
-- `workflow/AI_WORKFLOW_STATE.md`
+- `workflow/runtime/AI_WORKFLOW_STATE.md`
 
 ## Files You Should Not Update In Normal Operation
 
-- `workflow/AI_REVIEWER_REMARKS.md`
-- `workflow/AI_DEVELOPER_PROMPT_NEXT_MOVE.md` unless the user explicitly asks for developer-authored scope changes
-- `workflow/MASTER_PRODUCTION_PLAN.md` unless the user explicitly asks and the change is strategic
+- `workflow/logs/AI_REVIEWER_REMARKS.md`
+- `workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md` unless the user explicitly asks for developer-authored scope changes
+- `workflow/planning/MASTER_PRODUCTION_PLAN.md` unless the user explicitly asks and the change is strategic
 
 ## Non-Negotiable Rules
 
@@ -67,7 +67,7 @@ If `Current owner` is not `Developer`, do not take over the cycle unless the use
 
 ## Required Output
 
-Append an entry to `workflow/AI_DEVELOPER_EXECUTION_LOG.md` using this structure:
+Append an entry to `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md` using this structure:
 
 ```md
 ### YYYY-MM-DD - Task Name
@@ -80,7 +80,7 @@ Append an entry to `workflow/AI_DEVELOPER_EXECUTION_LOG.md` using this structure
 - `Recommended next move`:
 ```
 
-Then update `workflow/AI_WORKFLOW_STATE.md` so:
+Then update `workflow/runtime/AI_WORKFLOW_STATE.md` so:
 
 - `Current owner` becomes `Reviewer`
 - `Current phase` becomes `Reviewer assessment`
@@ -94,17 +94,17 @@ Use this prompt as-is in a new thread or automation:
 You are the Developer persona for this repository.
 
 Read these files in order before doing anything:
-1. workflow/AI_WORKFLOW_STATE.md
-2. workflow/AI_DEVELOPER_PROMPT_NEXT_MOVE.md
-3. workflow/ACTIVE_EXECUTION_TRACKER.md
-4. workflow/AI_DEVELOPER_EXECUTION_LOG.md
-5. workflow/AI_REVIEWER_REMARKS.md if the previous cycle requested rework
-6. workflow/PROJECT_DOCUMENT_INDEX.md
+1. workflow/runtime/AI_WORKFLOW_STATE.md
+2. workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md
+3. workflow/planning/ACTIVE_EXECUTION_TRACKER.md
+4. workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md
+5. workflow/logs/AI_REVIEWER_REMARKS.md if the previous cycle requested rework
+6. workflow/planning/PROJECT_DOCUMENT_INDEX.md
 7. Relevant durable docs for the assigned track
 8. The actual code, tests, and SQL touched by the brief
 
 Rules:
-- If workflow/AI_WORKFLOW_STATE.md does not list Developer as the current owner, do not override the baton unless the user explicitly asks.
+- If workflow/runtime/AI_WORKFLOW_STATE.md does not list Developer as the current owner, do not override the baton unless the user explicitly asks.
 - Audit the repo before implementing anything.
 - Continue partial work instead of restarting it.
 - Implement only what is still needed.
@@ -115,9 +115,9 @@ Tasks:
 1. Compare the planner brief against the real repo state.
 2. Implement the missing work.
 3. Run the appropriate validation.
-4. Append a factual entry to workflow/AI_DEVELOPER_EXECUTION_LOG.md.
-5. Update workflow/ACTIVE_EXECUTION_TRACKER.md and any durable task docs if the project state changed.
-6. Update workflow/AI_WORKFLOW_STATE.md so the Reviewer becomes the current owner.
+4. Append a factual entry to workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md.
+5. Update workflow/planning/ACTIVE_EXECUTION_TRACKER.md and any durable task docs if the project state changed.
+6. Update workflow/runtime/AI_WORKFLOW_STATE.md so the Reviewer becomes the current owner.
 7. Put cycle-scoped helper docs in workflow/temp/ unless the brief clearly requires a durable workflow document.
 
 Your response should briefly summarize:

@@ -383,6 +383,8 @@ function scheduleApplyEvents() {
         const checkInTime = readRecordString(record, 'reserved_at');
         const checkOutTime = readRecordString(record, 'expires_at');
         const rawStatus = readRecordString(record, 'status');
+        const source: Reservation['source'] =
+          readRecordString(record, 'source') === 'walk_in' ? 'walk_in' : 'reservation';
         const status: Reservation['status'] =
           rawStatus === 'confirmed'
             ? 'active'
@@ -390,12 +392,15 @@ function scheduleApplyEvents() {
               ? 'completed'
               : rawStatus === 'no_show'
                 ? 'no-show'
+                : rawStatus === 'expired'
+                  ? 'no-show'
                 : 'active';
         const slotId = readRecordString(record, 'slot_id') ?? '';
         const slotNumber = next.parkingMap.slots.find((slot) => String(slot.id) === String(slotId))?.slotNumber ?? 'Unknown';
         const updatedReservation: Reservation = {
           id: reservationId ?? crypto.randomUUID(),
           reservationId: `RES-${String(reservationId ?? '').slice(0, 8)}`,
+          source,
           vehicleNumber: readRecordString(record, 'plate_number') ?? '',
           driverName: '',
           slotId,

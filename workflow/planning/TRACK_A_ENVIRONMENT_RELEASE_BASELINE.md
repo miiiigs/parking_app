@@ -46,6 +46,8 @@ This baseline does not replace the wider product roadmap in [MASTER_PRODUCTION_P
 - [supabase/end_parking_session.sql](../supabase/end_parking_session.sql)
 - [supabase/issue_walk_in_entry_pass.sql](../supabase/issue_walk_in_entry_pass.sql)
 - [supabase/start_walk_in_session.sql](../supabase/start_walk_in_session.sql)
+- [supabase/expire_stale_walk_in_entry_passes.sql](../supabase/expire_stale_walk_in_entry_passes.sql)
+- [supabase/schedule_walk_in_expiry_cleanup.sql](../supabase/schedule_walk_in_expiry_cleanup.sql)
 - [supabase/walk_in_support.sql](../supabase/walk_in_support.sql)
 - [supabase/enable_realtime.sql](../supabase/enable_realtime.sql)
 - [supabase/seed.sql](../supabase/seed.sql)
@@ -217,6 +219,7 @@ Recommended current sequence for a brand-new Supabase project:
 1. Run [schema.sql](../supabase/schema.sql).
 2. Run [enable_rls.sql](../supabase/enable_rls.sql) as an explicit hardening rerun for the core tables.
 3. Run [admin_hardening.sql](../supabase/admin_hardening.sql).
+   Then run [operator_location_assignments.sql](../supabase/operator_location_assignments.sql) and provision explicit operator/location assignments before enabling gate mutations.
 4. After the first real operator auth user exists, run [bootstrap_admin_role.sql](../supabase/bootstrap_admin_role.sql) with the real admin email substituted.
 5. Run [parking_lot_layouts.sql](../supabase/parking_lot_layouts.sql).
 6. Run [mobile_dashboard_snapshot.sql](../supabase/mobile_dashboard_snapshot.sql).
@@ -230,17 +233,21 @@ Recommended current sequence for a brand-new Supabase project:
    - [reserve_parking_slot.sql](../supabase/reserve_parking_slot.sql)
    - [cancel_parking_reservation.sql](../supabase/cancel_parking_reservation.sql)
    - [start_parking_session.sql](../supabase/start_parking_session.sql)
+   - [confirm_parking_entry.sql](../supabase/confirm_parking_entry.sql)
    - [end_parking_session.sql](../supabase/end_parking_session.sql)
    - [issue_walk_in_entry_pass.sql](../supabase/issue_walk_in_entry_pass.sql)
    - [start_walk_in_session.sql](../supabase/start_walk_in_session.sql)
-9. Run [enable_realtime.sql](../supabase/enable_realtime.sql).
-10. Only for local or non-production seed scenarios, run [seed.sql](../supabase/seed.sql).
+9. Run [expire_stale_walk_in_entry_passes.sql](../supabase/expire_stale_walk_in_entry_passes.sql).
+10. Run [enable_realtime.sql](../supabase/enable_realtime.sql).
+11. Only for local or non-production seed scenarios, run [seed.sql](../supabase/seed.sql).
+12. After staging validation and explicit `pg_cron` enablement, run [schedule_walk_in_expiry_cleanup.sql](../supabase/schedule_walk_in_expiry_cleanup.sql). Keep scheduler activation separate from schema bootstrap and verify the job in the target environment.
 
 Notes:
 
 - Some support files overlap functionality already present in `schema.sql`. Treat them as compatibility or incremental upgrade files when reconciling an older environment to current repo behavior.
 - `parking_lot_layouts.sql` and `mobile_dashboard_snapshot.sql` are both required for the operator lot builder and the mobile lot layout payload.
 - `enable_realtime.sql` currently adds `parking_slots`, `reservations`, `parking_sessions`, and `payments` to the `supabase_realtime` publication.
+- `schedule_walk_in_expiry_cleanup.sql` is an environment activation artifact, not proof that the recurring job is active. Verify `cron.job`, `cron.job_run_details`, and emitted operator events in staging before promotion.
 
 ### Upgrade posture for existing environments
 
@@ -285,6 +292,7 @@ Current safest rollback posture:
 2. If a change fails functionally, restore the prior snapshot rather than improvising ad hoc reverse SQL under pressure.
 3. Run [backup_restore_smoke_test.sql](../supabase/backup_restore_smoke_test.sql) after restore.
 4. Re-run reconciliation if operational state may be inconsistent after restore.
+5. If the walk-in cleanup schedule must be rolled back independently, run `select cron.unschedule('expire-stale-walk-in-entry-passes');`.
 
 ### App rollback
 
@@ -310,6 +318,7 @@ Manual or external work still required:
 - perform one rollback drill using a real non-production backup or snapshot
 - confirm the final production mobile package or bundle identifiers before store release
 - decide and document the exact production host or hosts for the operator app if that deployment target changes from the current documented Next.js posture
+- enable and observe the walk-in expiry scheduler in staging before promoting it to pilot-production
 
 ## Current Track A Closure Standard
 

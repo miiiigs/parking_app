@@ -15,6 +15,7 @@ For this project, "production-ready" means more than shipping working screens.
 It means:
 
 - the backend is the source of truth for reservations, sessions, billing, and operator state
+- the backend owns gate-entry validation, parking grace windows, exit grace windows, penalties, and compensation outcomes
 - the mobile customer journey is understandable, reliable, and defensible in real-world use
 - the operator webapp can run a live parking location without direct database intervention
 - the security model holds under common abuse and role misuse
@@ -43,9 +44,10 @@ The mobile app currently covers:
 - login, register, and OTP flows
 - home and parking-lot browsing
 - slot selection and reservation flow
+- reservation entry-ticket QR presentation
 - arrival validation flow
 - active parking session flow
-- payment and receipt screens
+- payment, exit, and receipt screens
 - walk-in confirmation and walk-in QR flow
 - menu, profile, vehicle, phone, and payment-method screens
 - workflow recovery and persisted session state
@@ -73,6 +75,19 @@ The backend currently includes:
 - realtime publication setup for key parking data
 - supporting SQL for pricing, layout, admin hardening, and reconciliation
 
+## Canonical Customer Parking Lifecycle
+
+This is the intended production flow the app should align to:
+
+1. The user reserves a slot and immediately receives an entry QR ticket in the app.
+2. The gate scans that QR ticket on arrival, the operator or gate flow is redirected to the matching reservation, and lot entry is confirmed.
+3. Once entry is confirmed, the parking session becomes active in backend state without requiring a second QR scan for slot validation.
+4. A short parking grace countdown begins so the user can physically park in the reserved slot; when that grace window ends, the metered parking timer starts.
+5. The user is expected to occupy the reserved slot. If there is a slot conflict, the app should drive the exception flow, preserve auditability, and compensate the affected user automatically according to policy.
+6. Before leaving, the user pays the ticket in the app and receives exit authorization with a leave-the-slot grace period.
+7. The exit QR stays valid only during that leave grace window. If the user does not leave in time, the QR expires and overstay penalties apply.
+8. If something goes wrong at any stage, the app should route the user into a clear support or operator contact path instead of leaving them in an undefined state.
+
 ## Current Reality Snapshot
 
 ### Confirmed done
@@ -92,6 +107,7 @@ The backend currently includes:
 
 - [~] Environment and deployment discipline exists in fragments, but the durable production operating layer needs to be re-solidified
 - [~] Reservation lifecycle is backend-aware, but some customer-facing fallback or sample-data behavior still needs production-safe tightening
+- [~] The repo now presents entry-pass-first reservation and walk-in UX, but gate confirmation, session activation authority, and grace or penalty enforcement are not yet fully backend-owned
 - [~] Walk-in flow is significantly more real than before, but timeout automation and full operator visibility are not complete
 - [~] Mobile UI and UX are broad in coverage, but launch-quality error copy, recovery states, and field-validated scanning UX are not complete
 - [~] Operator web UX is operationally meaningful, but heavy views, detail actions, and high-volume ergonomics still need hardening
@@ -102,7 +118,7 @@ The backend currently includes:
 ### Confirmed not done
 
 - [ ] Real payment provider integration and finance-safe settlement lifecycle
-- [ ] Camera-first QR scanning as the production-default validation path
+- [ ] Gate-entry QR activation, parking grace timing, and exit-grace QR expiry aligned end to end in production code
 - [ ] Server-owned expiry, no-show, and housekeeping automation
 - [ ] Full production-safe environment, rollback, and release discipline
 - [ ] End-to-end security hardening for mobile, webapp, privileged routes, and SQL functions
@@ -114,8 +130,9 @@ The backend currently includes:
 
 - [ ] Broad commercial rollout is not yet safe
 - [ ] Payments remain operationally incomplete for real-money production use
-- [ ] Real QR validation still depends on UX or logic paths that are not yet true camera-default production flows
+- [ ] Current repo flow is closer to the intended gate-entry-first lifecycle, but still lacks backend-owned operator or gate confirmation, exit-authorization QR handling, and automated penalty or compensation enforcement
 - [ ] Walk-in lifecycle still needs server housekeeping and richer operator visibility before it can be trusted at scale
+- [ ] Penalty, compensation, and support escalation behavior are not yet modeled end to end as backend-owned commercial flows
 - [ ] Some environment or rollout documentation was intentionally removed as outdated and now needs current-state replacement
 - [ ] Current repo validation history is useful, but this plan should not assume every existing dirty-worktree change has already passed a fresh full validation run
 
@@ -146,8 +163,8 @@ The product should not yet claim:
 - backend-correct reservation lifecycle
 - backend-correct walk-in lifecycle
 - real payment strategy
-- real QR validation strategy
-- operator exception workflows
+- real gate-entry and exit-authorization QR strategy
+- operator exception and compensation workflows
 - security and privileged-access review
 - release and rollback readiness
 
@@ -159,7 +176,7 @@ Status:
 - [~] Partial
 
 Already done:
-- [x] Core concept is clear: reserve a slot, validate arrival, run a timed session, pay, and exit
+- [x] Core concept is clear at a high level: reserve a slot, enter through a validated gate ticket, park within a grace window, run a timed session, pay, and exit
 - [x] Distinct customer mobile app and operator webapp already exist in the repo
 - [x] The repo already implies a pilot-location-first operating model
 
@@ -167,6 +184,7 @@ Still required:
 - [ ] Define launch market and pilot-location selection criteria
 - [ ] Define first commercial customer and partner profile
 - [ ] Define reservation fee, parking fee, refund, and exception policy for commercial use
+- [ ] Define penalty and compensation policy for wrong-slot use, exit overstay, and operator-caused conflict
 - [ ] Define guard, operator, support, finance, and founder escalation ownership
 - [ ] Define explicit launch boundaries: what the app will support, what stays manual, and what remains out of scope
 
@@ -248,9 +266,11 @@ Already done:
 
 Still required:
 - [ ] Tighten reservation concurrency and slot-state race handling
+- [ ] Model gate-entry confirmation, parking grace, metered-session start, paid-exit grace, and penalty states as backend-authoritative transitions
 - [ ] Complete server-owned expiry, no-show, and stale-state cleanup behavior
 - [ ] Ensure walk-in inventory rules cannot corrupt reserved inventory
 - [ ] Ensure all status transitions remain backend-authoritative under retries and partial failures
+- [ ] Define automatic conflict-resolution outcomes, compensation writes, and operator-visible audit trails
 - [ ] Define long-term migration discipline for schema evolution
 - [ ] Clarify archival, retention, and export posture for receipts, sessions, audit events, and partner reporting
 
@@ -278,10 +298,12 @@ Already done:
 
 Still required:
 - [ ] Replace remaining production-risk fallback states with clearly safe UX
-- [ ] Make camera scanning the true default for QR validation when hardware allows
+- [ ] Align the customer flow to one primary contract: reservation QR for gate entry, no slot-validation scan after entry, parking grace, metered session, payment, and exit grace
+- [ ] Present clear parking-grace and leave-the-slot countdown states with penalty messaging
 - [ ] Improve stale-slot, offline, retry, and degraded-state customer messaging
 - [ ] Add launch-quality copy and visual trust signals across critical states
-- [ ] Validate the real ergonomics of reservation, walk-in, payment, and receipt flows on-device
+- [ ] Add issue-reporting or contact-support paths at reservation, entry, conflict, payment, and exit failure points
+- [ ] Validate the real ergonomics of reservation, gate entry, parking grace, payment, exit, and receipt flows on-device
 - [ ] Ensure settings and account-management surfaces match actual backend capability rather than placeholder expectations
 
 Success gate:
@@ -307,7 +329,7 @@ Already done:
 Still required:
 - [ ] Break heavy aggregate views into paginated or more specialized data contracts
 - [ ] Add richer detail drawers, operator notes, and safe destructive-action approval flows
-- [ ] Add walk-in-specific visibility, audit review, and exception actions
+- [ ] Add gate-entry, conflict, compensation, and exit-overstay visibility plus operator exception actions
 - [ ] Add shift handoff, unresolved issue logging, and incident communication UX
 - [ ] Improve resilience and ergonomic behavior for high-volume operational use
 - [ ] Improve degraded-state banners, fallback handling, and realtime failure visibility
@@ -336,6 +358,7 @@ Still required:
 - [ ] Implement payment intent, capture, timeout, refund, and reversal lifecycle
 - [ ] Add webhook handling and idempotent settlement logic
 - [ ] Separate accounting paths for reservation fee, parking fee, refund, and failed charge outcomes
+- [ ] Add accounting rules for penalties, compensation credits, fee waivers, and operator-approved reversals
 - [ ] Add payment failure UX and finance-visible discrepancy views
 - [ ] Add receipt retention, finance exports, and reconciliation posture suitable for pilot operations
 
@@ -361,7 +384,9 @@ Already done:
 Still required:
 - [ ] Add server-owned reservation expiry automation
 - [ ] Add walk-in pass invalidation and held-slot release automation
+- [ ] Add server-owned parking-grace and paid-exit-grace countdown enforcement
 - [ ] Add no-show and stale-session housekeeping paths
+- [ ] Add automatic penalty application and compensation-trigger automation where policy requires it
 - [ ] Define reconciliation automation boundaries versus manual operator actions
 - [ ] Validate notification behavior in real release builds
 - [ ] Add guardrails so degraded realtime never silently misleads operators or customers
@@ -493,16 +518,16 @@ Impact:
 What must happen before pilot:
 - provider integration, webhook logic, settlement posture, refund and failure handling
 
-### 3. QR validation is not yet a fully field-ready production interaction
+### 3. Gate-entry and exit QR lifecycle is not yet aligned in production code
 
 Risk:
-- slot validation may remain too dependent on simplified confirmation flows or under-validated scanning behavior
+- the product still relies on app-side continuation and incomplete backend authority instead of a full gate-confirmed and exit-authorized lifecycle
 
 Impact:
-- trust loss, wrong-slot friction, operator rescue burden
+- trust loss, wrong-slot friction, operator rescue burden, and unclear penalty handling
 
 What must happen before pilot:
-- real-device camera-default validation and strong recovery UX
+- one backend-owned gate-entry, grace-period, payment, exit, penalty, and recovery contract with real-device validation
 
 ### 4. Walk-in is closer to production than before, but not finished
 
@@ -545,11 +570,13 @@ What must happen before pilot:
 - authenticated user to vehicle-added rate
 - lot-opened to slot-selected rate
 - slot-selected to reservation-created rate
-- reservation-created to arrival-started rate
-- arrival-started to session-started rate
+- reservation-created to gate-entry-scanned rate
+- gate-entry-scanned to parking-grace-completed rate
+- parking-grace-completed to metered-session-started rate
 - session-started to session-completed rate
 - session-completed to payment-success rate
-- payment-success to receipt-viewed rate
+- payment-success to exit-grace-completed rate
+- exit-grace-completed to receipt-viewed rate
 
 ### Reservation and walk-in quality metrics
 
@@ -559,6 +586,8 @@ What must happen before pilot:
 - no-show rate
 - wrong-slot attempt rate
 - occupied-slot dispute rate
+- penalty incidence rate
+- compensation incidence rate
 - average time from reservation to arrival
 
 ### Utilization and revenue metrics
@@ -601,7 +630,7 @@ What must happen before pilot:
 ## Suggested Immediate Execution Order
 
 1. Re-solidify Phase 1 environment and release operations now that outdated docs were intentionally removed.
-2. Complete Phase 3 and Phase 4 hardening of the core reservation lifecycle and customer failure UX.
+2. Complete Phase 3 and Phase 4 hardening around the intended gate-entry, grace-period, penalty, and customer failure lifecycle.
 3. Finish Phase 5 and Phase 7 gaps around walk-in operator visibility and server housekeeping.
 4. Build Phase 6 real payment integration and finance-safe settlement.
 5. Build Phase 8 observability and incident readiness before any live commercial traffic.

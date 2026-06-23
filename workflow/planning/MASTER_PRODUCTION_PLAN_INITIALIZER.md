@@ -263,9 +263,9 @@ Future polish:
 Use this prompt in a new thread when you want Codex to create the first master plan:
 
 ```md
-Create or rebuild workflow/MASTER_PRODUCTION_PLAN.md as the main planning reference for this project.
+Create or rebuild workflow/planning/MASTER_PRODUCTION_PLAN.md as the main planning reference for this project.
 
-Use workflow/MASTER_PRODUCTION_PLAN_INITIALIZER.md as the instruction source.
+Use workflow/planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md as the instruction source.
 
 If the repository has useful implementation context, inspect it and use that reality in the plan.
 If not enough implementation context exists, build the plan from the user prompt and clearly label assumptions.

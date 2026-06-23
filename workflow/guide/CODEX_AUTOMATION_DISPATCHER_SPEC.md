@@ -4,6 +4,8 @@ This file records the exact Codex automation pattern used for the three-persona 
 
 Use it as the durable source for rebuilding the automation in another thread or another project after copying the `workflow/` folder.
 
+The manual `Debugger` persona is intentionally outside this automation.
+
 ## Why A Dispatcher Was Used
 
 Codex thread automations have an important limitation:
@@ -15,11 +17,13 @@ Because of that, a single baton-aware dispatcher automation is the safest thread
 The dispatcher:
 
 - wakes on a schedule
-- reads `workflow/AI_WORKFLOW_STATE.md`
+- reads `workflow/runtime/AI_WORKFLOW_STATE.md`
 - determines the current owner
 - performs only that persona's responsibilities
 - updates the baton for the next persona
 - exits
+
+The dispatcher does not run the debugger persona because the debugger is a manual support path for error investigation, not a baton owner.
 
 The workflow also expects personas to respect the `workflow/temp/` contract:
 
@@ -74,7 +78,7 @@ The interval is therefore:
 
 The source of truth for sequencing is still:
 
-- `workflow/AI_WORKFLOW_STATE.md`
+- `workflow/runtime/AI_WORKFLOW_STATE.md`
 
 ## Manual Runs Between Heartbeats
 
@@ -129,7 +133,7 @@ The active Codex automation was configured with this operating prompt:
 ```md
 Run the repository workflow as a single baton-aware dispatcher.
 
-Start by reading workflow/CODEX_AUTOMATION_DISPATCHER_SPEC.md and workflow/AI_WORKFLOW_STATE.md.
+Start by reading workflow/guide/CODEX_AUTOMATION_DISPATCHER_SPEC.md and workflow/runtime/AI_WORKFLOW_STATE.md.
 
 Before doing any role work, check whether the workflow state suggests a contradictory or already-active unresolved run. If the state is contradictory, unresolved, or effectively locked, make the smallest safe clarification update and stop without advancing the cycle.
 
@@ -138,24 +142,24 @@ Determine the current owner and act only as that persona for this run. Do not do
 If the current owner is Planner, follow the planner behavior defined by workflow/personas/PLANNER_PERSONA.md:
 - read the workflow source-of-truth files
 - decide the best next unit of work
-- update workflow/AI_DEVELOPER_PROMPT_NEXT_MOVE.md with a precise brief
-- update workflow/AI_WORKFLOW_STATE.md so Developer becomes the current owner
+- update workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md with a precise brief
+- update workflow/runtime/AI_WORKFLOW_STATE.md so Developer becomes the current owner
 
 If the current owner is Developer, follow the developer behavior defined by workflow/personas/DEVELOPER_PERSONA.md:
 - compare the brief against the real repo state
 - implement only the missing work
 - run required validation
-- append a factual entry to workflow/AI_DEVELOPER_EXECUTION_LOG.md
-- update workflow/ACTIVE_EXECUTION_TRACKER.md and any durable task docs if the project state changed
-- update workflow/AI_WORKFLOW_STATE.md so Reviewer becomes the current owner
+- append a factual entry to workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md
+- update workflow/planning/ACTIVE_EXECUTION_TRACKER.md and any durable task docs if the project state changed
+- update workflow/runtime/AI_WORKFLOW_STATE.md so Reviewer becomes the current owner
 
 If the current owner is Reviewer, follow the reviewer behavior defined by workflow/personas/REVIEWER_PERSONA.md:
 - review the real changes
-- record findings in workflow/AI_REVIEWER_REMARKS.md
+- record findings in workflow/logs/AI_REVIEWER_REMARKS.md
 - include manual actions required when external steps are needed
-- update workflow/AI_WORKFLOW_STATE.md so the baton returns to Developer for rework or Planner for the next cycle
+- update workflow/runtime/AI_WORKFLOW_STATE.md so the baton returns to Developer for rework or Planner for the next cycle
 
-Update workflow/ACTIVE_EXECUTION_TRACKER.md only when the current persona is supposed to change visible state there.
+Update workflow/planning/ACTIVE_EXECUTION_TRACKER.md only when the current persona is supposed to change visible state there.
 
 End with a short summary of what role ran, what it changed, any manual actions required, and who owns the next step.
 
@@ -167,8 +171,8 @@ If the baton state is missing, contradictory, or blocked, make the smallest safe
 If you want to recreate this automation in another thread:
 
 1. Copy the `workflow/` folder into the new project root.
-2. Rewrite `workflow/MASTER_PRODUCTION_PLAN.md`, `workflow/ACTIVE_EXECUTION_TRACKER.md`, and `workflow/PROJECT_DOCUMENT_INDEX.md` for the new project.
-3. Ensure `workflow/AI_WORKFLOW_STATE.md` starts with `Planner` as the current owner unless you intentionally want a different starting owner.
+2. Rewrite `workflow/planning/MASTER_PRODUCTION_PLAN.md`, `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`, and `workflow/planning/PROJECT_DOCUMENT_INDEX.md` for the new project.
+3. Ensure `workflow/runtime/AI_WORKFLOW_STATE.md` starts with `Planner` as the current owner unless you intentionally want a different starting owner.
 4. Create one heartbeat automation attached to the target thread.
 5. Use the name, schedule, and prompt pattern recorded in this file.
 6. Start it in `PAUSED` status first.

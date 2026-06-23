@@ -7,6 +7,7 @@ It explains:
 - what the workflow is
 - why the files are structured this way
 - what each persona does
+- how the manual debugger support path works
 - how the baton moves
 - how rework and manual actions are handled
 - how the workflow is made portable to other projects
@@ -14,11 +15,11 @@ It explains:
 
 ## Foundational Rule
 
-The main and initial planning reference for a project is [MASTER_PRODUCTION_PLAN.md](./MASTER_PRODUCTION_PLAN.md).
+The main and initial planning reference for a project is [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md).
 
 If a project is new, underdefined, or missing trustworthy planning docs, the workflow should start by building the master production plan first.
 
-Use [MASTER_PRODUCTION_PLAN_INITIALIZER.md](./MASTER_PRODUCTION_PLAN_INITIALIZER.md) to do that, even if the only available input is a prompt or rough project description.
+Use [MASTER_PRODUCTION_PLAN_INITIALIZER.md](../planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md) to do that, even if the only available input is a prompt or rough project description.
 
 ## Purpose
 
@@ -27,6 +28,12 @@ This workflow is designed for three Codex personas that collaborate through mark
 - `Planner`
 - `Developer`
 - `Reviewer`
+
+There is also one optional manual support persona:
+
+- `Debugger`
+
+The debugger is connected to the workflow, but it is not part of the automated baton cycle.
 
 The system is intentionally file-driven instead of memory-driven.
 
@@ -55,44 +62,59 @@ The workflow package consists of:
 - [THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](./THREE_PERSONA_DEVELOPMENT_WORKFLOW.md)
   This full operating guide.
 
-- [MASTER_PRODUCTION_PLAN_INITIALIZER.md](./MASTER_PRODUCTION_PLAN_INITIALIZER.md)
+- [MASTER_PRODUCTION_PLAN_INITIALIZER.md](../planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md)
   The initializer used to create or rebuild the master production plan from prompts, repo scans, or partial context.
 
-- [MASTER_PRODUCTION_PLAN.md](./MASTER_PRODUCTION_PLAN.md)
+- [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
   The main planning anchor and strategic roadmap for the current project.
 
-- [ACTIVE_EXECUTION_TRACKER.md](./ACTIVE_EXECUTION_TRACKER.md)
+- [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
   The active board for what is next, what is blocked, and what changed.
 
-- [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md)
+- [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md)
   The baton file that tells every persona who owns the current cycle.
 
-- [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](./AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
+- [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
   The planner-authored brief for the current cycle.
 
-- [AI_DEVELOPER_EXECUTION_LOG.md](./AI_DEVELOPER_EXECUTION_LOG.md)
+- [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
   The factual execution history.
 
-- [AI_REVIEWER_REMARKS.md](./AI_REVIEWER_REMARKS.md)
+- [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
   The reviewer decision record.
 
-- [PROJECT_DOCUMENT_INDEX.md](./PROJECT_DOCUMENT_INDEX.md)
+- [DEBUGGER_CALL_TEMPLATE.md](../manual/DEBUGGER_CALL_TEMPLATE.md)
+  The manual call format for invoking the debugger persona with a real error, bug, or required adjustment.
+
+- [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
+  The manual debugger investigation log that the planner may read before the next cycle and the reviewer may clear after acceptance.
+
+- [SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md](../manual/SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md)
+  The manual capture format for improvements, refinements, and non-bug adjustments the planner should consider later.
+
+- [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
+  The running suggestion log that the planner can use when choosing future cycles.
+
+- [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
   The bridge from the workflow package to project-specific documents elsewhere in the repo.
 
 - [CODEX_AUTOMATION_DISPATCHER_SPEC.md](./CODEX_AUTOMATION_DISPATCHER_SPEC.md)
   The durable specification for the Codex automation setup used here.
 
-- [temp/README.md](./temp/README.md)
+- [temp/README.md](../temp/README.md)
   The contract for temporary cycle-scoped workflow artifacts that should not clutter the main workflow root.
 
-- [personas/PLANNER_PERSONA.md](./personas/PLANNER_PERSONA.md)
+- [personas/PLANNER_PERSONA.md](../personas/PLANNER_PERSONA.md)
   Reusable planner persona rules and prompt.
 
-- [personas/DEVELOPER_PERSONA.md](./personas/DEVELOPER_PERSONA.md)
+- [personas/DEVELOPER_PERSONA.md](../personas/DEVELOPER_PERSONA.md)
   Reusable developer persona rules and prompt.
 
-- [personas/REVIEWER_PERSONA.md](./personas/REVIEWER_PERSONA.md)
+- [personas/REVIEWER_PERSONA.md](../personas/REVIEWER_PERSONA.md)
   Reusable reviewer persona rules and prompt.
+
+- [personas/DEBUGGER_PERSONA.md](../personas/DEBUGGER_PERSONA.md)
+  Reusable manual debugger persona rules and prompt.
 
 ## What Lives Outside The Folder
 
@@ -111,7 +133,7 @@ That is acceptable because those files are project artifacts, not workflow engin
 The rule is:
 
 - workflow-critical files must live in `workflow/`
-- project-specific references outside `workflow/` must be discoverable through [PROJECT_DOCUMENT_INDEX.md](./PROJECT_DOCUMENT_INDEX.md)
+- project-specific references outside `workflow/` must be discoverable through [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
 
 That is what makes this package portable.
 
@@ -146,7 +168,7 @@ A durable baseline such as a long-lived environment playbook, operating contract
 
 The temp folder is for artifacts that are provisional, disposable, or still awaiting a keep-or-delete decision.
 
-For initial project planning, outside files are optional, not required. The master plan can be created from prompts alone by using [MASTER_PRODUCTION_PLAN_INITIALIZER.md](./MASTER_PRODUCTION_PLAN_INITIALIZER.md).
+For initial project planning, outside files are optional, not required. The master plan can be created from prompts alone by using [MASTER_PRODUCTION_PLAN_INITIALIZER.md](../planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md).
 
 ## Source Of Truth Order
 
@@ -156,9 +178,9 @@ There are two useful reading orders in this workflow.
 
 Use this when starting a brand-new project or rebuilding planning from weak context:
 
-1. [MASTER_PRODUCTION_PLAN_INITIALIZER.md](./MASTER_PRODUCTION_PLAN_INITIALIZER.md)
-2. [MASTER_PRODUCTION_PLAN.md](./MASTER_PRODUCTION_PLAN.md)
-3. [ACTIVE_EXECUTION_TRACKER.md](./ACTIVE_EXECUTION_TRACKER.md) after the master plan is created
+1. [MASTER_PRODUCTION_PLAN_INITIALIZER.md](../planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md)
+2. [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
+3. [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md) after the master plan is created
 
 This is the bootstrap order.
 
@@ -168,25 +190,25 @@ It exists because the master production plan is the first real planning anchor.
 
 Use this when the project already has a working workflow and a current baton state:
 
-1. [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md)
+1. [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md)
    Read this first to determine who owns the baton.
 
-2. [MASTER_PRODUCTION_PLAN.md](./MASTER_PRODUCTION_PLAN.md)
+2. [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
    Read this to understand strategic direction and launch logic.
 
-3. [ACTIVE_EXECUTION_TRACKER.md](./ACTIVE_EXECUTION_TRACKER.md)
+3. [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
    Read this to understand current status, dependencies, and the active queue.
 
-4. [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](./AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
+4. [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
    Read this if the planner has already written the current cycle brief.
 
-5. [AI_DEVELOPER_EXECUTION_LOG.md](./AI_DEVELOPER_EXECUTION_LOG.md)
+5. [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
    Read this to understand what has actually been completed and validated.
 
-6. [AI_REVIEWER_REMARKS.md](./AI_REVIEWER_REMARKS.md)
+6. [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
    Read this to understand the latest review result and any rework or manual action requirements.
 
-7. [PROJECT_DOCUMENT_INDEX.md](./PROJECT_DOCUMENT_INDEX.md)
+7. [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
    Use this only when supplemental project documents outside the workflow folder are helpful.
 
 8. Relevant code, tests, SQL, and external durable project docs
@@ -232,9 +254,27 @@ The reviewer owns:
 
 The reviewer is not supposed to silently fix code in reviewer mode. Review and execution remain separate.
 
+### Debugger
+
+The debugger owns:
+
+- manual error investigation
+- root-cause analysis
+- focused bug correction
+- recording manual debugging context for later planning or review
+
+The debugger is not part of the automated cycle and does not own the baton.
+
+Use the debugger when:
+
+- an error blocks normal progress
+- a failing test, build, SQL change, or runtime behavior needs focused analysis
+- the planner needs better technical context before selecting the next cycle
+- manual corrective work happened outside the normal planner-to-developer handoff
+
 ## The Baton
 
-The baton is the workflow state recorded in [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md).
+The baton is the workflow state recorded in [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md).
 
 Only one persona owns the baton at a time.
 
@@ -243,6 +283,8 @@ Allowed `Current owner` values are:
 - `Planner`
 - `Developer`
 - `Reviewer`
+
+`Debugger` is intentionally not listed because it is not a baton owner.
 
 Allowed `Current phase` values are:
 
@@ -278,9 +320,9 @@ The planner then decides:
 - what validation is required
 - what a successful developer cycle should leave behind
 
-The planner writes the current brief to [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](./AI_DEVELOPER_PROMPT_NEXT_MOVE.md).
+The planner writes the current brief to [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md).
 
-The planner then updates [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md) so `Developer` becomes the current owner.
+The planner then updates [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md) so `Developer` becomes the current owner.
 
 Planner exit condition:
 
@@ -341,9 +383,9 @@ Examples:
 
 The developer must not claim validation that did not happen.
 
-After validation, the developer appends a factual entry to [AI_DEVELOPER_EXECUTION_LOG.md](./AI_DEVELOPER_EXECUTION_LOG.md).
+After validation, the developer appends a factual entry to [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md).
 
-Then the developer updates [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md) so `Reviewer` becomes the current owner.
+Then the developer updates [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md) so `Reviewer` becomes the current owner.
 
 Developer exit condition:
 
@@ -372,7 +414,7 @@ The reviewer asks:
 - is the status claim honest
 - are manual outside-Codex steps still required
 
-The reviewer writes the result to [AI_REVIEWER_REMARKS.md](./AI_REVIEWER_REMARKS.md).
+The reviewer writes the result to [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md).
 
 The reviewer also decides whether the baton returns to:
 
@@ -398,6 +440,32 @@ Possible results:
 - update the plan or tracker to reflect new reality
 
 This returns the system to another planner cycle.
+
+## Manual Debugger Loop
+
+The debugger is a parallel support path, not a fourth automated stage.
+
+Use it like this:
+
+1. Start from [DEBUGGER_CALL_TEMPLATE.md](../manual/DEBUGGER_CALL_TEMPLATE.md).
+2. Manually call the debugger persona with the real error, failing output, broken behavior, or adjustment request.
+3. Let the debugger inspect the repo and make only the necessary correction.
+4. Record the investigation in [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md).
+5. Let the planner read that log before choosing the next cycle if the debugging work changed project reality or clarified the next move.
+6. Let the reviewer clear or reset the debugger log once the issue is accepted and no longer active.
+
+The debugger should not silently replace the planner, developer, or reviewer.
+
+## Manual Suggestions Loop
+
+Suggestions and non-bug improvements should not be lost just because they are not active errors.
+
+Use them like this:
+
+1. Start from [SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md](../manual/SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md).
+2. Add the idea to [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md).
+3. Let the planner read that log before selecting the next cycle when the suggestions are relevant.
+4. Let the reviewer or planner mark suggestions completed, deferred, absorbed, or cleared once they are no longer active.
 
 ## Reviewer Decisions
 
@@ -429,7 +497,7 @@ Common examples:
 - device-only validation
 - production credential work
 
-These must be recorded in [AI_REVIEWER_REMARKS.md](./AI_REVIEWER_REMARKS.md) under:
+These must be recorded in [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md) under:
 
 - `Manual actions required`
 
@@ -470,7 +538,7 @@ This prevents hidden real-world dependencies from being mistaken for finished wo
 If the cycle is blocked by dependency:
 
 1. The reviewer or planner records the dependency clearly.
-2. [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md) should reflect the blocked state.
+2. [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md) should reflect the blocked state.
 3. The planner decides whether to wait, re-scope, or choose another safe task.
 
 Blocked work should not be mislabeled as done.
@@ -492,6 +560,7 @@ This workflow stays fluid because:
 - the current state is written down
 - the next action is written down
 - each persona has a narrow responsibility
+- error investigation can be captured without corrupting the main baton flow
 - project documents are indexed through the folder
 - manual outside-Codex work is visible instead of hidden
 
@@ -500,13 +569,14 @@ This workflow stays fluid because:
 To reuse this workflow in another project:
 
 1. Copy the entire `workflow/` folder into the new repository root.
-2. Use [MASTER_PRODUCTION_PLAN_INITIALIZER.md](./MASTER_PRODUCTION_PLAN_INITIALIZER.md) to create or rebuild [MASTER_PRODUCTION_PLAN.md](./MASTER_PRODUCTION_PLAN.md) for the new project.
-3. Rewrite [ACTIVE_EXECUTION_TRACKER.md](./ACTIVE_EXECUTION_TRACKER.md) only after the master plan exists.
-4. Rewrite [PROJECT_DOCUMENT_INDEX.md](./PROJECT_DOCUMENT_INDEX.md) only if the new project has supplemental durable docs outside the workflow folder.
-5. Reset [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md) so the starting owner is correct, usually `Planner`.
-6. Clear or reset [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](./AI_DEVELOPER_PROMPT_NEXT_MOVE.md), [AI_DEVELOPER_EXECUTION_LOG.md](./AI_DEVELOPER_EXECUTION_LOG.md), and [AI_REVIEWER_REMARKS.md](./AI_REVIEWER_REMARKS.md) if you want a clean start.
-7. Keep the persona files and automation spec largely unchanged.
-8. Review the Codex automation config and recreate it for the new thread or workspace.
+2. Use [MASTER_PRODUCTION_PLAN_INITIALIZER.md](../planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md) to create or rebuild [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md) for the new project.
+3. Rewrite [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md) only after the master plan exists.
+4. Rewrite [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md) only if the new project has supplemental durable docs outside the workflow folder.
+5. Reset [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md) so the starting owner is correct, usually `Planner`.
+6. Clear or reset [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md), [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md), and [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md) if you want a clean start.
+7. Clear or reset [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md) if you want a clean debugging history for the new project.
+8. Keep the persona files and automation spec largely unchanged.
+9. Review the Codex automation config and recreate it for the new thread or workspace.
 
 The persona behavior is reusable.
 
@@ -569,9 +639,9 @@ The current dispatcher configuration is:
 On each wake-up:
 
 1. Read [CODEX_AUTOMATION_DISPATCHER_SPEC.md](./CODEX_AUTOMATION_DISPATCHER_SPEC.md).
-2. Read [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md).
+2. Read [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md).
 3. Determine whether the current owner is `Planner`, `Developer`, or `Reviewer`.
-4. Read the matching persona file under [personas](./personas/PLANNER_PERSONA.md).
+4. Read the matching persona file under [personas](../personas/PLANNER_PERSONA.md).
 5. Perform only that role's responsibilities.
 6. Update the baton and any allowed workflow files.
 7. Stop.
@@ -584,7 +654,7 @@ You do not need to wait for the next automatic heartbeat if you want the workflo
 
 You can manually trigger the dispatcher again, and it will:
 
-- read [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md)
+- read [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md)
 - detect the next baton owner
 - run only that persona
 
@@ -638,6 +708,8 @@ Use the workflow like this:
 
 If the automation is active, the same pattern still applies. The automation simply performs whichever role currently owns the baton.
 
+The debugger remains manual even when the automation is active.
+
 ## Summary
 
 This workflow works because it separates:
@@ -651,3 +723,4 @@ This workflow works because it separates:
 - automation configuration
 
 That separation is what makes the system durable, reviewable, automatable, and portable across projects.
+

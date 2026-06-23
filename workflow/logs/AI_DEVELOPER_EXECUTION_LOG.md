@@ -341,3 +341,127 @@ Do not use this file as the strategic roadmap or the active priority board.
 
 - `Recommended next move`:
   Reviewer should assess whether the rebuilt Track A baseline is fully grounded in current repo evidence and whether the remaining manual gaps are documented clearly enough for the next planning cycle.
+
+### 2026-06-22 - Track C Walk-In Expiry And Operator Visibility
+
+- `Current move/task`:
+  Add a server-owned stale walk-in cleanup path and make walk-in reservations visible and auditable in the location-scoped operator reservations flow.
+
+- `Already finished before my work`:
+  Backend RPCs already issued walk-in entry passes, started walk-in sessions, bounded hold duration, and emitted issuance and session-start operator events.
+  The operator reservations route was already location-scoped and the reservation detail sheet already linked relevant operator events, but reservation source was discarded before reaching the UI.
+
+- `What I completed now`:
+  Added `supabase/expire_stale_walk_in_entry_passes.sql` with locked, retry-safe cleanup for expired unstarted walk-in holds, guarded slot release, an expiry audit event, and service-role-only execution.
+  Added `supabase/schedule_walk_in_expiry_cleanup.sql` as an explicit opt-in `pg_cron` activation artifact with idempotent job creation and rollback guidance.
+  Added walk-in source to shared operator reservation types, scoped REST queries, dashboard and paginated route mapping, realtime updates, source filtering, list badges, and reservation details.
+  Added focused mobile SQL contract assertions and operator route/UI contract assertions.
+  Updated the Supabase README, Track A release baseline, and active tracker for the new SQL ordering and remaining environment actions.
+
+- `Validation`:
+  `npm --workspace apps/mobile run test`: passed 32 of 32 tests.
+  `npm --workspace apps/parking-app-operator run test`: passed 28 of 28 tests.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, and static page generation.
+  `git diff --check`: passed before workflow closeout; only Git line-ending notices were emitted.
+  SQL was reviewed statically for reservation and slot locking, repeat execution, session and competing-hold guards, audit-event creation, restricted grants, and explicit scheduler rollback.
+
+- `Still open`:
+  The SQL was not executed against a database in this run.
+  A non-production Supabase project still needs the cleanup function deployed, `pg_cron` enabled, the recurring job activated, and expiry, slot release, audit events, and concurrency behavior observed.
+  Track A staging bootstrap and rollback rehearsal remain open and should be completed before pilot promotion.
+
+- `Recommended next move`:
+  Reviewer should inspect the cleanup function's concurrency and privilege boundaries, verify operator source propagation remains location-scoped, and confirm the tracker does not overstate unperformed staging activation.
+
+### 2026-06-22 - Track D Camera Validation And Safe Session Activation
+
+- `Current move/task`:
+  Replace the current reservation-arrival and walk-in session activation shortcuts with a camera-first slot-validation path that still relies on the existing backend QR-token checks.
+
+- `Already finished before my work`:
+  The mobile app already included `expo-camera`, the `/validate` route shell, slot QR tokens in mobile parking data, persisted workflow validation-token storage, and backend-backed `start_parking_session` plus `start_walk_in_session` helpers that accept `p_slot_qr_token`.
+  Reservation arrival and walk-in screens were already present, but they still started sessions from a button tap or countdown instead of from a real slot scan.
+
+- `What I completed now`:
+  Replaced `apps/mobile/app/validate.tsx` with a real camera scanner route using `CameraView` and `useCameraPermissions`.
+  Added scan debouncing, mount-error handling, explicit permission messaging, wrong-slot mismatch messaging, and an explicit degraded fallback that uses the assigned slot token only after user action.
+  Updated the reservation arrival screen so it no longer directly starts the session from a generated QR card and now routes to `/validate` as the default activation path.
+  Updated the walk-in screen so it no longer auto-starts the session when the countdown expires and no longer starts from the `I Have Parked` button; it now routes slot validation through `/validate` instead.
+  Extended the parking-flow store so walk-in validation can start from the active booking with an injected scanned token and still preserve workflow snapshot continuity.
+  Added focused mobile contract assertions covering the camera validator route, the reservation redirect into validation, the removal of walk-in timer auto-start, and scanned-token handoff into the existing walk-in session helper.
+  Updated `workflow/ACTIVE_EXECUTION_TRACKER.md` so Track D now reflects repo-side scanner implementation progress while keeping the real-device success gate open.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 34 of 34 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: no diff-check failures; only line-ending warnings were emitted.
+  No real-device camera validation was performed in this cycle.
+
+- `Still open`:
+  Track D is not fully closed because scanner behavior was not yet validated on a real Android or iOS device.
+  The product still has separate `entrance pass` and `slot validation` QR concepts in the walk-in path, and the final durable decision on whether they should remain distinct is still open.
+  Track A and Track C staging rollout, `pg_cron` activation, and concurrency rehearsal remain external manual follow-ups outside this cycle.
+
+- `Recommended next move`:
+  Reviewer should verify that `/validate` is now the real default scanner path for both reservation arrival and walk-in validation, that the old direct-start behaviors were actually removed, and that the tracker does not overstate real-device readiness.
+
+### 2026-06-23 - Backend-Owned Gate Entry Confirmation
+
+- `Current move/task`:
+  Implement a privileged, location-scoped gate confirmation transition that creates the authoritative session and parking-grace boundary, then make reservation and walk-in mobile flows observe that backend state instead of self-starting.
+
+- `Already finished before my work`:
+  Reservation and walk-in entry-pass QR presentation already existed, slot-QR validation had already been removed as the intended production path, operator auth and active-location resolution were available, and mobile workflow restoration could already read reservation and session rows.
+
+- `What I completed now`:
+  Added `supabase/confirm_parking_entry.sql` with reservation, slot, and location validation; row locking; duplicate-scan idempotency; server-owned entry and grace timestamps; safe slot occupancy; and one `parking_entry_confirmed` audit event.
+  Restricted the new function to `service_role` and revoked customer execution of the legacy reservation and walk-in start-session RPCs.
+  Added the authenticated `/api/operator/gate-entry` route for reservation and walk-in entry-pass payloads, with operator capability checks and active-location scope passed into the SQL contract.
+  Replaced mobile self-start calls with explicit backend session refresh, persisted backend grace fields, backend-authoritative session timing, and expired walk-in local-state cleanup.
+  Updated focused mobile and operator contract tests plus Supabase bootstrap documentation.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 35 of 35 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `npm.cmd --workspace apps/parking-app-operator run test`: passed 29 of 29 tests.
+  `npm.cmd --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript, page generation, and route discovery including `/api/operator/gate-entry`.
+  `git diff --check`: passed with line-ending warnings only.
+  Statically reviewed SQL grants, reservation and slot locks, active-location validation, invalid-state rejection, duplicate-session return behavior, server timestamps, and audit creation.
+
+- `Still open`:
+  The SQL was not executed against a live Supabase project in this run. A non-production deployment must verify valid, duplicate, expired, cancelled, wrong-location, and concurrent scans.
+  The location-scoped API exists, but a production gate scanner or operator UI still needs to invoke it; direct API testing is the current repo-side integration surface.
+  This slice records the metered-start boundary and makes mobile honor it, but paid exit QR, exit grace, penalties, compensation, and full commercial billing remain open.
+  Track A staging bootstrap and rollback rehearsal, Track C scheduler activation, and real-device validation remain manual dependencies.
+
+- `Recommended next move`:
+  Reviewer should inspect the SQL concurrency and grant boundaries, operator location enforcement, mobile non-authority and recovery behavior, and whether tracker claims correctly leave scanner-client and staging proof open.
+### 2026-06-23 - Gate Entry Authorization And Terminal Replay Rework
+
+- `Current move/task`:
+  Resolve reviewer findings by requiring durable operator-to-location authorization before gate mutation and rejecting terminal session rescans.
+
+- `Already finished before my work`:
+  The service-role-only gate SQL, operator route, mobile backend session observation, durable grace timestamps, and customer RPC grant revocations were already implemented and passing repo validation.
+
+- `What I completed now`:
+  Added `supabase/operator_location_assignments.sql` with a durable `(user_id, location_id)` key, authenticated own-assignment read policy, service-role compatibility, and explicit provisioning example.
+  Added `hasOperatorLocationAssignment` and made `/api/operator/gate-entry` return `403` before its privileged RPC unless the authenticated operator has an exact persisted assignment to the active location.
+  Restricted SQL idempotent replay to reservations still in `confirmed` state with sessions still in `active` state; completed and other terminal combinations now raise a terminal-state error.
+  Added behavior-level assignment allow/deny tests and strengthened route and SQL contract regression coverage.
+  Updated Supabase and Track A rollout documentation so assignment-table deployment and deliberate operator/location provisioning are explicit.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 35 of 35 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `npm.cmd --workspace apps/parking-app-operator run test`: passed 31 of 31 tests, including durable assignment allow/deny behavior.
+  The first parallel operator build timed out with an `EPIPE`; a standalone rerun of `npm.cmd --workspace apps/parking-app-operator run build` passed compilation, TypeScript, page generation, and gate route discovery.
+  `git diff --check`: passed with line-ending warnings only.
+
+- `Still open`:
+  The new assignment table and gate SQL have not been executed against Supabase in this run.
+  `Backend/DevOps` must provision at least one explicit operator/location assignment before gate confirmation can succeed in staging; absence of an assignment intentionally fails closed.
+  Live terminal-state, unauthorized-location, duplicate, and concurrent scan rehearsal remains required, along with the later gate scanner client and real-device validation.
+
+- `Recommended next move`:
+  Reviewer should verify that assignment lookup happens before the RPC, missing or cross-location assignments fail closed, active duplicate scans still replay, terminal scans fail, and rollout docs do not hide the new provisioning requirement.

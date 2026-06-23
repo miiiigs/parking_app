@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { calculateBill, createExitCode, createReceiptNumber, createTransactionId, createWalkInCode } from '../lib/flow';
+import { calculateBill, createExitCode, createReceiptNumber, createTransactionId } from '../lib/flow';
 import { secureStorage } from '../lib/storage';
 import type { Booking, CompletedSession, ParkingLot, ParkingSession, ParkingSlot } from '../types';
 import {
@@ -15,12 +15,11 @@ import {
   createParkingReservation,
   endParkingSession,
   getCurrentMobileWorkflowState,
+  getParkingSessionByReservationId,
   issueWalkInEntryPass as issueWalkInEntryPassRequest,
   mapCompletedSession,
   mapReservationToBooking,
   mapSessionToParkingSession,
-  startParkingSession,
-  startWalkInParkingSession,
   type ParkingSessionResult,
   type ReservationResult,
 } from '../../../lib/reservations';
@@ -35,12 +34,6 @@ interface ReserveSlotInput {
   lot: ParkingLot;
   slot: ParkingSlot;
   arrivalWindowMinutes: number;
-  plateNumber: string;
-}
-
-interface StartWalkInSessionInput {
-  lot: ParkingLot;
-  slot: ParkingSlot;
   plateNumber: string;
 }
 
@@ -71,8 +64,8 @@ interface ParkingFlowState {
   issueWalkInEntryPass: (input: IssueWalkInEntryPassInput) => Promise<Booking | null>;
   setReservationDraft: (draft: ReservationDraft) => void;
   clearReservationDraft: () => void;
-  startSession: (slotQrToken?: string) => Promise<ParkingSession | null>;
-  startWalkInSession: (input: StartWalkInSessionInput) => Promise<ParkingSession | null>;
+  refreshSession: () => Promise<ParkingSession | null>;
+  clearExpiredEntryPass: () => Promise<void>;
   finishSession: (durationSeconds: number) => Promise<CompletedSession | null>;
   cancelReservation: () => Promise<void>;
   restoreWorkflow: (lots: ParkingLot[]) => Promise<void>;
@@ -222,7 +215,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           session: null,
           completedSession: null,
           reservationDraft: null,
-          validationQrToken: slot.qrToken ?? '',
+          validationQrToken: '',
           scheduledNotificationIds: [],
           isRestoring: false,
         });
@@ -234,7 +227,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
               selectedSlotId: booking.slotId ?? booking.slot.id,
               selectedArrivalWindowMinutes: booking.arrivalWindowMinutes,
               plateNumber,
-              validationQrToken: slot.qrToken ?? '',
+              validationQrToken: '',
               createdReservation: booking.reservationId
                 ? ({
                     reservation_id: booking.reservationId,
@@ -260,47 +253,20 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
 
         return booking;
       },
-      startSession: async (slotQrToken?: string) => {
+      refreshSession: async () => {
         const booking = get().booking;
-
-        if (!booking) {
+        if (!booking?.reservationId) {
           return null;
         }
 
-        const validationToken = (slotQrToken ?? get().validationQrToken ?? booking.qrToken ?? booking.slot.qrToken ?? '').trim();
-
-        const sessionRecords = await startParkingSession({
-          reservationId: booking.reservationId ?? booking.reservationCode,
-          slotQrToken: validationToken || null,
-        });
-
-        if (get().scheduledNotificationIds.length > 0) {
-          await cancelReservationNotifications(
-            booking.reservationId ?? booking.reservationCode,
-            get().scheduledNotificationIds,
-          );
+        const sessionRecord = await getParkingSessionByReservationId(booking.reservationId);
+        if (!sessionRecord || sessionRecord.session_status === 'completed') {
+          return null;
         }
 
-        let session: ParkingSession;
-
-        if (sessionRecords && sessionRecords.length > 0) {
-          const current = sessionRecords[0];
-          session = {
-            ...booking,
-            sessionId: current.session_id,
-            sessionStatus: current.session_status,
-            startTime: current.started_at,
-            startedAt: current.started_at,
-            validatedAt: current.validated_at,
-            billedMinutes: current.billed_minutes,
-            billedAmount: current.billed_amount,
-            paymentStatus: current.payment_status,
-          };
-        } else {
-          session = {
-            ...booking,
-            startTime: new Date().toISOString(),
-          };
+        const session = mapSessionToParkingSession(sessionRecord, booking);
+        if (get().scheduledNotificationIds.length > 0) {
+          await cancelReservationNotifications(booking.reservationId, get().scheduledNotificationIds);
         }
 
         set({
@@ -308,7 +274,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           session,
           completedSession: null,
           reservationDraft: null,
-          validationQrToken: validationToken,
+          validationQrToken: '',
           scheduledNotificationIds: [],
         });
 
@@ -319,151 +285,34 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
               selectedSlotId: booking.slotId ?? booking.slot.id,
               selectedArrivalWindowMinutes: booking.arrivalWindowMinutes,
               plateNumber: booking.plateNumber,
-              validationQrToken: validationToken,
-              createdReservation: booking.reservationId
-                  ? ({
-                      reservation_id: booking.reservationId,
-                      slot_id: booking.slotId ?? booking.slot.id,
-                      slot_label: booking.slot.number,
-                      slot_status: booking.slot.status ?? 'occupied',
-                      reservation_status: booking.reservationStatus ?? 'confirmed',
-                      reserved_at: booking.createdAt,
-                      expires_at: booking.expiresAt ?? booking.createdAt,
-                      arrival_window_minutes: booking.arrivalWindowMinutes,
-                      plate_number: booking.plateNumber,
-                      reservation_fee: booking.reservationFee,
-                    } satisfies ReservationResult)
-                : null,
-              activeParkingSession: sessionRecords && sessionRecords.length > 0
-                ? sessionRecords[0]
-                : ({
-                    session_id: session.sessionId ?? booking.reservationId ?? booking.reservationCode,
-                    reservation_id: booking.reservationId ?? booking.reservationCode,
-                    slot_id: booking.slotId ?? booking.slot.id,
-                    slot_label: booking.slot.number,
-                    slot_status: booking.slot.status ?? 'occupied',
-                    reservation_status: booking.reservationStatus ?? 'confirmed',
-                    session_status: session.sessionStatus ?? 'active',
-                    started_at: session.startedAt ?? session.startTime,
-                    validated_at: session.validatedAt ?? session.startedAt ?? session.startTime,
-                    ended_at: null,
-                    plate_number: booking.plateNumber,
-                    reservation_fee: booking.reservationFee,
-                    billed_minutes: session.billedMinutes ?? null,
-                    billed_amount: session.billedAmount ?? null,
-                    payment_status: session.paymentStatus ?? null,
-                    pricing_config: booking.pricingConfig,
-                  } satisfies ParkingSessionResult),
+              validationQrToken: '',
+              createdReservation: null,
+              activeParkingSession: sessionRecord,
               scheduledNotificationIds: [],
             },
-            booking.reservationId ?? booking.reservationCode,
+            booking.reservationId,
           ),
         );
 
         return session;
       },
-      startWalkInSession: async ({ lot, slot, plateNumber }) => {
-        const existingBooking = get().booking;
-
-        if (existingBooking?.source === 'walk_in' && existingBooking.reservationId && existingBooking.slot.id === slot.id) {
-          const sessionRecords = await startWalkInParkingSession({
-            reservationId: existingBooking.reservationId,
-            slotQrToken: slot.qrToken ?? existingBooking.qrToken ?? null,
-          });
-
-          if (sessionRecords && sessionRecords.length > 0) {
-            const current = sessionRecords[0];
-            const session: ParkingSession = {
-              ...existingBooking,
-              sessionId: current.session_id,
-              sessionStatus: current.session_status,
-              startTime: current.started_at,
-              startedAt: current.started_at,
-              validatedAt: current.validated_at,
-              billedMinutes: current.billed_minutes,
-              billedAmount: current.billed_amount,
-              paymentStatus: current.payment_status,
-            };
-
-            set({
-              booking: existingBooking,
-              session,
-              completedSession: null,
-              reservationDraft: null,
-              validationQrToken: slot.qrToken ?? existingBooking.qrToken ?? '',
-              scheduledNotificationIds: [],
-            });
-
-            await saveStoredWorkflowSnapshot(
-              buildStoredWorkflowSnapshot(
-                {
-                  stage: 'session',
-                  selectedSlotId: existingBooking.slotId ?? existingBooking.slot.id,
-                  selectedArrivalWindowMinutes: existingBooking.arrivalWindowMinutes,
-                  plateNumber: existingBooking.plateNumber,
-                  validationQrToken: slot.qrToken ?? existingBooking.qrToken ?? '',
-                  createdReservation: existingBooking.reservationId
-                    ? ({
-                        reservation_id: existingBooking.reservationId,
-                        slot_id: existingBooking.slotId ?? existingBooking.slot.id,
-                        slot_label: existingBooking.slot.number,
-                        slot_status: existingBooking.slot.status ?? 'occupied',
-                        reservation_status: existingBooking.reservationStatus ?? 'confirmed',
-                        source: 'walk_in',
-                        reserved_at: existingBooking.createdAt,
-                        expires_at: existingBooking.expiresAt ?? existingBooking.createdAt,
-                        arrival_window_minutes: existingBooking.arrivalWindowMinutes,
-                        plate_number: existingBooking.plateNumber,
-                        reservation_fee: existingBooking.reservationFee,
-                        pricing_config: existingBooking.pricingConfig,
-                      } satisfies ReservationResult)
-                    : null,
-                  activeParkingSession: sessionRecords[0],
-                  scheduledNotificationIds: [],
-                },
-                existingBooking.reservationId ?? existingBooking.reservationCode,
-              ),
-            );
-
-            return session;
-          }
+      clearExpiredEntryPass: async () => {
+        const booking = get().booking;
+        const expiresAt = booking?.expiresAt ? new Date(booking.expiresAt).getTime() : Number.NaN;
+        if (!booking || !Number.isFinite(expiresAt) || expiresAt > Date.now()) {
+          return;
         }
-
-        const startTime = new Date().toISOString();
-        const reservationCode = createWalkInCode(slot.id);
-
-        const session: ParkingSession = {
-          reservationCode,
-          source: 'walk_in',
-          lotId: lot.id,
-          lotName: lot.name,
-          address: lot.address,
-          slotId: slot.id,
-          slotLabel: slot.number,
-          slot,
-          arrivalWindowMinutes: 0,
-          plateNumber,
-          reservationFee: 0,
-          pricePerHour: lot.pricePerHour,
-          pricingConfig: lot.pricingConfig,
-          qrToken: slot.qrToken ?? null,
-          createdAt: startTime,
-          startTime,
-          startedAt: startTime,
-          validatedAt: startTime,
-          sessionStatus: 'active',
-        };
 
         set({
           booking: null,
-          session,
+          session: null,
           completedSession: null,
           reservationDraft: null,
-          validationQrToken: slot.qrToken ?? '',
+          validationQrToken: '',
           scheduledNotificationIds: [],
+          isRestoring: false,
         });
-
-        return session;
+        await clearStoredWorkflowSnapshot();
       },
       finishSession: async (durationSeconds) => {
         const session = get().session;

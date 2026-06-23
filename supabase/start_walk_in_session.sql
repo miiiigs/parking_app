@@ -87,4 +87,5 @@ begin
 end;
 $$;
 
-grant execute on function start_walk_in_session(uuid, text) to anon, authenticated;
+revoke all on function start_walk_in_session(uuid, text) from public, anon, authenticated;
+grant execute on function start_walk_in_session(uuid, text) to service_role;

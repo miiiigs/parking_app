@@ -56,9 +56,12 @@ export default function SessionScreen() {
     const update = () => {
       const startTime = new Date(session.startTime).getTime();
       const rawElapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-      const graceSeconds = Math.max(0, session.pricingConfig.entryGraceMinutes) * 60;
+      const fallbackGraceEnd = startTime + Math.max(0, session.pricingConfig.entryGraceMinutes) * 60 * 1000;
+      const graceEndsAt = session.parkingGraceEndsAt
+        ? new Date(session.parkingGraceEndsAt).getTime()
+        : fallbackGraceEnd;
       setElapsedSeconds(rawElapsedSeconds);
-      setGraceRemainingSeconds(Math.max(0, graceSeconds - rawElapsedSeconds));
+      setGraceRemainingSeconds(Math.max(0, Math.floor((graceEndsAt - Date.now()) / 1000)));
     };
 
     update();
@@ -79,8 +82,13 @@ export default function SessionScreen() {
       return 0;
     }
 
-    const graceSeconds = Math.max(0, session.pricingConfig.entryGraceMinutes) * 60;
-    return Math.max(0, elapsedSeconds - graceSeconds);
+    const fallbackMeteredStart = new Date(session.startTime).getTime()
+      + Math.max(0, session.pricingConfig.entryGraceMinutes) * 60 * 1000;
+    const meteredStart = session.meteredStartedAt
+      ? new Date(session.meteredStartedAt).getTime()
+      : fallbackMeteredStart;
+    const currentTime = new Date(session.startTime).getTime() + elapsedSeconds * 1000;
+    return Math.max(0, Math.floor((currentTime - meteredStart) / 1000));
   }, [elapsedSeconds, session]);
 
   const isWalkIn = Boolean(session?.reservationCode.startsWith('WIN-'));
@@ -212,7 +220,7 @@ export default function SessionScreen() {
                     <Clock3 color="rgba(255,255,255,0.7)" size={13} strokeWidth={2.2} />
                     <Text style={styles.timerMetaText}>
                       {inEntryGracePeriod
-                        ? `Parking timer starts at ${formatTime(new Date(new Date(session.startTime).getTime() + Math.max(0, session.pricingConfig.entryGraceMinutes) * 60 * 1000).toISOString())}`
+                        ? `Parking timer starts at ${formatTime(session.parkingGraceEndsAt ?? new Date(new Date(session.startTime).getTime() + Math.max(0, session.pricingConfig.entryGraceMinutes) * 60 * 1000).toISOString())}`
                         : `Started at ${formatTime(session.startTime)}`}
                     </Text>
                   </View>

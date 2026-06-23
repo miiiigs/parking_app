@@ -11,11 +11,12 @@ Monorepo scaffold for the Smart Parking Reservation System startup idea.
 
 ## Core operational docs
 
-- [workflow/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](./workflow/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md) - full planner, developer, reviewer operating cycle
-- [workflow/MASTER_PRODUCTION_PLAN_INITIALIZER.md](./workflow/MASTER_PRODUCTION_PLAN_INITIALIZER.md) - bootstrap guide for creating the master production plan from prompts or partial context
-- [workflow/MASTER_PRODUCTION_PLAN.md](./workflow/MASTER_PRODUCTION_PLAN.md) - master production sequence and launch gates
-- [workflow/ACTIVE_EXECUTION_TRACKER.md](./workflow/ACTIVE_EXECUTION_TRACKER.md) - current execution order and active progress tracking
-- [workflow/AI_DEVELOPER_EXECUTION_LOG.md](./workflow/AI_DEVELOPER_EXECUTION_LOG.md) - running log of what the active developer actually completed and validated
+- [workflow/README.md](./workflow/README.md) - folder map for the reorganized workflow package
+- [workflow/guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](./workflow/guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md) - full planner, developer, reviewer operating cycle
+- [workflow/planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md](./workflow/planning/MASTER_PRODUCTION_PLAN_INITIALIZER.md) - bootstrap guide for creating the master production plan from prompts or partial context
+- [workflow/planning/MASTER_PRODUCTION_PLAN.md](./workflow/planning/MASTER_PRODUCTION_PLAN.md) - master production sequence and launch gates
+- [workflow/planning/ACTIVE_EXECUTION_TRACKER.md](./workflow/planning/ACTIVE_EXECUTION_TRACKER.md) - current execution order and active progress tracking
+- [workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md](./workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md) - running log of what the active developer actually completed and validated
 - [workflow/personas/PLANNER_PERSONA.md](./workflow/personas/PLANNER_PERSONA.md) - reusable planner persona prompt
 - [workflow/personas/DEVELOPER_PERSONA.md](./workflow/personas/DEVELOPER_PERSONA.md) - reusable developer persona prompt
 - [workflow/personas/REVIEWER_PERSONA.md](./workflow/personas/REVIEWER_PERSONA.md) - reusable reviewer persona prompt

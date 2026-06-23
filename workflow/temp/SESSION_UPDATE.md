@@ -1,97 +1,106 @@
 # Session Update
 
-Use this file as the quick human-readable session summary for the current working session.
+Use this file as the quick human-readable reset note for the current working session.
 
-You can manually clear this file when:
+## Current Reset Snapshot
 
-- the session is intentionally restarted
-- the current changes were already committed and acknowledged
-- you want the next session to begin with a clean temporary summary
+- `Session date`: `2026-06-23`
+- `Workflow state`: active and reorganized
+- `Current baton owner`: `Reviewer`
+- `Current cycle`: `2026-06-23-cycle-002-gate-entry-confirmation`
+- `Primary live objective`: complete reviewer verification of the gate-entry authorization and terminal replay rework, then return the baton to `Planner` if accepted
 
-## Current Session Summary
+## What Changed In This Session
 
-### What changed
+### Workflow organization
 
-- The three-persona workflow completed its first full automated cycle successfully.
-- The `Developer` pass rebuilt the Track A environment and release baseline from real repo evidence.
-- The `Reviewer` pass approved that baseline with follow-ups instead of marking it fully complete.
-- The workflow was refined so future cycle-only notes can live under `workflow/temp/` instead of cluttering the main `workflow/` folder.
-- A temp-folder operating rule was added so:
-  - `Developer` creates temporary cycle docs there by default
-  - `Reviewer` decides whether they should be deleted, retained, or promoted
-  - `Planner` checks the temp folder before planning the next cycle
+- Reorganized the `workflow/` package by usage:
+  - `workflow/guide/`
+  - `workflow/planning/`
+  - `workflow/runtime/`
+  - `workflow/logs/`
+  - `workflow/manual/`
+  - `workflow/personas/`
+  - `workflow/temp/`
+- Added folder-level `README.md` files so each workflow area is easier to understand in a fresh thread or another project.
+- Updated the main workflow map in [workflow/README.md](../README.md).
 
-### Key new or updated workflow files
+### Manual support additions
 
-- `workflow/TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md`
-  Durable reference for environments, env vars, release flow, Supabase bootstrap sequence, rollback posture, and remaining external gaps.
+- Added the reusable debugger support path:
+  - [DEBUGGER_CALL_TEMPLATE.md](../manual/DEBUGGER_CALL_TEMPLATE.md)
+  - [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
+  - [DEBUGGER_PERSONA.md](../personas/DEBUGGER_PERSONA.md)
+- Added the reusable suggestions and improvements path:
+  - [SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md](../manual/SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md)
+  - [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
+- Planner guidance now explicitly allows future cycles to consider:
+  - active debugger findings
+  - manually captured suggestions and small improvement requests
 
-- `workflow/AI_REVIEWER_REMARKS.md`
-  Records that the Track A baseline rebuild was approved with follow-ups and lists the required manual actions.
+### Workflow contract updates
 
-- `workflow/AI_WORKFLOW_STATE.md`
-  Returns the baton to `Planner` for the next cycle.
+- The full operating guide was kept as the main durable explanation in [THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](../guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md).
+- The automation specification now reflects the reorganized folder structure in [CODEX_AUTOMATION_DISPATCHER_SPEC.md](../guide/CODEX_AUTOMATION_DISPATCHER_SPEC.md).
+- Persona contracts were aligned to the new paths under `planning`, `runtime`, `logs`, and `manual`.
+- Active workflow references were normalized so the current live files point to the new structure instead of the older root-level layout.
 
-- `workflow/temp/README.md`
-  Defines how temporary workflow artifacts should be created and cleaned up.
+## Product And Cycle State
 
-- `workflow/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md`
-- `workflow/personas/PLANNER_PERSONA.md`
-- `workflow/personas/DEVELOPER_PERSONA.md`
-- `workflow/personas/REVIEWER_PERSONA.md`
-- `workflow/CODEX_AUTOMATION_DISPATCHER_SPEC.md`
-  Updated so the temp-folder behavior is part of the workflow contract.
+### Product direction currently in force
 
-## Why these changes matter
+- `MASTER_PRODUCTION_PLAN.md` remains the controlling product contract.
+- The intended customer flow is still gate-entry-first:
+  - reservation or walk-in entry pass is scanned by gate or operator
+  - backend confirmation becomes authoritative
+  - mobile observes backend session state instead of self-starting it
+  - parking grace, metered timing, exit grace, penalties, compensation, and billing remain part of the broader lifecycle
 
-- The project now has a current Track A operating reference again after the older environment docs were removed.
-- The workflow has already proven that the baton-aware automation can move Planner -> Developer -> Reviewer cleanly.
-- Temporary session artifacts now have a designated place, which should keep the main `workflow/` folder cleaner over time.
+### Active implementation state
 
-## What is not fully done yet
+- Gate-entry confirmation is now implemented as a privileged backend transition with:
+  - durable entry confirmation
+  - parking grace timing
+  - slot occupancy mutation
+  - operator audit output
+  - duplicate-scan idempotency
+- The operator API route exists for reservation and walk-in entry-pass confirmation.
+- Mobile no longer starts the session directly; it waits for and hydrates the backend-created session.
+- Reviewer-requested rework was implemented so:
+  - exact persisted operator-to-location assignment is required before privileged gate mutation
+  - terminal or completed rescans now fail instead of replaying as success
 
-- Track A is documented and accepted, but it is not fully proven in real execution yet.
-- The environment and rollback flow still need a real non-production rehearsal.
-- Some external setup items still depend on manual action outside Codex.
+## Manual Actions Still Required
 
-## Manual actions still required
+- Deploy the relevant Supabase SQL artifacts in a non-production environment, including:
+  - gate-entry confirmation SQL
+  - operator location assignment SQL
+- Provision at least one real operator-to-location assignment before live gate confirmation testing.
+- Rehearse valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scan cases against Supabase.
+- Connect and validate the real gate scanner or operator client against `/api/operator/gate-entry`.
+- Keep Track A environment bootstrap and rollback rehearsal open.
+- Keep Track C scheduler rollout and real-device mobile validation open.
 
-### Supabase and backend
+## Source Of Truth For The Next Run
 
-- Run the required SQL/bootstrap sequence in a non-production Supabase project using `workflow/TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md`.
-- Perform one clean `staging` bootstrap rehearsal.
-- Take a backup or snapshot.
-- Perform one rollback drill.
-- Run the post-restore smoke checks after rollback.
+- [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
+- [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
+- [AI_WORKFLOW_STATE.md](../runtime/AI_WORKFLOW_STATE.md)
+- [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
+- [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
+- [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
+- [THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](../guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md)
+- [CODEX_AUTOMATION_DISPATCHER_SPEC.md](../guide/CODEX_AUTOMATION_DISPATCHER_SPEC.md)
 
-### Mobile release setup
+## Reset Notes
 
-- Create and secure the Android upload keystore.
-- Create `apps/mobile/android/keystore.properties`.
-- Confirm the final production package or bundle identifiers before store release.
+- This file is a temporary session summary, not the durable source of truth.
+- Historical developer and reviewer details remain in the logs.
+- Older root-level workflow path references may still appear inside historical log entries; the live workflow files now use the reorganized structure.
+- After commit and acknowledgment, this file can be cleared manually to mark the next clean session start.
 
-### Operator and deployment
-
-- Provision real deployment secrets for the operator app.
-- Confirm or document the final production hosting target if it differs from the currently documented Next.js deployment posture.
-
-### Validation and testing
-
-- Run any real-environment validation required for the next launch-critical step.
-- Continue app-level testing when a future cycle changes code, SQL behavior, or release-critical runtime behavior.
-
-## Suggested next planning direction
-
-- Decide whether the next cycle should focus on:
-  - the Track A non-production bootstrap and rollback rehearsal path
-  - or another high-priority implementation track that can safely move in parallel without pretending Track A is fully closed
-
-## Suggested Git Commit Message
+## Suggested Commit Message
 
 ```text
-refine workflow temp handling and record session update
+chore(workflow): reorganize workflow package and add manual support templates
 ```
-
-## Reset Note
-
-If you have already committed the current work and want a clean restart, it is safe to clear this file manually and reuse it for the next session summary.
