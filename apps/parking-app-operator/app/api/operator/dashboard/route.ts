@@ -212,13 +212,14 @@ export async function GET(request: Request) {
         ? readBatchedInFilterList<{
             id: string;
             slot_id: string;
+            source: 'reservation' | 'walk_in';
             plate_number: string;
             status: string;
             reserved_at: string;
             expires_at: string;
             reservation_fee: number;
           }>(
-            `${config.url}/rest/v1/reservations?select=id,slot_id,plate_number,status,reserved_at,expires_at,reservation_fee&order=reserved_at.desc`,
+            `${config.url}/rest/v1/reservations?select=id,slot_id,source,plate_number,status,reserved_at,expires_at,reservation_fee&order=reserved_at.desc`,
             'slot_id',
             slotIds,
             headers,
@@ -507,6 +508,7 @@ export async function GET(request: Request) {
       return {
         id: reservation.id,
         reservationId: `RES-${String(reservation.id).slice(0, 8).toUpperCase()}`,
+        source: reservation.source,
         vehicleNumber: reservation.plate_number ?? '',
         driverName: '',
         slotId: reservation.slot_id,

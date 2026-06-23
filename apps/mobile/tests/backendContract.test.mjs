@@ -20,13 +20,27 @@ test('reservation rpc derives identity and price on the server', () => {
   assert.equal(source.includes('grant execute on function reserve_parking_slot(uuid, text, integer, numeric)'), true);
 });
 
-test('session rpc rejects unauthenticated, foreign, and expired reservations', () => {
+test('gate confirmation is service-only, location-scoped, locked, and idempotent', () => {
+  const confirmationSource = readSource('../../../supabase/confirm_parking_entry.sql');
   const startSource = readSource('../../../supabase/start_parking_session.sql');
   const endSource = readSource('../../../supabase/end_parking_session.sql');
 
-  assert.equal(startSource.includes('Not authenticated'), true);
-  assert.equal(startSource.includes('Reservation does not belong to the current user'), true);
-  assert.equal(startSource.includes('Reservation has expired'), true);
+  assert.equal(confirmationSource.includes('for update'), true);
+  assert.equal(confirmationSource.includes('v_slot.location_id <> p_location_id'), true);
+  assert.equal(confirmationSource.includes('Entry pass has expired'), true);
+  assert.equal(confirmationSource.includes('parking_grace_ends_at'), true);
+  assert.equal(confirmationSource.includes('idempotent_replay'), true);
+  assert.equal(confirmationSource.includes("v_reservation.status <> 'confirmed' or v_existing_session.status <> 'active'"), true);
+  assert.equal(
+    confirmationSource.indexOf("v_existing_session.status <> 'active'") < confirmationSource.indexOf('return query select'),
+    true,
+  );
+  assert.equal(confirmationSource.includes('Entry pass is in a terminal state'), true);
+  assert.equal(confirmationSource.includes("'parking_entry_confirmed'"), true);
+  assert.equal(confirmationSource.includes('grant execute on function confirm_parking_entry(uuid, uuid) to service_role'), true);
+  assert.equal(confirmationSource.includes('from public, anon, authenticated'), true);
+  assert.equal(startSource.includes('grant execute on function start_parking_session(uuid, text) to service_role'), true);
+  assert.equal(startSource.includes('to anon, authenticated'), false);
   assert.equal(endSource.includes('Not authenticated'), true);
   assert.equal(endSource.includes('Reservation does not belong to the current user'), true);
 });

@@ -40,6 +40,7 @@ type LiveLocationRow = {
 
 type LiveSlotRow = {
   id: string;
+  location_id: string;
   slot_label: string;
   status: ParkingSlotStatus;
   display_order: number;
@@ -54,6 +55,7 @@ type LiveLayoutRow = {
 export type ParkingDataLoadResult = {
   lots: ParkingLot[];
   isLiveData: boolean;
+  mode: 'live' | 'demo';
 };
 
 function isMissingPricingColumnError(message: string | undefined) {
@@ -122,6 +124,8 @@ function parseLotLayout(value: unknown): ParkingLotDefinition | null {
 function mapLayoutToParkingLot(location: LiveLocationRow, layout: ParkingLotDefinition, liveSlots: LiveSlotRow[]): ParkingLot {
   const pricingConfig = buildLocationPricingConfig(location);
   const reservationPricing = buildLocationReservationPricingConfig(location);
+  const liveSlotsById = new Map(liveSlots.map((slot) => [slot.id, slot] as const));
+  const liveSlotsByLabel = new Map(liveSlots.map((slot) => [slot.slot_label.toLowerCase(), slot] as const));
   const appliedLayout = applyLiveSlotStatuses(
     layout,
     liveSlots.map((slot) => ({
@@ -133,7 +137,7 @@ function mapLayoutToParkingLot(location: LiveLocationRow, layout: ParkingLotDefi
   );
 
   const slots = appliedLayout.slots.map((slot) => {
-    const live = liveSlots.find((entry) => entry.id === slot.id) ?? liveSlots.find((entry) => entry.slot_label.toLowerCase() === slot.label.toLowerCase());
+    const live = liveSlotsById.get(slot.id) ?? liveSlotsByLabel.get(slot.label.toLowerCase());
 
     return {
       id: slot.id,
@@ -195,6 +199,7 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
     return {
       lots: buildFallbackLots(),
       isLiveData: false,
+      mode: 'demo',
     };
   }
 
@@ -224,30 +229,58 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
   }
 
   if (locationError || !locations || locations.length === 0) {
+    if (locationError) {
+      throw new Error(locationError.message ?? 'Unable to load parking locations.');
+    }
+
     return {
-      lots: buildFallbackLots(),
-      isLiveData: false,
+      lots: [],
+      isLiveData: true,
+      mode: 'live',
     };
   }
+
   const liveLocations = locations;
+  const locationIds = liveLocations.map((location) => location.id);
+  const [{ data: slotRows, error: slotError }, { data: layoutRows, error: layoutError }] = await Promise.all([
+    supabase
+      .from('parking_slots')
+      .select('id, location_id, slot_label, status, display_order, qr_token')
+      .in('location_id', locationIds)
+      .order('display_order', { ascending: true }),
+    supabase
+      .from('parking_lot_layouts')
+      .select('location_id, layout')
+      .in('location_id', locationIds),
+  ]);
+
+  if (slotError) {
+    throw new Error(slotError.message ?? 'Unable to load parking slots.');
+  }
+
+  if (layoutError) {
+    throw new Error(layoutError.message ?? 'Unable to load parking layouts.');
+  }
+
+  const slotsByLocation = new Map<string, LiveSlotRow[]>();
+  ((slotRows ?? []) as Array<LiveSlotRow & { location_id: string }>).forEach((slot) => {
+    const current = slotsByLocation.get(slot.location_id);
+    if (current) {
+      current.push(slot);
+      return;
+    }
+
+    slotsByLocation.set(slot.location_id, [slot]);
+  });
+
+  const layoutsByLocation = new Map(
+    ((layoutRows ?? []) as LiveLayoutRow[]).map((layout) => [layout.location_id, layout] as const),
+  );
   const lots: ParkingLot[] = [];
 
   for (const location of liveLocations) {
-    const [{ data: slotRows }, { data: layoutRows }] = await Promise.all([
-      supabase
-        .from('parking_slots')
-        .select('id, slot_label, status, display_order, qr_token')
-        .eq('location_id', location.id)
-        .order('display_order', { ascending: true }),
-      supabase
-        .from('parking_lot_layouts')
-        .select('location_id, layout')
-        .eq('location_id', location.id)
-        .maybeSingle(),
-    ]);
-
-    const liveSlots = (slotRows ?? []) as LiveSlotRow[];
-    const parsedLayout = parseLotLayout((layoutRows as LiveLayoutRow | null)?.layout);
+    const liveSlots = slotsByLocation.get(location.id) ?? [];
+    const parsedLayout = parseLotLayout(layoutsByLocation.get(location.id)?.layout);
     const fallbackLayout = buildParkingLotDefinitionFromSlots(
       liveSlots.map((slot) => ({
         id: slot.id,
@@ -265,6 +298,7 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
   return {
     lots,
     isLiveData: true,
+    mode: 'live',
   };
 }
 

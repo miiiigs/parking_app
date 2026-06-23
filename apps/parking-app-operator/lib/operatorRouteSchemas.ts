@@ -94,6 +94,10 @@ export const operatorSlotUpdateRouteRequestSchema = z.object({
     }),
 });
 
+export const operatorGateEntryRouteRequestSchema = z.object({
+  entryPass: z.string().trim().min(1),
+});
+
 export const operatorAdminToolsRouteRequestSchema = z.object({
   action: z.enum(['reconcile', 'reset-slots', 'update-pricing']),
   preview: z.boolean().optional().default(false),

@@ -11,6 +11,7 @@ returns table (
   slot_label text,
   slot_status text,
   reservation_status text,
+  source text,
   session_status text,
   started_at timestamptz,
   validated_at timestamptz,
@@ -88,6 +89,7 @@ begin
         v_slot.slot_label,
         v_slot.status,
         v_reservation.status,
+        coalesce(v_reservation.source, 'reservation'),
         v_existing_session.status,
         v_existing_session.started_at,
         v_reservation.validated_at,
@@ -156,6 +158,7 @@ begin
       v_slot.status,
       v_reservation.status,
       'active',
+      coalesce(v_reservation.source, 'reservation'),
       v_started_at,
       v_started_at,
       null::timestamptz,
@@ -168,4 +171,5 @@ begin
 end;
 $$;
 
-grant execute on function start_parking_session(uuid, text) to anon, authenticated;
+revoke all on function start_parking_session(uuid, text) from public, anon, authenticated;
+grant execute on function start_parking_session(uuid, text) to service_role;

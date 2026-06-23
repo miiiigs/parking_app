@@ -189,6 +189,9 @@ export function ReservationDetailSheet({
 
             <div className="space-y-6 p-4">
               <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="border-border text-xs font-medium">
+                  {reservation.source === 'walk_in' ? 'Walk-In' : 'Reservation'}
+                </Badge>
                 <Badge className={`${reservationTone(reservation.status)} border text-xs font-medium`}>
                   {reservation.status}
                 </Badge>
@@ -198,7 +201,11 @@ export function ReservationDetailSheet({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <DetailBlock label="Driver" value={reservation.driverName || 'Walk-in Driver'} />
+                <DetailBlock
+                  label="Driver"
+                  value={reservation.driverName || (reservation.source === 'walk_in' ? 'Walk-in Driver' : 'Unknown driver')}
+                />
+                <DetailBlock label="Source" value={reservation.source === 'walk_in' ? 'Walk-In' : 'Reservation'} />
                 <DetailBlock label="Vehicle" value={reservation.vehicleNumber || 'No plate captured'} />
                 <DetailBlock label="Slot" value={reservation.slotNumber} />
                 <DetailBlock label="Reservation Amount" value={formatCurrency(reservation.amount)} />

@@ -56,6 +56,7 @@ export default function ReservationsPage() {
   const [draftSearch, setDraftSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<Reservation['status'] | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<Reservation['source'] | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [list, setList] = useState<ReservationListResponse | null>(null);
@@ -77,7 +78,7 @@ export default function ReservationsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, statusFilter, pageSize]);
+  }, [searchTerm, sourceFilter, statusFilter, pageSize]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,6 +96,10 @@ export default function ReservationsPage() {
 
     if (statusFilter) {
       params.set('status', statusFilter);
+    }
+
+    if (sourceFilter) {
+      params.set('source', sourceFilter);
     }
 
     fetch(`/api/operator/reservations?${params.toString()}`, {
@@ -117,7 +122,7 @@ export default function ReservationsPage() {
       .finally(() => setLoadingList(false));
 
     return () => controller.abort();
-  }, [page, pageSize, searchTerm, statusFilter]);
+  }, [page, pageSize, searchTerm, sourceFilter, statusFilter]);
 
   const selectedReservation = useMemo(
     () => reservations.find((reservation) => reservation.id === selectedReservationId) ?? null,
@@ -139,6 +144,11 @@ export default function ReservationsPage() {
   ];
 
   const statusCounts = list?.statusCounts ?? { active: 0, completed: 0, 'no-show': 0 };
+  const sourceFilters: Array<{ label: string; value: Reservation['source'] | null }> = [
+    { label: 'All Sources', value: null },
+    { label: 'Reserved', value: 'reservation' },
+    { label: 'Walk-In', value: 'walk_in' },
+  ];
 
   return (
     <DashboardLayout>
@@ -169,6 +179,19 @@ export default function ReservationsPage() {
                       variant={statusFilter === option.value ? 'default' : 'outline'}
                       size="sm"
                       className={statusFilter === option.value ? 'bg-primary text-primary-foreground' : 'border-border'}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sourceFilters.map((option) => (
+                    <Button
+                      key={option.label}
+                      onClick={() => setSourceFilter(option.value)}
+                      variant={sourceFilter === option.value ? 'default' : 'outline'}
+                      size="sm"
+                      className={sourceFilter === option.value ? 'bg-primary text-primary-foreground' : 'border-border'}
                     >
                       {option.label}
                     </Button>
@@ -217,6 +240,9 @@ export default function ReservationsPage() {
                       <div>
                         <div className="font-mono text-xs text-muted-foreground">{reservation.reservationId}</div>
                         <div className="mt-1 text-sm font-medium text-foreground">{reservation.vehicleNumber}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {reservation.source === 'walk_in' ? 'Walk-In' : 'Reservation'}
+                        </div>
                       </div>
                       <Badge className={`${getStatusColor(reservation.status)} border text-xs font-medium`}>
                         {reservation.status}
@@ -259,7 +285,7 @@ export default function ReservationsPage() {
               <table className="w-full min-w-[1100px] text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['Res. ID', 'Driver', 'Vehicle', 'Slot', 'Check-in', 'Check-out', 'Duration', 'Status', 'Payment', 'Amount', 'Actions'].map(
+                    {['Res. ID', 'Source', 'Driver', 'Vehicle', 'Slot', 'Check-in', 'Check-out', 'Duration', 'Status', 'Payment', 'Amount', 'Actions'].map(
                       (label) => (
                         <th key={label} className="px-4 py-3 text-left font-medium text-muted-foreground">
                           {label}
@@ -272,7 +298,14 @@ export default function ReservationsPage() {
                   {reservations.map((reservation) => (
                     <tr key={reservation.id} className="border-b border-border transition-colors hover:bg-secondary/50">
                       <td className="px-4 py-3 font-mono text-xs text-foreground">{reservation.reservationId}</td>
-                      <td className="px-4 py-3 text-foreground">{reservation.driverName || 'Walk-in Driver'}</td>
+                      <td className="px-4 py-3 text-foreground">
+                        <Badge variant="outline" className="border-border text-xs">
+                          {reservation.source === 'walk_in' ? 'Walk-In' : 'Reservation'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {reservation.driverName || (reservation.source === 'walk_in' ? 'Walk-in Driver' : 'Unknown driver')}
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{reservation.vehicleNumber}</td>
                       <td className="px-4 py-3 font-medium text-foreground">{reservation.slotNumber}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{formatTime(reservation.checkInTime)}</td>

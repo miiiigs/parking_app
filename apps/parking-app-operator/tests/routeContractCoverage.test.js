@@ -38,6 +38,22 @@ test('layout and slot routes enforce active-location ownership on writes', () =>
   assert.equal(slotsRoute.includes('operatorSlotUpdateRouteRequestSchema.safeParse'), true);
 });
 
+test('gate entry route is authenticated, location-scoped, and invokes the service-only confirmation rpc', () => {
+  const gateEntryRoute = readSource('../app/api/operator/gate-entry/route.ts');
+  const routeSchemas = readSource('../lib/operatorRouteSchemas.ts');
+
+  assert.equal(gateEntryRoute.includes('getCurrentOperatorUser'), true);
+  assert.equal(gateEntryRoute.includes("hasOperatorCapability(operatorUser.role, 'edit-slot-status')"), true);
+  assert.equal(gateEntryRoute.includes('resolveOperatorLocationContext'), true);
+  assert.equal(gateEntryRoute.includes('hasOperatorLocationAssignment'), true);
+  assert.equal(gateEntryRoute.includes('operatorUser.id'), true);
+  assert.equal(gateEntryRoute.includes('Operator is not assigned to the active parking location.'), true);
+  assert.equal(gateEntryRoute.includes('/rest/v1/rpc/confirm_parking_entry'), true);
+  assert.equal(gateEntryRoute.includes('p_location_id: activeLocation.id'), true);
+  assert.equal(gateEntryRoute.includes("'walkin-entry-pass|'"), true);
+  assert.equal(routeSchemas.includes('operatorGateEntryRouteRequestSchema'), true);
+});
+
 test('admin tools route keeps only reconciliation and slot reset actions in production', () => {
   const adminToolsRoute = readSource('../app/api/operator/admin-tools/route.ts');
 
@@ -53,11 +69,26 @@ test('admin tools route keeps only reconciliation and slot reset actions in prod
 
 test('reservations and audit pages use server-backed pagination and export paths', () => {
   const reservationsPage = readSource('../app/dashboard/reservations/page.tsx');
+  const reservationsRoute = readSource('../app/api/operator/reservations/route.ts');
+  const scopedQueries = readSource('../lib/operatorScopedQueries.ts');
+  const detailSheet = readSource('../components/dashboard/operation-detail-sheet.tsx');
+  const dashboardRoute = readSource('../app/api/operator/dashboard/route.ts');
+  const operatorDataStore = readSource('../lib/operatorDataStore.ts');
   const auditPage = readSource('../app/dashboard/audit/page.tsx');
 
   assert.equal(reservationsPage.includes('/api/operator/reservations'), true);
   assert.equal(reservationsPage.includes("'no-show'"), true);
   assert.equal(reservationsPage.includes('Page size'), true);
+  assert.equal(reservationsPage.includes("params.set('source', sourceFilter)"), true);
+  assert.equal(reservationsPage.includes("reservation.source === 'walk_in' ? 'Walk-In' : 'Reservation'"), true);
+  assert.equal(reservationsRoute.includes("const sourceFilter = searchParams.get('source')"), true);
+  assert.equal(reservationsRoute.includes('reservation.source === sourceFilter'), true);
+  assert.equal(reservationsRoute.includes('source: reservation.source'), true);
+  assert.equal(scopedQueries.includes('select=id,slot_id,source,plate_number'), true);
+  assert.equal(detailSheet.includes('reservation.source'), true);
+  assert.equal(dashboardRoute.includes('source: reservation.source'), true);
+  assert.equal(dashboardRoute.includes('select=id,slot_id,source,plate_number'), true);
+  assert.equal(operatorDataStore.includes("readRecordString(record, 'source') === 'walk_in'"), true);
   assert.equal(auditPage.includes('/api/operator/audit'), true);
   assert.equal(auditPage.includes('Export'), true);
   assert.equal(auditPage.includes('Page Size'), true);

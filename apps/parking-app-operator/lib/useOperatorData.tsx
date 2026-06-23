@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { refreshOperatorData, subscribeOperatorData } from './operatorDataStore';
-import type { OperatorDashboardData } from './types';
+import { useSyncExternalStore } from 'react';
+import { getOperatorDataSnapshot, refreshOperatorData, subscribeOperatorData } from './operatorDataStore';
 
 export function useOperatorData() {
-  const [data, setData] = useState<OperatorDashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsub = subscribeOperatorData(({ data: d, loading: l }) => {
-      setData(d);
-      setLoading(l);
-    });
-
-    return () => unsub();
-  }, []);
+  const state = useSyncExternalStore(
+    subscribeOperatorData,
+    getOperatorDataSnapshot,
+    getOperatorDataSnapshot,
+  );
 
   return {
-    data,
-    loading,
-    refresh: (options?: { silent?: boolean }) => refreshOperatorData(options),
+    data: state.data,
+    loading: state.loading,
+    error: state.error,
+    refresh: (options?: { silent?: boolean; force?: boolean }) => refreshOperatorData(options),
   } as const;
 }

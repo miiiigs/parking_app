@@ -32,6 +32,7 @@ export interface ParkingLot {
 export interface Booking {
   reservationId?: string;
   reservationCode: string;
+  source?: 'reservation' | 'walk_in' | 'local';
   lotId: string;
   lotName: string;
   address: string;
@@ -55,6 +56,8 @@ export interface ParkingSession extends Booking {
   startTime: string;
   startedAt?: string | null;
   validatedAt?: string | null;
+  parkingGraceEndsAt?: string | null;
+  meteredStartedAt?: string | null;
   billedMinutes?: number | null;
   billedAmount?: number | null;
   paymentStatus?: string | null;

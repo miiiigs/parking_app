@@ -35,3 +35,20 @@ Backup and restore testing:
 - Use the backup restore smoke test SQL after restoring a database snapshot.
 - Verify counts for locations, slots, reservations, sessions, payments, and audit records.
 - Run a reconciliation after restore to repair slot-state drift before operators resume work.
+
+Walk-in expiry cleanup:
+
+- Run `expire_stale_walk_in_entry_passes.sql` after the walk-in support and RPC files.
+- Call `select public.expire_stale_walk_in_entry_passes();` in staging to verify expired, unstarted walk-in holds are marked expired and their still-owned slots are released.
+- Enable the Supabase `pg_cron` extension, then run `schedule_walk_in_expiry_cleanup.sql` to invoke cleanup once per minute.
+- Confirm the `expire-stale-walk-in-entry-passes` job exists and inspect `cron.job_run_details` after at least one execution.
+- Roll back scheduler activation with `select cron.unschedule('expire-stale-walk-in-entry-passes');`.
+- Do not mark the scheduler active in an environment until the job and its audit events have been observed there.
+
+Gate entry confirmation:
+
+- Run `operator_location_assignments.sql` after `admin_hardening.sql`, then provision each operator/location pair deliberately. A selected location is not mutation authorization.
+- Run `confirm_parking_entry.sql` after the reservation and legacy session RPC files. It adds durable entry-confirmation and parking-grace timestamps.
+- The operator API calls `confirm_parking_entry` with the service-role key after authenticating the operator and resolving the active location.
+- `start_parking_session` and `start_walk_in_session` are retained only for compatibility and are no longer executable by `anon` or `authenticated` roles.
+- Verify valid, duplicate, expired, cancelled, and wrong-location scans against a non-production database before promotion.

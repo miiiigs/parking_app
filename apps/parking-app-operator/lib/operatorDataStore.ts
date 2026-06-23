@@ -25,12 +25,15 @@ type RealtimePayload = {
 type OperatorStoreState = {
   data: OperatorDashboardData | null;
   loading: boolean;
+  error: string | null;
 };
 
 let cachedData: OperatorDashboardData | null = null;
 let loading = true;
+let storeError: string | null = null;
+let storeState: OperatorStoreState = { data: cachedData, loading, error: storeError };
 let inFlightRefresh: Promise<OperatorDashboardData | null> | null = null;
-let subscribers = new Set<(state: OperatorStoreState) => void>();
+let subscribers = new Set<() => void>();
 let pendingEvents: RealtimePayload[] = [];
 let applyTimer: number | null = null;
 let channel: RealtimeChannel | null = null;
@@ -41,9 +44,17 @@ let lastRealtimeEventAt = 0;
 let failedActionCount = 0;
 let realtimeStatus: OperatorSystemHealth['realtime'] = 'unknown';
 let syncMode: OperatorSystemHealth['syncMode'] = 'realtime';
+let activeDashboardRequestController: AbortController | null = null;
+
+const DASHBOARD_REFRESH_COOLDOWN_MS = 3000;
+const DASHBOARD_REQUEST_TIMEOUT_MS = 15000;
 
 function toIsoTimestamp(value: number) {
   return value > 0 ? new Date(value).toISOString() : null;
+}
+
+function syncStoreState() {
+  storeState = { data: cachedData, loading, error: storeError };
 }
 
 function computeOverallHealth(health: OperatorSystemHealth): OperatorSystemHealth['overall'] {
@@ -91,7 +102,8 @@ function applyHealthToCachedData() {
 }
 
 function notifyAll() {
-  for (const cb of subscribers) cb({ data: cachedData, loading });
+  syncStoreState();
+  for (const cb of subscribers) cb();
 }
 
 function normalizeOperatorSlotStatus(status: string): ParkingSlot['status'] {
@@ -148,9 +160,14 @@ function recomputeMetrics(next: OperatorDashboardData) {
   };
 }
 
-async function doRefresh(options?: { silent?: boolean }) {
+async function doRefresh(options?: { silent?: boolean; force?: boolean }) {
   const url = '/api/operator/dashboard';
   const shouldShowLoading = !options?.silent && cachedData === null;
+  const now = Date.now();
+
+  if (!options?.force && cachedData && now - lastRefreshAt < DASHBOARD_REFRESH_COOLDOWN_MS) {
+    return cachedData;
+  }
 
   if (shouldShowLoading) {
     loading = true;
@@ -158,8 +175,17 @@ async function doRefresh(options?: { silent?: boolean }) {
   }
 
   try {
-    const res = await fetch(url);
+    activeDashboardRequestController?.abort();
+    const controller = new AbortController();
+    activeDashboardRequestController = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), DASHBOARD_REQUEST_TIMEOUT_MS);
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+    }).finally(() => window.clearTimeout(timeoutId));
+
     if (!res.ok) {
+      storeError = `Dashboard sync failed (${res.status}).`;
       if (cachedData) {
         cachedData = {
           ...cachedData,
@@ -177,6 +203,7 @@ async function doRefresh(options?: { silent?: boolean }) {
     const payload = (await res.json().catch(() => null)) as OperatorDashboardData | null;
     if (payload) {
       lastRefreshAt = Date.now();
+      storeError = null;
       cachedData = {
         ...payload,
         systemHealth: mergeSystemHealth(payload.systemHealth),
@@ -184,7 +211,8 @@ async function doRefresh(options?: { silent?: boolean }) {
     }
 
     return cachedData;
-  } catch {
+  } catch (error) {
+    storeError = error instanceof Error ? error.message : 'Failed to refresh operator dashboard.';
     if (cachedData) {
       cachedData = {
         ...cachedData,
@@ -198,15 +226,13 @@ async function doRefresh(options?: { silent?: boolean }) {
     }
     return cachedData;
   } finally {
+    activeDashboardRequestController = null;
     loading = false;
     notifyAll();
   }
 }
 
-export function subscribeOperatorData(cb: (state: OperatorStoreState) => void) {
-  subscribers.add(cb);
-  cb({ data: cachedData, loading });
-
+function ensureStoreInitialized() {
   if (!initialized) {
     initialized = true;
     ensureRealtimeSubscribed();
@@ -214,13 +240,22 @@ export function subscribeOperatorData(cb: (state: OperatorStoreState) => void) {
       inFlightRefresh = doRefresh().finally(() => (inFlightRefresh = null));
     }
   }
+}
+
+export function subscribeOperatorData(listener: () => void) {
+  subscribers.add(listener);
+  ensureStoreInitialized();
 
   return () => {
-    subscribers.delete(cb);
+    subscribers.delete(listener);
   };
 }
 
-export async function refreshOperatorData(options?: { silent?: boolean }) {
+export function getOperatorDataSnapshot() {
+  return storeState;
+}
+
+export async function refreshOperatorData(options?: { silent?: boolean; force?: boolean }) {
   if (inFlightRefresh) return inFlightRefresh;
   inFlightRefresh = doRefresh(options).finally(() => (inFlightRefresh = null));
   return inFlightRefresh;
@@ -348,6 +383,8 @@ function scheduleApplyEvents() {
         const checkInTime = readRecordString(record, 'reserved_at');
         const checkOutTime = readRecordString(record, 'expires_at');
         const rawStatus = readRecordString(record, 'status');
+        const source: Reservation['source'] =
+          readRecordString(record, 'source') === 'walk_in' ? 'walk_in' : 'reservation';
         const status: Reservation['status'] =
           rawStatus === 'confirmed'
             ? 'active'
@@ -355,12 +392,15 @@ function scheduleApplyEvents() {
               ? 'completed'
               : rawStatus === 'no_show'
                 ? 'no-show'
+                : rawStatus === 'expired'
+                  ? 'no-show'
                 : 'active';
         const slotId = readRecordString(record, 'slot_id') ?? '';
         const slotNumber = next.parkingMap.slots.find((slot) => String(slot.id) === String(slotId))?.slotNumber ?? 'Unknown';
         const updatedReservation: Reservation = {
           id: reservationId ?? crypto.randomUUID(),
           reservationId: `RES-${String(reservationId ?? '').slice(0, 8)}`,
+          source,
           vehicleNumber: readRecordString(record, 'plate_number') ?? '',
           driverName: '',
           slotId,
@@ -450,15 +490,19 @@ function ensureRealtimeSubscribed() {
     if (!fallbackIntervalId) {
       fallbackIntervalId = window.setInterval(() => {
         if (document.visibilityState === 'visible') {
-          refreshOperatorData();
+          void refreshOperatorData({ silent: true });
         }
       }, 8000) as unknown as number;
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') refreshOperatorData();
+      if (document.visibilityState === 'visible') {
+        void refreshOperatorData({ silent: true });
+      }
     };
-    const handleWindowFocus = () => refreshOperatorData();
+    const handleWindowFocus = () => {
+      void refreshOperatorData({ silent: true });
+    };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleWindowFocus);
@@ -488,7 +532,7 @@ function ensureRealtimeSubscribed() {
       applyHealthToCachedData();
       notifyAll();
       if (status === 'SUBSCRIBED' && !lastRefreshAt) {
-        void refreshOperatorData();
+        void refreshOperatorData({ silent: true });
       }
     });
 }

@@ -17,10 +17,33 @@ test('reservation contract no longer exposes client-supplied user identity or re
   assert.equal(source.includes('p_reservation_fee'), false);
 });
 
-test('session operations prime mobile auth before rpc calls', () => {
+test('mobile observes backend-created sessions and does not call customer session-start rpc', () => {
   const source = readSource('../src/lib/reservations.ts');
+  const storeSource = readSource('../src/features/parking/store/useParkingFlowStore.ts');
 
   assert.equal(source.includes('await ensureMobileAuthSession();'), true);
-  assert.equal(source.includes("supabase.rpc('start_parking_session'"), true);
+  assert.equal(source.includes("supabase.rpc('start_parking_session'"), false);
+  assert.equal(source.includes("supabase.rpc('start_walk_in_session'"), false);
   assert.equal(source.includes("supabase.rpc('end_parking_session'"), true);
+  assert.equal(storeSource.includes('getParkingSessionByReservationId'), true);
+  assert.equal(storeSource.includes('refreshSession: async'), true);
+  assert.equal(storeSource.includes('startSession: async'), false);
+});
+
+test('reservation arrival uses the entry pass flow and no longer requires slot-qr validation', () => {
+  const arrivalSource = readSource('../src/features/parking/screens/ArrivalScreen.tsx');
+  const validateSource = readSource('../app/validate.tsx');
+
+  assert.equal(arrivalSource.includes("router.push('/validate')"), false);
+  assert.equal(arrivalSource.includes('Scan Assigned Slot QR'), false);
+  assert.equal(arrivalSource.includes('Check Gate Confirmation'), true);
+  assert.equal(arrivalSource.includes('reservation-entry|'), true);
+  assert.equal(validateSource.includes('CameraView'), false);
+});
+
+test('session timing prefers backend-owned grace and metered boundaries', () => {
+  const sessionSource = readSource('../src/features/parking/screens/SessionScreen.tsx');
+
+  assert.equal(sessionSource.includes('session.parkingGraceEndsAt'), true);
+  assert.equal(sessionSource.includes('session.meteredStartedAt'), true);
 });

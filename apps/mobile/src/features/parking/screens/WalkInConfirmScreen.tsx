@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Car, ChevronDown, ChevronLeft, Check, CreditCard, MapPin, Zap } from 'lucide-react-native';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -6,6 +6,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
 import { getRouteParam } from '../../auth/utils';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
+import { ParkingDataStatusCard } from '../../../components/parking/ParkingDataStatusCard';
 import { VehiclePickerSheet } from '../../../components/parking/VehiclePickerSheet';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
@@ -15,7 +16,7 @@ import { formatParkingPricingSummary } from '@parking/shared';
 export default function WalkInConfirmScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string; slotId?: string }>();
-  const { lots } = useMobileParkingData();
+  const { lots, isLoading, isRefreshing, status, error, lastSyncedAt, refresh } = useMobileParkingData();
   const { vehicles, selectedVehicle, selectedVehicleId, selectVehicle } = useMobileVehicles();
   const storedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
   const setPaymentMethod = useWalkInPreferencesStore((state) => state.setPaymentMethod);
@@ -29,12 +30,6 @@ export default function WalkInConfirmScreen() {
   const [showVehicleSheet, setShowVehicleSheet] = useState(false);
   const hasSelectedSlot = Boolean(slot);
   const parkingRateSummary = useMemo(() => (lot ? formatParkingPricingSummary(lot.pricingConfig) : 'PHP 0.00/hr'), [lot]);
-
-  useEffect(() => {
-    if (!lot) {
-      router.replace('/home');
-    }
-  }, [lot, router]);
 
   const canProceed = hasSelectedSlot && Boolean(storedPaymentMethod) && Boolean(selectedVehicle);
 
@@ -69,8 +64,24 @@ export default function WalkInConfirmScreen() {
     return [...cardOptions, ...walletOptions, ...fallbackOptions];
   }, [cards, wallets]);
 
+  if (!lot && isLoading) {
+    return (
+      <View style={styles.loadingRoot}>
+        <Text style={styles.loadingTitle}>Loading walk-in parking...</Text>
+        <Text style={styles.loadingCopy}>Syncing the selected parking lot and slot details.</Text>
+      </View>
+    );
+  }
+
   if (!lot) {
-    return null;
+    return (
+      <View style={styles.loadingRoot}>
+        <Text style={styles.loadingTitle}>{error ? 'Unable to load walk-in parking.' : 'Parking lot not found.'}</Text>
+        {error ? <Text style={styles.loadingCopy}>{error}</Text> : null}
+        <AuthActionButton label="Retry" onPress={() => void refresh()} style={styles.loadingButton} />
+        <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
+      </View>
+    );
   }
 
   return (
@@ -114,6 +125,14 @@ export default function WalkInConfirmScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ParkingDataStatusCard
+          status={status}
+          error={error}
+          isRefreshing={isRefreshing}
+          lastSyncedAt={lastSyncedAt}
+          onRetry={() => void refresh()}
+        />
+
         <View style={styles.heroCard}>
           <View style={styles.heroIcon}>
             <Zap color="#FFFFFF" size={24} strokeWidth={2.3} />
@@ -271,6 +290,31 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FAFAF9',
+  },
+  loadingRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    backgroundColor: '#FAFAF9',
+    paddingHorizontal: 24,
+  },
+  loadingTitle: {
+    color: '#1E293B',
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+  },
+  loadingCopy: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
+  },
+  loadingButton: {
+    alignSelf: 'stretch',
   },
   header: {
     backgroundColor: '#FFFFFF',

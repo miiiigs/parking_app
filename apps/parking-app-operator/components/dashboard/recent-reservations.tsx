@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 
 import { ReservationDetailSheet, SessionDetailSheet } from '@/components/dashboard/operation-detail-sheet';
+import { ReservationTableSkeleton } from '@/components/dashboard/loading-skeletons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,6 +65,10 @@ export function RecentReservations() {
     return formatDistanceToNow(new Date(value), { addSuffix: true });
   };
 
+  if (loading && !data) {
+    return <ReservationTableSkeleton />;
+  }
+
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -72,7 +77,6 @@ export function RecentReservations() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && !data ? <div className="py-8 text-center text-muted-foreground">Loading...</div> : null}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
             <thead>

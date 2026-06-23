@@ -3,6 +3,7 @@
 import { AlertCircle, CheckCircle, Clock, ParkingCircle, TrendingUp, XCircle } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MetricsSkeleton } from '@/components/dashboard/loading-skeletons';
 import { formatCurrency } from '@/lib/formatCurrency';
 import { useOperatorData } from '@/lib/useOperatorData';
 import type { DashboardMetrics } from '@/lib/types';
@@ -54,6 +55,16 @@ const metricItems = (metrics: DashboardMetrics) => [
 
 export function DashboardMetrics() {
   const { data, loading } = useOperatorData();
+
+  if (loading && !data) {
+    return (
+      <div>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Key Metrics</h2>
+        <MetricsSkeleton />
+      </div>
+    );
+  }
+
   const metrics = data?.metrics ?? {
     activeReservations: 0,
     occupiedSlots: 0,
@@ -68,7 +79,6 @@ export function DashboardMetrics() {
   return (
     <div>
       <h2 className="mb-4 text-lg font-semibold text-foreground">Key Metrics</h2>
-      {loading && !data ? <div className="text-muted-foreground">Loading metrics...</div> : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {metricItems(metrics).map((metric) => {

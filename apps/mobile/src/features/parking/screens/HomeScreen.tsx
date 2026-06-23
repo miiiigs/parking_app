@@ -54,7 +54,7 @@ const BUILDING_TYPES: BuildingType[] = ['All', 'Mall', 'Commercial', 'Office'];
 export default function HomeScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
-  const { lots, isLiveData, isLoading, refresh } = useMobileParkingData();
+  const { lots, isLiveData, isLoading, isRefreshing, status, error, lastSyncedAt, refresh } = useMobileParkingData();
   const { contentWidth, horizontalPadding } = useResponsiveMetrics();
   const booking = useParkingFlowStore((state) => state.booking);
   const session = useParkingFlowStore((state) => state.session);
@@ -81,9 +81,13 @@ export default function HomeScreen() {
   }, [activeType, lots, query]);
 
   const featuredLot = filteredLots[0] ?? lots[0] ?? null;
+  const hasNoLots = lots.length === 0;
   const isGuest = auth.isGuest;
   const requiresAuth = auth.isGuest || (!auth.user && !auth.isLoading);
   const isInitialLoading = isLoading && lots.length === 0;
+  const isSyncing = isRestoring || isLoading || isRefreshing;
+  const dataStatusLabel = isSyncing ? 'Syncing' : status === 'live' ? 'Live' : status === 'stale' ? 'Offline cache' : 'Demo';
+  const lastSyncLabel = lastSyncedAt ? formatLastSyncLabel(lastSyncedAt) : null;
 
   const quickAction = session
     ? {
@@ -93,9 +97,13 @@ export default function HomeScreen() {
       }
     : booking
       ? {
-          title: 'Reservation saved',
-          copy: `Open the entry pass for slot ${booking.slot.number}`,
-          onPress: () => router.push('/arrival'),
+          title: booking.source === 'walk_in' ? 'Walk-in entry pass' : 'Reservation saved',
+          copy: booking.source === 'walk_in'
+            ? `Resume the walk-in pass for slot ${booking.slot.number}`
+            : `Open the entry pass for slot ${booking.slot.number}`,
+          onPress: () => booking.source === 'walk_in'
+            ? router.push({ pathname: '/walkin-qr', params: { lotId: booking.lotId, slotId: booking.slot.id } })
+            : router.push('/arrival'),
         }
       : completedSession
         ? {
@@ -180,7 +188,7 @@ export default function HomeScreen() {
           <View style={styles.loadingBody}>
             <ActivityIndicator size="small" color="#0F766E" />
             <Text style={styles.loadingTitle}>Loading parking data</Text>
-            <Text style={styles.loadingCopy}>Fetching live lot availability and layout.</Text>
+            <Text style={styles.loadingCopy}>Syncing live parking availability, pricing, and layout.</Text>
           </View>
           <BottomNav activeTab="search" />
         </View>
@@ -278,6 +286,19 @@ export default function HomeScreen() {
               </Pressable>
             ) : null}
 
+            {error ? (
+              <View style={styles.syncAlertCard}>
+                <View style={styles.syncAlertHeader}>
+                  <AlertTriangle color="#D97706" size={16} strokeWidth={2.2} />
+                  <Text style={styles.syncAlertTitle}>Live sync interrupted</Text>
+                </View>
+                <Text style={styles.syncAlertCopy}>
+                  {lastSyncLabel ? `Showing the last synced parking data from ${lastSyncLabel}.` : 'We could not refresh parking data right now.'}
+                </Text>
+                <Text style={styles.syncAlertMeta}>{error}</Text>
+              </View>
+            ) : null}
+
             <View style={styles.resultsHeader}>
               <Text style={styles.resultsCopy}>
                 <Text style={styles.resultsCount}>{filteredLots.length}</Text> parking {filteredLots.length === 1 ? 'lot' : 'lots'} found
@@ -287,9 +308,19 @@ export default function HomeScreen() {
                   <MapPin color="#0F766E" size={12} strokeWidth={2.3} />
                   <Text style={styles.nearYouText}>Near You</Text>
                 </View>
-                <View style={[styles.dataModeBadge, isLiveData ? styles.dataModeLive : styles.dataModeFallback]}>
-                  <Text style={[styles.dataModeText, isLiveData ? styles.dataModeTextLive : styles.dataModeTextFallback]}>
-                    {isRestoring || isLoading ? 'Syncing' : isLiveData ? 'Live' : 'Sample'}
+                <View
+                  style={[
+                    styles.dataModeBadge,
+                    status === 'live' ? styles.dataModeLive : status === 'stale' ? styles.dataModeStale : styles.dataModeFallback,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dataModeText,
+                      status === 'live' ? styles.dataModeTextLive : status === 'stale' ? styles.dataModeTextStale : styles.dataModeTextFallback,
+                    ]}
+                  >
+                    {dataStatusLabel}
                   </Text>
                 </View>
               </View>
@@ -302,8 +333,20 @@ export default function HomeScreen() {
 
               {filteredLots.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>No parking lots matched.</Text>
-                  <Text style={styles.emptyCopy}>Try a different location name, address, or filter.</Text>
+                  <Text style={styles.emptyTitle}>
+                    {hasNoLots ? (isLiveData ? 'No parking lots available.' : status === 'demo' ? 'Demo parking lots only.' : 'Parking data unavailable.') : 'No parking lots matched.'}
+                  </Text>
+                  <Text style={styles.emptyCopy}>
+                    {hasNoLots
+                      ? error
+                        ? 'Pull to refresh when the connection is back.'
+                        : isLiveData
+                          ? 'No active parking lots are available for this account yet.'
+                          : status === 'demo'
+                            ? 'Connect the mobile app to Supabase to load the real operator-managed parking lots.'
+                            : 'We could not load parking lots right now.'
+                      : 'Try a different location name, address, or filter.'}
+                  </Text>
                 </View>
               ) : null}
             </View>
@@ -377,6 +420,20 @@ export default function HomeScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+function formatLastSyncLabel(value: number) {
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - value) / 1000));
+
+  if (elapsedSeconds < 60) {
+    return 'just now';
+  }
+
+  if (elapsedSeconds < 3600) {
+    return `${Math.floor(elapsedSeconds / 60)} min ago`;
+  }
+
+  return `${Math.floor(elapsedSeconds / 3600)} hr ago`;
 }
 
 function HomeLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void }) {
@@ -709,6 +766,9 @@ const styles = StyleSheet.create({
   dataModeFallback: {
     backgroundColor: '#FFF7ED',
   },
+  dataModeStale: {
+    backgroundColor: '#FEF3C7',
+  },
   dataModeText: {
     fontSize: 11,
     lineHeight: 13,
@@ -719,6 +779,9 @@ const styles = StyleSheet.create({
     color: '#0F766E',
   },
   dataModeTextFallback: {
+    color: '#B45309',
+  },
+  dataModeTextStale: {
     color: '#B45309',
   },
   listSection: {
@@ -872,6 +935,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: 18,
     gap: 6,
+  },
+  syncAlertCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  syncAlertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  syncAlertTitle: {
+    color: '#92400E',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  syncAlertCopy: {
+    color: '#92400E',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_500Medium',
+  },
+  syncAlertMeta: {
+    color: '#B45309',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: 'Poppins_400Regular',
   },
   emptyTitle: {
     color: '#1E293B',

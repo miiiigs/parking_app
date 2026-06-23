@@ -14,6 +14,7 @@ export type ScopedSlotRow = {
 export type ScopedReservationRow = {
   id: string;
   slot_id: string;
+  source: 'reservation' | 'walk_in';
   plate_number: string;
   status: string;
   reserved_at: string;
@@ -140,7 +141,7 @@ export async function fetchScopedReservationsWithRelations(
   const slotIds = slotRows.map((slot) => slot.id);
 
   const reservationRows = await readBatchedInFilterList<ScopedReservationRow>(
-    `${url}/rest/v1/reservations?select=id,slot_id,plate_number,status,reserved_at,expires_at,reservation_fee&order=reserved_at.desc`,
+    `${url}/rest/v1/reservations?select=id,slot_id,source,plate_number,status,reserved_at,expires_at,reservation_fee&order=reserved_at.desc`,
     'slot_id',
     slotIds,
     headers,

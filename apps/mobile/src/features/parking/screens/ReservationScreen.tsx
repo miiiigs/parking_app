@@ -50,7 +50,7 @@ export default function ReservationScreen() {
   const params = useLocalSearchParams<{ lotId?: string; mode?: string }>();
   const auth = useMobileAuth();
   const { vehicles, selectedVehicle, selectedVehicleId, selectVehicle } = useMobileVehicles();
-  const { lots, isLoading } = useMobileParkingData();
+  const { lots, isLoading, error: dataError, refresh } = useMobileParkingData();
   const storedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
   const setPaymentMethod = useWalkInPreferencesStore((state) => state.setPaymentMethod);
   const wallets = usePaymentMethodsStore((state) => state.wallets);
@@ -214,7 +214,9 @@ export default function ReservationScreen() {
   if (!lot) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Parking lot not found.</Text>
+        <Text style={styles.loadingTitle}>{dataError ? 'Unable to load parking lot.' : 'Parking lot not found.'}</Text>
+        {dataError ? <Text style={styles.loadingCopy}>{dataError}</Text> : null}
+        {dataError ? <AuthActionButton label="Retry" onPress={() => void refresh()} style={styles.loadingButton} /> : null}
         <AuthActionButton label="Back to home" onPress={() => router.replace('/home')} style={styles.loadingButton} />
       </View>
     );
@@ -703,6 +705,13 @@ const styles = StyleSheet.create({
   },
   loadingButton: {
     alignSelf: 'stretch',
+  },
+  loadingCopy: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   header: {
     backgroundColor: '#FFFFFF',
