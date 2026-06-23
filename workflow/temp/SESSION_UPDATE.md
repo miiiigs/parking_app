@@ -6,9 +6,9 @@ Use this file as the quick human-readable reset note for the current working ses
 
 - `Session date`: `2026-06-23`
 - `Workflow state`: active and reorganized
-- `Current baton owner`: `Reviewer`
+- `Current baton owner`: `Planner`
 - `Current cycle`: `2026-06-23-cycle-002-gate-entry-confirmation`
-- `Primary live objective`: complete reviewer verification of the gate-entry authorization and terminal replay rework, then return the baton to `Planner` if accepted
+- `Primary live objective`: select the next repo-executable cycle after reviewer approval of the gate-entry authorization and terminal replay rework
 
 ## What Changed In This Session
 
@@ -42,8 +42,10 @@ Use this file as the quick human-readable reset note for the current working ses
 
 - The full operating guide was kept as the main durable explanation in [THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](../guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md).
 - The automation specification now reflects the reorganized folder structure in [CODEX_AUTOMATION_DISPATCHER_SPEC.md](../guide/CODEX_AUTOMATION_DISPATCHER_SPEC.md).
+- The live dispatcher heartbeat cadence is now `5 minutes` instead of `20 minutes`.
 - Persona contracts were aligned to the new paths under `planning`, `runtime`, `logs`, and `manual`.
 - Active workflow references were normalized so the current live files point to the new structure instead of the older root-level layout.
+- Reviewer guidance now explicitly reads debugger and suggestion logs and records whether they should be retained, completed, absorbed, rejected, or reset.
 
 ## Product And Cycle State
 
@@ -69,6 +71,9 @@ Use this file as the quick human-readable reset note for the current working ses
 - Reviewer-requested rework was implemented so:
   - exact persisted operator-to-location assignment is required before privileged gate mutation
   - terminal or completed rescans now fail instead of replaying as success
+- Reviewer approved the rework with follow-ups and returned the baton to `Planner`.
+- The active tracker now records the repo-side rework as accepted while keeping staging proof, assignment provisioning, and scanner-client integration open.
+- The active suggestion backlog now contains an operator-side `Parking Actions` improvement request for entry scan, exit scan, and manual QR confirmation flows.
 
 ## Manual Actions Still Required
 
@@ -89,6 +94,8 @@ Use this file as the quick human-readable reset note for the current working ses
 - [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
 - [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
 - [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
+- [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
+- [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
 - [THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](../guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md)
 - [CODEX_AUTOMATION_DISPATCHER_SPEC.md](../guide/CODEX_AUTOMATION_DISPATCHER_SPEC.md)
 
@@ -102,5 +109,5 @@ Use this file as the quick human-readable reset note for the current working ses
 ## Suggested Commit Message
 
 ```text
-chore(workflow): reorganize workflow package and add manual support templates
+chore(workflow): finalize workflow reset and planner handoff
 ```

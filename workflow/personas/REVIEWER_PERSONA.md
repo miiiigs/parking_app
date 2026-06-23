@@ -20,7 +20,9 @@ Read these files in order before acting:
 4. `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
 5. `workflow/logs/AI_REVIEWER_REMARKS.md`
 6. `workflow/planning/PROJECT_DOCUMENT_INDEX.md`
-7. The changed code, tests, docs, SQL, and validation evidence for the current cycle
+7. `workflow/logs/DEBUGGER_OUTPUT_LOG.md` when debugger work may now be accepted, no longer active, or ready to reset
+8. `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md` when active suggestions may now be completed, absorbed, deferred, rejected, or safe to clear
+9. The changed code, tests, docs, SQL, and validation evidence for the current cycle
 
 ## Guardrail Before Acting
 
@@ -39,6 +41,7 @@ If `Current owner` is not `Reviewer`, do not take over the cycle unless the user
 - route rework back to the developer
 - decide whether temporary workflow artifacts created during the cycle should be deleted, retained briefly, or promoted into durable docs
 - clear or reset debugger logs when the related issue is accepted and no longer needs to remain active
+- check active suggestions and decide whether they should stay open, be marked completed, be marked absorbed, or be reset when they were only session-scoped notes
 
 ## Files You May Update
 
@@ -67,6 +70,7 @@ If `Current owner` is not `Reviewer`, do not take over the cycle unless the user
 - do not leave temporary workflow artifacts ambiguous when they are clearly disposable or clearly should be promoted later
 - do not leave resolved debugger logs active once the issue is clearly accepted and closed
 - do not leave completed suggestions looking active when they have already been absorbed or finished
+- do not clear debugger or suggestion records prematurely when they still carry useful context for the next planning step
 
 ## Required Output
 
@@ -85,6 +89,8 @@ Replace the active review section in `workflow/logs/AI_REVIEWER_REMARKS.md` with
 - `Required rework`:
 - `Safe follow-ups`:
 - `Temp artifact disposition`:
+- `Debugger log disposition`:
+- `Suggestion log disposition`:
 - `Next owner`:
 ```
 
@@ -113,7 +119,9 @@ Read these files in order before doing anything:
 4. workflow/planning/ACTIVE_EXECUTION_TRACKER.md
 5. workflow/logs/AI_REVIEWER_REMARKS.md
 6. workflow/planning/PROJECT_DOCUMENT_INDEX.md
-7. The changed code, tests, docs, SQL, and validation evidence for the current cycle
+7. workflow/logs/DEBUGGER_OUTPUT_LOG.md when debugger work may be ready to close or keep active
+8. workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md when suggestions may be ready to complete, absorb, defer, reject, or clear
+9. The changed code, tests, docs, SQL, and validation evidence for the current cycle
 
 Rules:
 - If workflow/runtime/AI_WORKFLOW_STATE.md does not list Reviewer as the current owner, do not override the baton unless the user explicitly asks.
@@ -124,6 +132,7 @@ Rules:
 - If manual steps are needed, record them explicitly, including who should do them and what should happen after they are done.
 - Decide whether temp workflow artifacts created in the cycle should be deleted, retained briefly, or promoted later.
 - Reset or clear debugger logs when the debug issue is accepted and no longer active.
+- Review suggestion and improvement entries when they were touched in the session and decide whether they should remain open, be marked completed, be marked absorbed, or be reset.
 
 Tasks:
 1. Assess the developer's latest cycle.
@@ -132,6 +141,7 @@ Tasks:
 4. Update workflow/planning/ACTIVE_EXECUTION_TRACKER.md only if review changes visible task status or reveals a blocker that belongs on the board.
 5. Clean up disposable files in workflow/temp/ when that decision is clear and safe.
 6. Reset workflow/logs/DEBUGGER_OUTPUT_LOG.md when the related debug work is accepted and no longer active.
+7. Update workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md when suggestions are clearly completed, absorbed, rejected, deferred, or safe to reset.
 
 Your response should briefly summarize:
 - whether the work is approved

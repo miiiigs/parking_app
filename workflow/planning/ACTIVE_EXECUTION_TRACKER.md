@@ -118,7 +118,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - repo rework now enforces durable operator-location assignment and terminal replay rejection; reviewer acceptance and staging proof remain open`
+- `In progress - repo rework accepted for durable operator-location assignment and terminal replay rejection; staging proof remains open`
 
 Owner:
 - `Mobile` + `Backend`
@@ -214,7 +214,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - authorization and terminal replay rework is implemented in repo; reviewer acceptance, assignment provisioning, scanner integration, and staging proof remain open`
+- `In progress - authorization and terminal replay rework is accepted in repo; assignment provisioning, scanner integration, and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
@@ -257,8 +257,8 @@ Validation method:
 - Verified the repo now contains backend-owned gate confirmation and parking-grace boundaries; exit authorization, automated penalties, compensation handling, scanner-client integration, and staging proof remain open.
 
 Remaining gap before success gate:
-- The current mobile flow still relies on app-side continuation after gate scan instead of a backend-owned gate or operator confirmation event.
-- Backend state transitions for parking grace, metered start, paid exit grace, penalty assessment, and compensation are not yet defined as the authoritative contract in repo code.
+- The backend-owned gate or operator confirmation event exists as a location-scoped API and SQL contract, but no production gate scanner or operator Parking Actions client has been connected yet.
+- Backend state transitions for paid exit grace, penalty assessment, and compensation are not yet defined as the authoritative contract in repo code.
 - Operator and support handling for conflicts, compensation, and exit overstay remain open product and implementation gaps.
 
 ## Track E - Payments and Settlement
