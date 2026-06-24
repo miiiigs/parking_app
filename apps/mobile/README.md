@@ -14,7 +14,7 @@ This is the primary mobile app in the repository.
 ## Current role
 
 - main frontend basis for the mobile app
-- Expo Router app shell for reservation, arrival, session, exit, and receipt flows
+- Expo Router app shell for reservation, gate-entry waiting, session, exit, and receipt flows
 - Supabase-backed auth/data foundation for live backend testing
 - native notification scheduling and saved-workflow recovery foundation
 
@@ -34,6 +34,6 @@ This is the primary mobile app in the repository.
 ## Notes
 
 - The flow still falls back to local sample data when live backend data is unavailable.
-- Bundle identifiers in `app.json` are placeholders and should be replaced before store submission.
+- The current bundle identifiers in `app.json` are usable repo defaults, but the final production identifiers should still be confirmed before store submission.
 - `eas.json` is included so the app can move to internal and production builds without changing structure.
 - See [PRODUCTION_READINESS_CHECKLIST.md](PRODUCTION_READINESS_CHECKLIST.md) for the current migration status.

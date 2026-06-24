@@ -51,4 +51,4 @@ Gate entry confirmation:
 - Run `confirm_parking_entry.sql` after the reservation and legacy session RPC files. It adds durable entry-confirmation and parking-grace timestamps.
 - The operator API calls `confirm_parking_entry` with the service-role key after authenticating the operator and resolving the active location.
 - `start_parking_session` and `start_walk_in_session` are retained only for compatibility and are no longer executable by `anon` or `authenticated` roles.
-- Verify valid, duplicate, expired, cancelled, and wrong-location scans against a non-production database before promotion.
+- Verify valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans against a non-production database before promotion.

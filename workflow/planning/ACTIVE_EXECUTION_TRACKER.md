@@ -214,7 +214,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - authorization and terminal replay rework is accepted in repo; assignment provisioning, scanner integration, and staging proof remain open`
+- `In progress - backend confirmation is accepted in repo; operator Parking Actions client, assignment provisioning, scanner integration, exit authorization, and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
@@ -222,7 +222,7 @@ Owner:
 Tasks:
 - [x] Present a reservation-backed entry QR ticket in the mobile flow.
 - [x] Remove slot-QR validation as the default mobile activation path.
-- [~] Redirect gate or operator validation into the matching reservation and confirm lot entry in backend state. The authenticated location-scoped API exists; a production gate scanner client still needs to call it.
+- [~] Redirect gate or operator validation into the matching reservation and confirm lot entry in backend state. The authenticated location-scoped API exists; a production gate scanner or operator Parking Actions client still needs to call it.
 - [x] Start the parking lifecycle on confirmed lot entry without requiring a second slot-validation scan.
 - [x] Add a parking grace countdown before the metered timer starts.
 - [ ] Add a paid exit QR and leave-the-slot grace countdown after payment.
@@ -371,6 +371,9 @@ Already true:
 - location-scoped dashboard, map, pricing, reconciliation, and audit base exist
 
 Tasks:
+- [ ] Add a `Parking Actions` operator menu for entry scan, exit scan planning, and manual QR confirmation workflows.
+- [ ] Connect entry QR scan/manual confirmation to the reviewed `/api/operator/gate-entry` route.
+- [ ] Keep exit scan actions blocked or informational until the backend paid-exit authorization contract exists.
 - [ ] Split large dashboard data contract into dedicated paginated endpoints.
 - [ ] Add richer detail actions for disputes, compensation, and manual intervention.
 - [ ] Add shift handoff notes and unresolved issue log.
@@ -459,18 +462,19 @@ Future polish:
 
 These are the next tasks we should actively execute in order.
 
-1. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
-2. `Track D`: connect the production gate scanner client to the location-scoped confirmation API, then prove valid, duplicate, expired, cancelled, and wrong-location scans in staging.
-3. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
-4. `Track E`: payment provider decision and backend settlement design.
-5. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
+1. `Track H` plus `Track D` repo work: add the operator `Parking Actions` entry scan/manual confirmation surface that calls the reviewed gate-entry API; keep exit scan visibly planned but blocked on the exit authorization backend contract.
+2. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
+3. `Track D` manual/staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
+4. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
+5. `Track E`: payment provider decision and backend settlement design.
+6. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
 
 ## Recommended Parallel Work Split
 
 If multiple builders are available, this is the safest split:
 
 - Builder 1: Track A staging bootstrap and rollback rehearsal against the rebuilt baseline when credentials and a target are available.
-- Builder 2: Track B plus Track D backend gate-confirmation and grace-period lifecycle design or implementation slice.
+- Builder 2: Track H plus Track D operator Parking Actions entry scan/manual confirmation implementation slice.
 - Builder 3: Track C cleanup deployment, scheduler activation, and operator acceptance in staging.
 - Builder 4: Track G analytics event taxonomy and logging plan.
 

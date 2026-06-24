@@ -4,11 +4,13 @@ Use this file as the quick human-readable reset note for the current working ses
 
 ## Current Reset Snapshot
 
-- `Session date`: `2026-06-23`
-- `Workflow state`: active and reorganized
-- `Current baton owner`: `Planner`
-- `Current cycle`: `2026-06-23-cycle-002-gate-entry-confirmation`
-- `Primary live objective`: select the next repo-executable cycle after reviewer approval of the gate-entry authorization and terminal replay rework
+- `Session date`: `2026-06-24`
+- `Workflow state`: active, reorganized, and developer-ready
+- `Current baton owner`: `Developer`
+- `Current cycle`: `2026-06-24-cycle-003-operator-parking-actions`
+- `Primary live objective`: implement the operator-facing Parking Actions entry scan/manual confirmation workflow against the reviewed gate-entry API
+- `Automation cadence`: `Heartbeat dispatcher configured for every 5 minutes`
+- `Automation status`: `PAUSED`
 
 ## What Changed In This Session
 
@@ -46,6 +48,21 @@ Use this file as the quick human-readable reset note for the current working ses
 - Persona contracts were aligned to the new paths under `planning`, `runtime`, `logs`, and `manual`.
 - Active workflow references were normalized so the current live files point to the new structure instead of the older root-level layout.
 - Reviewer guidance now explicitly reads debugger and suggestion logs and records whether they should be retained, completed, absorbed, rejected, or reset.
+- The review template now includes explicit `Debugger log disposition` and `Suggestion log disposition` fields.
+- The next automation goal is now written in [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md), and the baton has been handed to `Developer`.
+
+### Project audit and cleanup
+
+- Rechecked the project against the master plan across mobile, operator/admin, Supabase, workflow state, usability, backend integration, and commercial readiness.
+- Removed stale tracked root files that duplicated or confused the monorepo app entry points:
+  - `App.js`
+  - `index.js`
+  - `app.json`
+  - `_ReservationScreen.orig.tsx`
+- Removed generated root build/test logs:
+  - `apk-build*.log`
+  - `mobile-tests*.log`
+- Updated the root README, mobile readiness checklist, operator readiness checklist, Supabase rollout guidance, project document index, master plan, and tracker so they reflect the current gate-entry-first reality.
 
 ## Product And Cycle State
 
@@ -74,6 +91,8 @@ Use this file as the quick human-readable reset note for the current working ses
 - Reviewer approved the rework with follow-ups and returned the baton to `Planner`.
 - The active tracker now records the repo-side rework as accepted while keeping staging proof, assignment provisioning, and scanner-client integration open.
 - The active suggestion backlog now contains an operator-side `Parking Actions` improvement request for entry scan, exit scan, and manual QR confirmation flows.
+- That suggestion has been marked `Absorbed into brief` because it is now the basis of the next developer cycle.
+- The debugger log remains intentionally active because the Metro startup fix still needs one manual native launch confirmation on a real emulator or device before it should be reset.
 
 ## Manual Actions Still Required
 
@@ -83,8 +102,24 @@ Use this file as the quick human-readable reset note for the current working ses
 - Provision at least one real operator-to-location assignment before live gate confirmation testing.
 - Rehearse valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scan cases against Supabase.
 - Connect and validate the real gate scanner or operator client against `/api/operator/gate-entry`.
+- Re-run `npm --workspace apps/mobile run android` on the intended emulator or device to fully close the Metro debugger item before resetting the debugger log.
 - Keep Track A environment bootstrap and rollback rehearsal open.
 - Keep Track C scheduler rollout and real-device mobile validation open.
+
+## Planner Intake Notes For The Next Run
+
+- The baton has moved to `Developer`, so the next automation should implement the scoped Parking Actions brief rather than run another planning pass.
+- The most visible new planner input, the `Parking Actions` suggestion, has already been absorbed into the current developer brief.
+- The debugger log should not be cleared yet because its remaining emulator/device check is still manual and unconfirmed.
+- Exit scan should remain visibly planned or disabled until a backend paid-exit authorization contract exists.
+
+## Validation Run In This Session
+
+- `git diff --check`: passed with line-ending warnings only.
+- `npm --workspace apps/mobile run test`: passed 37 of 37 tests.
+- `npm --workspace apps/mobile run typecheck`: passed.
+- `npm --workspace apps/parking-app-operator run test`: passed 31 of 31 tests.
+- `npm --workspace apps/parking-app-operator run build`: passed.
 
 ## Source Of Truth For The Next Run
 
@@ -109,5 +144,5 @@ Use this file as the quick human-readable reset note for the current working ses
 ## Suggested Commit Message
 
 ```text
-chore(workflow): finalize workflow reset and planner handoff
+feat(parking): align gate-entry workflow and prepare operator parking actions
 ```

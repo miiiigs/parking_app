@@ -22,6 +22,9 @@ Last reassessed: 2026-06-08
   - [app/api/operator/layout/route.ts](./app/api/operator/layout/route.ts)
   - [app/api/operator/slots/route.ts](./app/api/operator/slots/route.ts)
   - [app/api/operator/admin-tools/route.ts](./app/api/operator/admin-tools/route.ts)
+- [x] Add the service-role-backed gate-entry confirmation API with durable operator/location assignment checks.
+- [ ] Add an operator-facing Parking Actions page that calls the gate-entry API for entry scan/manual confirmation.
+- [ ] Keep exit scan/confirmation actions blocked until the backend paid-exit authorization contract exists.
 - [ ] Break the dashboard contract into dedicated paginated endpoints for reservations, payments, audit logs, and reconciliation history instead of one large aggregate payload.
 - [ ] Add structured error logging and request correlation IDs for operator API routes.
 - [ ] Add idempotency protection for high-risk writes such as map apply, rollback, slot resets, and status changes.
@@ -50,6 +53,7 @@ Last reassessed: 2026-06-08
 
 ## Suggested Next Features
 
+- [ ] Parking Actions page for entry scan, manual gate confirmation, and future exit scan handling.
 - [ ] Shift handoff log with unresolved issues and operator notes.
 - [ ] Real audit export with CSV or PDF download history.
 - [ ] Alerting for slot or session mismatches and realtime degradation.

@@ -23,9 +23,9 @@ Monorepo scaffold for the Smart Parking Reservation System startup idea.
 
 ## Next build step
 
-1. Keep the mobile app on Expo Router, but use `expo run:android` for local native testing and EAS builds for release instead of Expo Go for native features.
-2. Define the Supabase schema.
-3. Implement reservation, validation, session state flows.
-4. Wire payment and notification events.
-5. Add store-build configuration for Android and iOS.
+1. Continue the workflow from [workflow/runtime/AI_WORKFLOW_STATE.md](./workflow/runtime/AI_WORKFLOW_STATE.md).
+2. Build the operator-facing Parking Actions entry scan/manual confirmation workflow against the reviewed gate-entry API.
+3. Keep Supabase staging bootstrap, operator-location assignment provisioning, and live gate-confirmation rehearsal as explicit manual follow-ups.
+4. Keep paid exit authorization, payment provider integration, penalties, compensation, and production observability as open launch-critical tracks.
+5. Use `expo run:android` for local native testing and EAS builds for release instead of Expo Go for native features.
 6. Follow the Android build checklist in [ANDROID_BUILD_CHECKLIST.md](ANDROID_BUILD_CHECKLIST.md).

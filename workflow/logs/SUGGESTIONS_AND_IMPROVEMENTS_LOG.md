@@ -53,4 +53,4 @@ Use this file for:
 - `Suggested planner interpretation`:
   Consider this as a likely next-cycle candidate that connects the approved backend gate-entry contract to an operator-facing Parking Actions UI and extends the same operator flow thinking toward exit handling.
 - `Status`:
-  `Open`
+  `Absorbed into brief`
