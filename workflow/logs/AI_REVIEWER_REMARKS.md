@@ -21,67 +21,70 @@ Use this file after the developer finishes a cycle and before the planner advanc
 
 ## Current Review
 
-### 2026-06-23 - Gate Entry Authorization Rework Review
+### 2026-06-25 - Dashboard Auth-User Onboarding Review
 
 - `Current move/task`:
-  Re-review the gate-entry authorization and terminal replay corrections after developer rework.
+  Review the Track K slice that lets admins onboard a dashboard user from `Access Control` by inviting a new Supabase Auth user when needed while preserving the existing role-provisioning path for already-existing Auth users.
 
 - `Scope reviewed`:
-  `supabase/confirm_parking_entry.sql`
-  `supabase/operator_location_assignments.sql`
-  `supabase/README.md`
-  `apps/parking-app-operator/app/api/operator/gate-entry/route.ts`
-  `apps/parking-app-operator/lib/operatorLocationAccess.ts`
+  `apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts`
+  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
+  `apps/parking-app-operator/lib/operatorAdminAccess.ts`
   `apps/parking-app-operator/lib/operatorRouteSchemas.ts`
   `apps/parking-app-operator/tests/locationContext.test.mjs`
   `apps/parking-app-operator/tests/routeContractCoverage.test.js`
+  `apps/parking-app-operator/README.md`
+  `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
-  `workflow/planning/TRACK_A_ENVIRONMENT_RELEASE_BASELINE.md`
   `workflow/temp/SESSION_UPDATE.md`
 
 - `Inputs reviewed`:
   `workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md`
   `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
+  `workflow/planning/PROJECT_DOCUMENT_INDEX.md`
   `workflow/logs/DEBUGGER_OUTPUT_LOG.md`
   `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`
-  current route, SQL, test, rollout, temp-session, and validation evidence
+  current onboarding route, Access Control UI copy, helper-layer invite and lookup logic, focused contract coverage, doc updates, temporary session recap, and developer validation evidence
 
 - `Findings`:
-  No material repo-blocking findings remain for the requested rework.
-  The gate-entry route now checks `hasOperatorLocationAssignment` with the authenticated `operatorUser.id` and `activeLocation.id` before invoking the service-role `confirm_parking_entry` RPC. Missing or cross-location assignment returns `403` before privileged mutation.
-  `confirm_parking_entry` now rejects existing-session replays unless the reservation is still `confirmed` and the existing session is still `active`, so terminal completed or otherwise non-active rescans no longer return successful idempotent confirmation.
-  Residual risk remains external: the assignment table and SQL behavior were reviewed statically and covered by repo tests, but not executed against a live Supabase target in this reviewer run.
+  No material repo-blocking findings remain for this slice.
+  The onboarding route remains admin-only, keeps privileged Auth-user onboarding on the server side through the Supabase Admin API, preserves the existing-user provisioning path, and still uses `admin_user_roles` as the actual dashboard access gate.
+  Residual risk remains external rather than repo-blocking: live invite delivery, first-login completion, non-production Supabase proof, and the broader bootstrap-admin replacement are still manual or future-cycle follow-ups.
 
 - `Validation checked`:
-  Re-ran `npm --workspace apps/parking-app-operator run test`: passed 31 of 31 tests, including durable assignment allow/deny coverage.
-  Reviewed developer's recorded validation: mobile test passed 35 of 35, mobile typecheck passed, operator build passed on standalone rerun, and `git diff --check` passed with line-ending warnings only.
-  Statically reviewed assignment-table RLS/grants, route ordering before RPC invocation, service-role-only gate RPC execution, SQL terminal-state ordering, duplicate-active replay behavior, rollout docs, and temp-session manual checklist.
+  Reviewed developer validation evidence: `npm --workspace apps/parking-app-operator run test` passed 41 of 41 tests, `npm --workspace apps/parking-app-operator run build` passed, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
+  Statically reviewed the actual dashboard-account route, the shared admin helper invite and lookup path, the Access Control onboarding copy, the request schema, the helper-level invite assertions, the route contract coverage, and the updated README, checklist, and tracker wording.
 
 - `Decision`:
   `Approved with follow-ups`
 
+- `Testing expectation snapshot`:
+  `Done`: admins can now use `Access Control` to grant or update a dashboard role for an existing Supabase Auth user or invite a new dashboard user by email while preparing the `admin_user_roles` record server-side.
+  `Partial`: the repo now reflects invitation-based onboarding and the preserved existing-user path truthfully, but that behavior is only code-validated until a non-production Supabase environment proves real invitation delivery, first sign-in completion, and post-invite access behavior end to end.
+  `Missing`: production-safe bootstrap-admin replacement, broader admin customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof for the accepted admin control-plane flows.
+
 - `Manual actions required`:
-  `Backend/DevOps` must deploy `operator_location_assignments.sql` and `confirm_parking_entry.sql` to a non-production Supabase project.
-  `Backend/DevOps` must provision at least one explicit operator/location assignment before gate confirmation testing; absence of an assignment is expected to fail closed.
-  `Backend/QA` must rehearse valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans against Supabase before pilot promotion.
-  `Operator/QA` must later connect and validate a real gate scanner or operator UI client against `/api/operator/gate-entry`.
+  `Backend/DevOps` must deploy and verify the current Supabase SQL and dashboard environment baseline in a non-production project before treating invitation-based onboarding as staging-ready.
+  `Admin/QA` must use real Supabase Auth users to verify `/dashboard/access-control` can both invite a new dashboard user and grant or update a role for an existing one, including the first-login completion path after invitation delivery.
+  `Operator/QA` must confirm that invited or updated dashboard accounts still obey the accepted location-assignment model once they sign in, and that non-admin accounts continue to see only explicitly assigned lots.
+  `Founder/Product` should still define the production-safe replacement for the current `admin@example.com` bootstrap convention before broader rollout.
 
 - `Required rework`:
-  None for this cycle.
+  None required to accept this cycle.
 
 - `Safe follow-ups`:
-  Planner should decide the next slice, with the strongest candidate being the operator-side Parking Actions or scanner client that uses the approved gate-entry API.
-  Paid exit QR, exit grace, penalties, compensation, full billing, Track A staging bootstrap, Track C scheduler activation, and real-device validation remain later work.
+  Planner should choose between the manual non-production proof queue for the accepted admin-control-plane flows and the next repo slice for broader Track K admin customer-oversight or bootstrap hardening.
+  Broader admin customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof remain later work.
 
 - `Temp artifact disposition`:
-  Retain `workflow/temp/SESSION_UPDATE.md` briefly. It accurately summarizes the workflow reorganization, the accepted gate-entry rework, and the manual actions that still need to be applied. Planner may clear it after using it as reset context.
+  Retain `workflow/temp/SESSION_UPDATE.md` only as a temporary human recap. It trails the current accepted review state and should not be treated as live workflow truth.
 
 - `Debugger log disposition`:
-  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. It documents an unrelated Metro startup fix that still requires manual Android launch confirmation, so it should remain visible to Planner.
+  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The Metro fix and rerunnable SQL hardening both still have manual external validation steps pending.
 
 - `Suggestion log disposition`:
-  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The active operator Parking Actions and entry/exit scan request is not completed by this cycle and should be considered by Planner.
+  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The admin/operator separation suggestion is substantially advanced but not fully finished, and the Parking Actions suggestion still has unfinished exit-contract follow-up.
 
 - `Next owner`:
   `Planner`
@@ -107,6 +110,7 @@ If there are no findings, say so explicitly.
 - `Findings`:
 - `Validation checked`:
 - `Decision`:
+- `Testing expectation snapshot`:
 - `Manual actions required`:
 - `Required rework`:
 - `Safe follow-ups`:

@@ -251,6 +251,7 @@ The reviewer owns:
 - validation audit
 - approval or rejection decisions
 - surfacing manual actions that Codex cannot complete directly
+- translating cycle results into a short testing-expectation snapshot so the user knows what should work now, what is partial, and what is still missing
 
 The reviewer is not supposed to silently fix code in reviewer mode. Review and execution remain separate.
 
@@ -415,6 +416,8 @@ The reviewer asks:
 - are manual outside-Codex steps still required
 
 The reviewer writes the result to [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md).
+
+When the cycle changed visible behavior, operational flows, or backend-backed product capability, the reviewer should also leave a compact testing-expectation snapshot using `Done`, `Partial`, and `Missing` so a human tester can quickly understand what to expect before opening the app.
 
 The reviewer also decides whether the baton returns to:
 

@@ -465,3 +465,161 @@ Do not use this file as the strategic roadmap or the active priority board.
 
 - `Recommended next move`:
   Reviewer should verify that assignment lookup happens before the RPC, missing or cross-location assignments fail closed, active duplicate scans still replay, terminal scans fail, and rollout docs do not hide the new provisioning requirement.
+
+### 2026-06-24 - Operator Parking Actions Entry Scan
+
+- `Current move/task`:
+  Build the first operator-facing `Parking Actions` flow so admin/operator roles can scan or manually verify reservation and walk-in entry QR payloads against the reviewed `/api/operator/gate-entry` route, while keeping exit verification visibly blocked until the backend contract exists.
+
+- `Already finished before my work`:
+  The gate-entry SQL and authenticated operator API route already existed with durable operator-location assignment checks, terminal replay rejection, parking-grace ownership, and passing operator/mobile contract coverage.
+  The planner had already absorbed the user suggestion into the highest-priority developer brief and moved the baton to `Developer`.
+
+- `What I completed now`:
+  Added a discoverable `Parking Actions` navigation item in the operator dashboard for roles that can mutate slot status.
+  Added `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx` with an entry-verification workflow that supports browser camera QR scanning when available and manual QR payload entry as the fallback.
+  Wired the page to call only `/api/operator/gate-entry`, surface success, idempotent replay, and failure messaging, and keep exit verification visible but intentionally disabled until backend exit authorization exists.
+  Added `apps/parking-app-operator/components/dashboard/parking-action-controls.tsx` so reservation and session detail sheets now expose manual operator fallback actions.
+  Updated `operation-detail-sheet.tsx` so reservations now have manual `Verify Entry QR`, `Open Parking Actions`, and blocked `Verify Exit QR` controls, while sessions expose Parking Actions access and blocked exit verification messaging.
+  Updated the operator production-readiness checklist and execution tracker so implementation reality now reflects the new entry-side Parking Actions slice while keeping staging, assignment provisioning, hardware scanning, and exit lifecycle work open.
+  Added focused operator route/UI contract assertions for the new Parking Actions surface.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 32 of 32 tests.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/dashboard/parking-actions`.
+  `git diff --check`: passed with line-ending warnings only.
+  Statically verified the browser client calls only `/api/operator/gate-entry` and does not access privileged Supabase credentials directly.
+
+- `Still open`:
+  Real camera or scanner hardware behavior was not validated on a production-like operator device in this run.
+  Operator-location assignments and Supabase SQL still need non-production deployment and scan-case rehearsal before the new flow can be treated as staging-proven.
+  Exit verification remains intentionally blocked because the backend paid-exit authorization and leave-the-slot grace contract does not exist yet.
+  Broader operator exception handling for disputes, compensation, and overstay remains outside this slice.
+
+- `Recommended next move`:
+  Reviewer should verify that the new Parking Actions page and manual detail-sheet controls are correctly capability-gated, only call the reviewed operator route, represent idempotent replay and failure states honestly, and keep exit verification blocked until the backend contract exists.
+
+### 2026-06-24 - Admin Operator Identity And Multi-Lot Foundation
+
+- `Current move/task`:
+  Implement the first Track K foundation slice for explicit admin-versus-operator dashboard behavior, admin-managed operator-to-lot assignment, customer-versus-dashboard account-boundary documentation, and backend-backed multi-lot development data.
+
+- `Already finished before my work`:
+  `parking-app-operator` already had Supabase Auth login, `admin_user_roles`, role capability checks, active-location context, a durable `operator_location_assignments` table, exact gate-entry assignment enforcement, and the first Parking Actions entry scan UI in the worktree.
+
+- `What I completed now`:
+  Added an admin-only `Access Control` dashboard page for viewing dashboard accounts, active lots, and current operator-to-lot assignments.
+  Added `/api/operator/location-assignments` with admin-only list, create, and delete operations backed by the service-role key on the server.
+  Extended operator location-access helpers so assignment reads, creates, and deletes are centralized and testable.
+  Tightened non-admin location context so operators, support, and finance only receive active locations they are explicitly assigned to, while admins retain all-location visibility.
+  Adjusted capabilities so `operator` keeps assigned-lot parking operations but no longer receives pricing, reconciliation, slot-reset, map-layout, or assignment-management powers.
+  Added the `Access Control` dashboard navigation entry for admins.
+  Expanded `supabase/seed.sql` from one pilot lot to three non-production lots with deterministic slot QR tokens.
+  Updated operator and Supabase documentation to describe dashboard-versus-customer account boundaries, admin-managed assignment flows, and non-production multi-lot seed usage.
+  Added focused tests for admin-only access control, assignment route contracts, assignment helper filtering, capability separation, and multi-lot seed coverage.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 35 of 35 tests.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/dashboard/access-control` and `/api/operator/location-assignments`.
+  `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Statically verified service-role containment, admin-only assignment writes, non-admin assignment-filtered location context, admin all-location visibility, multi-lot seed data, and account-boundary documentation.
+
+- `Still open`:
+  The Access Control flow was not executed against a live Supabase project in this run.
+  Staging still needs real dashboard accounts, explicit assignment creation/removal, assigned-location filtering, and three-lot visibility verified end to end.
+  `admin@example.com` remains the non-production bootstrap convention; production invitation/onboarding remains future work.
+  Broader customer oversight, admin analytics, paid-exit authorization, scanner hardware proof, and production rollout validation remain outside this slice.
+
+- `Recommended next move`:
+  Reviewer should verify admin-only assignment management, service-role containment, non-admin assigned-location scoping, capability separation, multi-lot seed safety, account-boundary documentation, and preservation of the existing Parking Actions entry flow.
+
+### 2026-06-25 - Admin Lot Management And Dashboard Role Provisioning
+
+- `Current move/task`:
+  Implement the next Track K repo slice for admin-managed parking lots and dashboard-role provisioning, while preserving durable operator-location security and keeping shared location inventory behavior truthful across operator and mobile surfaces.
+
+- `Already finished before my work`:
+  The operator dashboard already had role-aware capability checks, active-location context, durable operator-to-location assignments, admin-only assignment management, and three-lot seed data.
+  The mobile app already read parking lot inventory from the shared backend `locations` source.
+
+- `What I completed now`:
+  Added `apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts` so admins can grant dashboard roles to existing Supabase Auth users through a service-role-backed server route with audit logging.
+  Added `apps/parking-app-operator/app/api/operator/locations/route.ts` plus `apps/parking-app-operator/lib/operatorAdminAccess.ts` so admins can list, create, update, activate, and deactivate parking lots through shared helpers instead of direct SQL.
+  Extended `apps/parking-app-operator/app/dashboard/access-control/page.tsx` so the admin Access Control page now provisions dashboard roles in addition to managing lot assignments.
+  Added `apps/parking-app-operator/components/dashboard/location-management-panel.tsx` and updated `app/dashboard/parking-setup/page.tsx` so admins can manage parking-lot metadata from the dashboard.
+  Updated `apps/parking-app-operator/lib/auth-context.tsx` so operator location inventory and active-location fallback refresh correctly after admin lot changes.
+  Expanded operator contract and helper tests to cover the new request schemas, admin helpers, route strings, and code-normalization behavior.
+  Updated the operator README, production-readiness checklist, and active execution tracker so the repo documentation matches the new admin control-plane reality and its remaining limits.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 40 of 40 tests.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/api/operator/dashboard-accounts`, `/api/operator/locations`, `/dashboard/access-control`, and `/dashboard/parking-setup`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Mobile automated tests were not rerun in this slice because no mobile source files changed; repo review confirmed the mobile app still reads the shared backend `locations` inventory rather than an operator-only source.
+
+- `Still open`:
+  Dashboard-role provisioning currently requires the Supabase Auth user to already exist; this slice does not create auth users or send invitations.
+  The new admin lot-management and dashboard-role flows were not executed against a live Supabase project in this run, so staging proof is still required.
+  Production-safe bootstrap-admin replacement, invitation-based onboarding, broader customer-oversight tooling, and admin analytics remain future Track K work.
+
+- `Recommended next move`:
+  Reviewer should verify the new admin-only routes and UI surfaces, the service-role containment and audit behavior, the operator location refresh behavior after lot changes, and that the tracker and README do not overstate invitation or staging readiness.
+
+### 2026-06-25 - Manage Parking Lots Surface Separation
+
+- `Current move/task`:
+  Implement the next Track K repo slice that separates global parking-lot administration from lot-scoped setup by moving multi-lot management into a dedicated admin-only surface, keeping `Parking Setup` focused on the selected dashboard lot, and making existing-lot editing more explicit.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K foundations in place: admin-only dashboard role provisioning for existing Supabase Auth users, admin-only parking-lot CRUD routes, durable operator-to-location assignment enforcement, shared backend `locations` inventory for operator and mobile surfaces, and active-location refresh behavior after admin lot changes.
+
+- `What I completed now`:
+  Added a dedicated admin-only `Manage Parking Lots` navigation entry and `apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx` so global lot administration no longer lives inside `Parking Setup`.
+  Reworked `apps/parking-app-operator/app/dashboard/parking-setup/page.tsx` into a selected-lot setup surface that shows the active dashboard lot summary, keeps pricing and grace-period configuration on the selected lot only, and links admins back to `Manage Parking Lots` when they need global inventory controls.
+  Refactored `apps/parking-app-operator/components/dashboard/location-management-panel.tsx` so create and edit flows are split into separate cards, existing-lot editing uses an explicit selected-lot dropdown editor instead of reusing the create form, and the UI explains the boundary between global inventory control and lot-scoped setup.
+  Updated operator contract coverage so tests now assert the dedicated `Manage Parking Lots` route, the new navigation contract, the selected-lot `Parking Setup` copy, and the clearer lot-editing flow.
+  Updated the operator README and active execution tracker so the durable docs now describe the separated surfaces truthfully and keep staging-only or future-work limits explicit.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 40 of 40 tests, including the updated route and UI contract coverage for the separated lot-management surfaces.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/dashboard/manage-parking-lots` and `/dashboard/parking-setup`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with existing line-ending warnings only.
+  Mobile automated tests were not rerun in this slice because no mobile source files changed and repo review confirmed the shared backend `locations` inventory contract was preserved rather than rewritten.
+
+- `Still open`:
+  The new `Manage Parking Lots` and updated selected-lot `Parking Setup` surfaces were not exercised against a live Supabase environment in this run, so non-production create-update-deactivate rehearsal is still required.
+  Dashboard-role provisioning still assumes the target Supabase Auth user already exists; invitation-based or admin-created auth-user onboarding remains future Track K work.
+  Broader admin customer-oversight tooling, production-safe bootstrap-admin replacement, and staging proof for the full admin control plane remain outside this repo slice.
+
+- `Recommended next move`:
+  Reviewer should verify the new admin-only menu and route gating, confirm that `Parking Setup` is now truthfully selected-lot scoped, check that the dedicated edit flow is clearer than the old create-form reuse, and make sure the README and tracker do not imply live staging proof or invitation-based onboarding that still does not exist.
+
+### 2026-06-25 - Dashboard Auth-User Onboarding From Access Control
+
+- `Current move/task`:
+  Implement the next Track K repo slice so admins can onboard a dashboard user from `Access Control` without manually pre-creating the Supabase Auth account first, while preserving accepted role gating, lot assignment, and non-admin location scoping.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K control-plane foundations in place: admin-only `Access Control`, durable operator-to-lot assignments, admin-only dashboard-role provisioning for existing Supabase Auth users, dedicated `Manage Parking Lots`, selected-lot `Parking Setup`, and shared backend lot parity.
+
+- `What I completed now`:
+  Extended `apps/parking-app-operator/lib/operatorAdminAccess.ts` with a server-side `inviteAuthUserByEmail` helper and reused the same admin-client layer for existing-user lookup, so the onboarding path stays inside the Supabase Admin API rather than inventing local credential handling.
+  Updated `apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts` so the admin-only route now invites a new Supabase Auth user when the email does not exist yet, preserves the existing-user role-provisioning path, keeps `admin_user_roles` as the actual dashboard access gate, and records whether the action invited a new user or updated an existing one.
+  Updated `apps/parking-app-operator/app/dashboard/access-control/page.tsx` so the onboarding card now clearly explains the dual behavior: existing Auth users get access immediately, while new emails receive a Supabase invite and a prepared dashboard role.
+  Added helper-level invite coverage in `apps/parking-app-operator/tests/locationContext.test.mjs` and updated `apps/parking-app-operator/tests/routeContractCoverage.test.js` so the new invite helper path and Access Control copy are contract-checked.
+  Updated `apps/parking-app-operator/README.md`, `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`, and `workflow/planning/ACTIVE_EXECUTION_TRACKER.md` so repo documentation now reflects invitation-based onboarding in code while still keeping live Supabase proof and bootstrap-admin follow-up explicitly open.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 41 of 41 tests, including the new dashboard invite-helper coverage.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/api/operator/dashboard-accounts` and `/dashboard/access-control`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Mobile automated tests were not rerun in this slice because no mobile source files changed and the onboarding work stayed entirely inside the operator dashboard admin surface.
+
+- `Still open`:
+  Invitation-based onboarding was not exercised against a live Supabase project in this run, so real email delivery, first-login completion, and non-production proof remain manual follow-ups.
+  `admin@example.com` remains the non-production bootstrap convention; this slice does not replace the broader production-safe bootstrap-admin decision.
+  Broader customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof remain outside this repo slice.
+
+- `Recommended next move`:
+  Reviewer should verify that the new onboarding route and UI stay admin-only, preserve the existing-user provisioning path, keep `admin_user_roles` as the actual dashboard access gate, and update the tracker and docs truthfully without implying live invitation proof or bootstrap-admin completion.

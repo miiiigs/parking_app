@@ -65,6 +65,10 @@ The operator webapp currently covers:
 - pricing settings and reconciliation utilities
 - location context, layout safety, and operator permission logic
 
+Current structural limit:
+
+- the webapp still behaves mostly like one shared operations surface, not yet as a clearly separated `admin plus operator` control plane with distinct global versus lot-scoped powers
+
 ### Backend and data platform
 
 The backend currently includes:
@@ -111,6 +115,7 @@ This is the intended production flow the app should align to:
 - [~] Walk-in flow is significantly more real than before, but timeout automation and full operator visibility are not complete
 - [~] Mobile UI and UX are broad in coverage, but launch-quality error copy, recovery states, and field-validated scanning UX are not complete
 - [~] Operator web UX is operationally meaningful, but heavy views, detail actions, and high-volume ergonomics still need hardening
+- [~] Admin and operator role concepts exist, but the app still needs explicit admin-versus-operator separation, admin-managed lot assignment, and clearer customer-versus-dashboard account boundaries
 - [~] Security posture has real foundations, but rate limiting, abuse protection, secret review, and end-to-end hardening are unfinished
 - [~] Observability exists only as early state surfaces and partial realtime visibility, not as a production telemetry stack
 - [~] Commercial billing logic exists only as a foundation, not as a gateway-backed settlement system
@@ -119,6 +124,7 @@ This is the intended production flow the app should align to:
 
 - [ ] Real payment provider integration and finance-safe settlement lifecycle
 - [ ] Gate-entry QR activation has a reviewed backend contract, but scanner-client integration, staging proof, paid-exit grace, and exit-grace QR expiry are not yet aligned end to end in production code
+- [ ] The dashboard still needs a production-safe admin control plane for global lot management, operator-account assignment, and customer-versus-dashboard identity boundaries
 - [ ] Server-owned expiry, no-show, and housekeeping automation
 - [ ] Full production-safe environment, rollback, and release discipline
 - [ ] End-to-end security hardening for mobile, webapp, privileged routes, and SQL functions
@@ -131,6 +137,7 @@ This is the intended production flow the app should align to:
 - [ ] Broad commercial rollout is not yet safe
 - [ ] Payments remain operationally incomplete for real-money production use
 - [ ] Current repo flow now has a repo-accepted backend-owned operator gate confirmation contract, but still lacks an operator scanner client, exit-authorization QR handling, and automated penalty or compensation enforcement
+- [ ] The current webapp still needs explicit `admin` versus `operator` experience separation, admin-managed operator assignment, and shared mobile/backend multi-lot parity before broader operations can be trusted
 - [ ] Walk-in lifecycle still needs server housekeeping and richer operator visibility before it can be trusted at scale
 - [ ] Penalty, compensation, and support escalation behavior are not yet modeled end to end as backend-owned commercial flows
 - [ ] Some environment or rollout documentation was intentionally removed as outdated and now needs current-state replacement
@@ -237,6 +244,8 @@ Already done:
 
 Still required:
 - [ ] Finalize production auth posture for customer launch
+- [ ] Separate customer mobile identities from operator/admin dashboard identities and define whether shared-account overlap is allowed
+- [ ] Define the bootstrap admin path and the production-safe operator/admin provisioning model
 - [ ] Review all privileged server routes and service-role usage for least privilege
 - [ ] Audit `security definer` SQL functions for production safety
 - [ ] Add rate limiting and abuse protections for auth, reservation, walk-in, and operator actions
@@ -328,6 +337,9 @@ Already done:
 
 Still required:
 - [ ] Break heavy aggregate views into paginated or more specialized data contracts
+- [ ] Split the shared operations app into explicit `admin` and `operator` experiences, where admin owns all-lot control and operators stay restricted to assigned locations
+- [ ] Add admin-managed parking-lot assignment and operator-account management so normal lot assignment does not require direct SQL
+- [ ] Add multi-lot parity across backend, mobile, and dashboard surfaces, including at least two more testing lots in backend-backed data
 - [ ] Add richer detail drawers, operator notes, and safe destructive-action approval flows
 - [ ] Add operator-facing Parking Actions for entry scan, manual gate confirmation, conflict, compensation, exit scan, and exit-overstay exception handling
 - [ ] Add shift handoff, unresolved issue logging, and incident communication UX

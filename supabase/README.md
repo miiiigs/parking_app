@@ -22,6 +22,8 @@ Auth and RLS setup:
 - Run the admin hardening file to create admin roles, audit logs, and reconciliation support.
 - Run the bootstrap admin role SQL once for the first dashboard user, then edit the email placeholder to match your real admin account.
 - Mobile users sign in anonymously and can only read their own reservations and sessions.
+- Dashboard users also live in Supabase Auth, but dashboard access requires a matching row in `admin_user_roles`.
+- Do not treat ordinary customer accounts as dashboard staff accounts unless they are deliberately granted a dashboard role.
 - Admin server actions still use the service role key, so keep that key server-side only.
 
 Parking lot layouts (admin builder → mobile map):
@@ -47,8 +49,15 @@ Walk-in expiry cleanup:
 
 Gate entry confirmation:
 
-- Run `operator_location_assignments.sql` after `admin_hardening.sql`, then provision each operator/location pair deliberately. A selected location is not mutation authorization.
+- Run `operator_location_assignments.sql` after `admin_hardening.sql`, then provision each non-admin operator/location pair deliberately. A selected location is not mutation authorization.
+- After the dashboard is deployed, admins can manage assignment rows through the operator app `Access Control` page instead of direct SQL for normal setup.
 - Run `confirm_parking_entry.sql` after the reservation and legacy session RPC files. It adds durable entry-confirmation and parking-grace timestamps.
 - The operator API calls `confirm_parking_entry` with the service-role key after authenticating the operator and resolving the active location.
 - `start_parking_session` and `start_walk_in_session` are retained only for compatibility and are no longer executable by `anon` or `authenticated` roles.
 - Verify valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans against a non-production database before promotion.
+
+Development multi-lot seed data:
+
+- `seed.sql` now creates three non-production locations: `BGC Pilot Site`, `Makati Business Hub`, and `Ortigas Center Deck`.
+- The additional lots exist so mobile and operator location behavior can be tested against real backend-backed multi-lot data.
+- Do not run seed data against production. Use it only for local, staging, or controlled non-production environments.

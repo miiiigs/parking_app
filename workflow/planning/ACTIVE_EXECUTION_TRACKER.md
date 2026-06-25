@@ -214,7 +214,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - backend confirmation is accepted in repo; operator Parking Actions client, assignment provisioning, scanner integration, exit authorization, and staging proof remain open`
+- `In progress - backend confirmation and the first operator Parking Actions entry client now exist in repo; assignment provisioning, hardware-scanner proof, exit authorization, and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
@@ -222,7 +222,7 @@ Owner:
 Tasks:
 - [x] Present a reservation-backed entry QR ticket in the mobile flow.
 - [x] Remove slot-QR validation as the default mobile activation path.
-- [~] Redirect gate or operator validation into the matching reservation and confirm lot entry in backend state. The authenticated location-scoped API exists; a production gate scanner or operator Parking Actions client still needs to call it.
+- [~] Redirect gate or operator validation into the matching reservation and confirm lot entry in backend state. The authenticated location-scoped API exists and the first operator Parking Actions client now calls it; staging proof and hardware-scanner validation still remain.
 - [x] Start the parking lifecycle on confirmed lot entry without requiring a second slot-validation scan.
 - [x] Add a parking grace countdown before the metered timer starts.
 - [ ] Add a paid exit QR and leave-the-slot grace countdown after payment.
@@ -257,7 +257,7 @@ Validation method:
 - Verified the repo now contains backend-owned gate confirmation and parking-grace boundaries; exit authorization, automated penalties, compensation handling, scanner-client integration, and staging proof remain open.
 
 Remaining gap before success gate:
-- The backend-owned gate or operator confirmation event exists as a location-scoped API and SQL contract, but no production gate scanner or operator Parking Actions client has been connected yet.
+- The backend-owned gate or operator confirmation event exists as a location-scoped API and SQL contract, and the operator dashboard now has a first Parking Actions entry client plus manual reservation/session fallback actions. Non-production Supabase proof, assignment provisioning, and real scanner validation still remain.
 - Backend state transitions for paid exit grace, penalty assessment, and compensation are not yet defined as the authoritative contract in repo code.
 - Operator and support handling for conflicts, compensation, and exit overstay remain open product and implementation gaps.
 
@@ -362,7 +362,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - base operator surfaces exist, but gate-entry exceptions, compensation handling, and overstay actions are still missing`
+- `In progress - the first Parking Actions surface now exists for entry scan/manual verification, but exit authorization, dispute handling, compensation handling, and broader operator interventions are still missing`
 
 Owner:
 - `Operator` + `Backend`
@@ -371,8 +371,8 @@ Already true:
 - location-scoped dashboard, map, pricing, reconciliation, and audit base exist
 
 Tasks:
-- [ ] Add a `Parking Actions` operator menu for entry scan, exit scan planning, and manual QR confirmation workflows.
-- [ ] Connect entry QR scan/manual confirmation to the reviewed `/api/operator/gate-entry` route.
+- [x] Add a `Parking Actions` operator menu for entry scan, exit scan planning, and manual QR confirmation workflows.
+- [x] Connect entry QR scan/manual confirmation to the reviewed `/api/operator/gate-entry` route.
 - [ ] Keep exit scan actions blocked or informational until the backend paid-exit authorization contract exists.
 - [ ] Split large dashboard data contract into dedicated paginated endpoints.
 - [ ] Add richer detail actions for disputes, compensation, and manual intervention.
@@ -392,6 +392,24 @@ Rollback/fallback:
 
 Future polish:
 - multi-location operator console
+
+Implementation:
+- [apps/parking-app-operator/app/dashboard/parking-actions/page.tsx](../apps/parking-app-operator/app/dashboard/parking-actions/page.tsx)
+- [apps/parking-app-operator/components/dashboard/parking-action-controls.tsx](../apps/parking-app-operator/components/dashboard/parking-action-controls.tsx)
+- [apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx](../apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx)
+- [apps/parking-app-operator/components/layout/dashboard-layout.tsx](../apps/parking-app-operator/components/layout/dashboard-layout.tsx)
+- [apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md](../apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md)
+
+Validation method:
+- `npm --workspace apps/parking-app-operator run test`
+- `npm --workspace apps/parking-app-operator run build`
+- `git diff --check`
+- Verified the operator dashboard now exposes a discoverable `Parking Actions` route, manual reservation/session fallback controls, and an explicit exit-blocked state without claiming a backend exit mutation exists.
+
+Remaining gap before success gate:
+- Browser-level entry scanning now exists with manual QR fallback, but real scanner hardware behavior still needs non-production operator validation.
+- Exit verification is intentionally visible-but-blocked until the backend paid-exit authorization and grace contract exists.
+- Operators still lack richer dispute, compensation, and overstay interventions for real-world exception handling.
 
 ## Track I - Security and Abuse Controls
 
@@ -458,25 +476,112 @@ Rollback/fallback:
 Future polish:
 - device-farm automation
 
+## Track K - Admin Control Plane, Identity Separation, and Multi-Lot Provisioning
+
+Priority:
+- `P0`
+
+Status:
+- `In progress - repo now includes admin/operator identity separation, assignment management, dashboard-role onboarding through existing or invited auth users, dedicated global lot administration, and selected-lot parking setup separation; staging proof, bootstrap-admin hardening, and broader admin-control-plane work remain open`
+
+Owner:
+- `Backend` + `Operator` + `Mobile` + `Security`
+
+Already true:
+- `parking-app-operator` already has role-aware capability checks, location context, and an `admin` role concept
+- the gate-entry route already enforces exact operator-location assignment for privileged mutation
+- the mobile app, operator app, and Supabase backend already share one parking domain model
+
+Tasks:
+- [x] Define the shared `admin and operator` app model for `parking-app-operator`, including which screens stay shared and which become admin-only.
+- [ ] Keep `admin@example.com` as the current non-production bootstrap admin and document the production-safe replacement or bootstrap path.
+- [x] Distinguish customer mobile identities from operator/admin dashboard identities and define whether any shared-account overlap is allowed.
+- [~] Give admin full-system visibility and control across all parking lots, operator accounts, operator-to-lot assignments, and customer oversight surfaces that belong in the dashboard. Assignment management, lot management, and dashboard-role provisioning surfaces now exist; broader customer oversight remains future work.
+- [~] Add admin-managed operator assignment and provisioning flows so lot assignment does not require direct SQL for normal operations. Assignment management plus dashboard-role onboarding for existing or newly invited Supabase Auth users now exist; live staging proof and broader bootstrap hardening are still open.
+- [x] Ensure operators can only view or mutate the parking lots they are explicitly assigned to.
+- [x] Add at least two more parking lots in backend-backed development or staging-ready data and make operator plus mobile surfaces reflect the same location inventory.
+- [~] Align backend contracts, seeded location data, mobile location queries, and operator location queries so multi-lot behavior matches end to end. Repo contracts and seed data are aligned; staging proof remains open.
+- [x] Add admin-side parking-lot management so new lots can be created, updated, and managed from the dashboard with clean backend persistence.
+- [x] Add admin-side operator account creation or invitation management so admin can provision dashboard operators before assigning them to parking lots.
+- [~] Ensure admin-managed parking-lot changes propagate cleanly to the mobile app's available parking-lot list and other location-backed surfaces. Repo-backed `locations` reads stay shared across mobile and operator surfaces, and the operator auth context now refreshes location inventory after admin lot changes; non-production proof is still required.
+- [x] Move global parking-lot creation and multi-lot administration into a new admin-only `Manage Parking Lots` menu instead of keeping those controls under lot-scoped `Parking Setup`.
+- [x] Keep `Parking Setup` focused on the currently selected parking lot only.
+- [x] Replace create-form reuse for lot editing with a selected-lot dropdown card or dedicated selected-lot editor so editing an existing lot is cleaner and more explicit.
+- [ ] Finalize operator-versus-admin menu visibility so operators only see operational pages and admin-only control surfaces remain hidden from non-admin roles.
+- [ ] Rename the operator-facing `Admin Tools` menu or page label to `Operator Tools` while preserving reconciliation capability for operators.
+- [ ] Remove the location switcher for non-admin users so assigned-lot operators do not appear to choose across locations they should not operate.
+- [ ] Improve the admin lot-switcher dropdown readability and visibility.
+- [ ] Reorder the left navigation to the agreed operational-first sequence, with admin-only entries grouped at the end.
+
+Success gate:
+- An admin can manage global parking operations, lot assignments, and lot inventory from the dashboard, operators are restricted to their assigned lots, customer and dashboard account boundaries are explicit, and multi-lot data is visible consistently across backend, mobile, and web surfaces without direct database intervention for normal setup.
+
+Dependencies:
+- Track A
+- Track B
+- Track D
+
+Rollback/fallback:
+- retain the current bootstrap admin plus manual SQL assignment path only for internal testing while the first admin control plane slice is being built
+
+Future polish:
+- invitation-based operator onboarding
+- lot templates and bulk assignment tools
+- admin analytics and customer-support tooling
+
+Implementation:
+- [apps/parking-app-operator/app/dashboard/access-control/page.tsx](../apps/parking-app-operator/app/dashboard/access-control/page.tsx)
+- [apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx](../apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx)
+- [apps/parking-app-operator/app/dashboard/parking-setup/page.tsx](../apps/parking-app-operator/app/dashboard/parking-setup/page.tsx)
+- [apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts](../apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts)
+- [apps/parking-app-operator/app/api/operator/location-assignments/route.ts](../apps/parking-app-operator/app/api/operator/location-assignments/route.ts)
+- [apps/parking-app-operator/app/api/operator/locations/route.ts](../apps/parking-app-operator/app/api/operator/locations/route.ts)
+- [apps/parking-app-operator/components/dashboard/location-management-panel.tsx](../apps/parking-app-operator/components/dashboard/location-management-panel.tsx)
+- [apps/parking-app-operator/lib/operatorAdminAccess.ts](../apps/parking-app-operator/lib/operatorAdminAccess.ts)
+- [apps/parking-app-operator/lib/operatorLocationServer.ts](../apps/parking-app-operator/lib/operatorLocationServer.ts)
+- [apps/parking-app-operator/lib/operatorLocationAccess.ts](../apps/parking-app-operator/lib/operatorLocationAccess.ts)
+- [apps/parking-app-operator/lib/operatorPermissions.ts](../apps/parking-app-operator/lib/operatorPermissions.ts)
+- [apps/parking-app-operator/lib/auth-context.tsx](../apps/parking-app-operator/lib/auth-context.tsx)
+- [supabase/seed.sql](../supabase/seed.sql)
+- [apps/parking-app-operator/README.md](../apps/parking-app-operator/README.md)
+- [supabase/README.md](../supabase/README.md)
+
+Validation method:
+- `npm --workspace apps/parking-app-operator run test`
+- `npm --workspace apps/parking-app-operator run build`
+- `git diff --check`
+- Statically verified admin-only dashboard-role provisioning and parking-lot management route enforcement, service-role containment, non-admin assigned-location filtering, operator-side location refresh after admin lot changes, multi-lot seed data, and documentation of dashboard-versus-customer identity boundaries.
+- Statically verified the dashboard-account route can now invite a new Supabase Auth user through the server-side admin path while preserving the existing-user role-provisioning flow and `admin_user_roles` gate.
+- Mobile automated tests were not rerun in this slice because no mobile source files changed; repo review confirmed the mobile app still reads shared backend `locations` inventory rather than an operator-only source.
+
+Remaining gap before success gate:
+- The Access Control, Manage Parking Lots, and Parking Setup flows still need non-production Supabase proof with real dashboard accounts, role provisioning, operator assignments, and lot create-update-deactivate rehearsal.
+- `admin@example.com` remains the non-production bootstrap convention; production-safe invitation or onboarding is still future work.
+- Invitation-based dashboard onboarding now exists in repo, but live email delivery, first-login completion, and staging proof are still future work.
+- Broader customer oversight and admin analytics are outside this first foundation slice.
+
 ## Do Next Queue
 
 These are the next tasks we should actively execute in order.
 
-1. `Track H` plus `Track D` repo work: add the operator `Parking Actions` entry scan/manual confirmation surface that calls the reviewed gate-entry API; keep exit scan visibly planned but blocked on the exit authorization backend contract.
-2. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
-3. `Track D` manual/staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
-4. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
-5. `Track E`: payment provider decision and backend settlement design.
-6. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
+1. `Track K` repo follow-up: finalize operator-versus-admin navigation and visibility, remove the non-admin location switcher, rename `Admin Tools` to `Operator Tools` for operator use, improve the admin lot-switcher UI, and enforce the agreed left-menu order.
+2. `Track K` staging and repo follow-up: prove admin lot management and invitation-based dashboard onboarding against Supabase, then decide whether broader admin customer-oversight tooling is the next repo slice.
+3. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
+4. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
+5. `Track D` plus `Track H` repo follow-up: define the backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real.
+6. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
+7. `Track E`: payment provider decision and backend settlement design.
+8. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
 
 ## Recommended Parallel Work Split
 
 If multiple builders are available, this is the safest split:
 
 - Builder 1: Track A staging bootstrap and rollback rehearsal against the rebuilt baseline when credentials and a target are available.
-- Builder 2: Track H plus Track D operator Parking Actions entry scan/manual confirmation implementation slice.
-- Builder 3: Track C cleanup deployment, scheduler activation, and operator acceptance in staging.
-- Builder 4: Track G analytics event taxonomy and logging plan.
+- Builder 2: Track K admin-versus-operator identity, assignment, and multi-lot implementation review or staging proof.
+- Builder 3: Track D plus Track H staging proof and paid-exit contract design for the new Parking Actions surface.
+- Builder 4: Track C cleanup deployment, scheduler activation, and operator acceptance in staging.
+- Builder 5: Track G analytics event taxonomy and logging plan.
 
 ## Definition Of Done For This Stage
 

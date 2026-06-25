@@ -7,6 +7,10 @@ Operator dashboard for parking lot operations. This app is the current web front
 This app is built for:
 - authenticated operator access through Supabase Auth
 - role-based access for `admin`, `operator`, `support`, and `finance`
+- admin-managed operator-to-lot assignments
+- admin-managed parking-lot inventory and metadata
+- admin-managed dashboard-user onboarding and dashboard-role provisioning through Supabase Auth
+- separate global lot administration and selected-lot parking setup surfaces
 - explicit active-location context
 - live lot monitoring through the applied parking map
 - map drafting, applying, rollback, and audit history
@@ -20,6 +24,8 @@ This app is not a demo shell anymore. The README below describes the actual runt
 
 - email/password sign-in through Supabase Auth
 - access is allowed only if the authenticated user also exists in `admin_user_roles`
+- customer mobile accounts and dashboard accounts currently share Supabase Auth, but dashboard access is granted only through `admin_user_roles`
+- shared customer/dashboard identity overlap is not production-recommended unless a future access policy explicitly approves it
 - supported roles:
   - `admin`
   - `operator`
@@ -37,12 +43,66 @@ Auth entry points:
 - the active location is selected in the header UI
 - the selected location is stored in an HTTP-only cookie
 - operator API routes resolve and enforce that location context server-side
+- admins can see all active locations
+- non-admin dashboard users only receive locations listed in `operator_location_assignments`
+- a selected location is UI context only; durable assignment remains the authorization boundary for privileged lot operations
 
 Location context entry points:
 - [components/layout/location-switcher.tsx](./components/layout/location-switcher.tsx)
 - [app/api/operator/location/route.ts](./app/api/operator/location/route.ts)
 - [lib/operatorLocationServer.ts](./lib/operatorLocationServer.ts)
 - [lib/operatorLocation.ts](./lib/operatorLocation.ts)
+
+### Access Control
+
+The `Access Control` page is admin-only.
+
+It supports:
+- viewing dashboard accounts from `admin_user_roles`
+- inviting new dashboard users through Supabase Auth onboarding
+- granting or updating dashboard roles for existing Supabase Auth users
+- viewing active parking lots
+- creating and removing operator-to-lot assignments in `operator_location_assignments`
+- keeping assignment writes on server routes backed by the service-role key
+
+Current limitation:
+- this flow now depends on Supabase invitation delivery for new dashboard users; live non-production proof is still required, and the broader production-safe bootstrap-admin decision remains open
+
+Primary files:
+- [app/dashboard/access-control/page.tsx](./app/dashboard/access-control/page.tsx)
+- [app/api/operator/dashboard-accounts/route.ts](./app/api/operator/dashboard-accounts/route.ts)
+- [app/api/operator/location-assignments/route.ts](./app/api/operator/location-assignments/route.ts)
+- [lib/operatorLocationAccess.ts](./lib/operatorLocationAccess.ts)
+
+### Parking Setup
+
+The `Parking Setup` page is admin-only and selected-lot scoped.
+
+It supports:
+- adjusting pricing, billing intervals, and grace periods for the currently selected dashboard lot
+- keeping rate changes separate from global lot inventory management
+- making the selected dashboard lot explicit before pricing edits are applied
+
+Primary files:
+- [app/dashboard/parking-setup/page.tsx](./app/dashboard/parking-setup/page.tsx)
+- [components/dashboard/pricing-settings-panel.tsx](./components/dashboard/pricing-settings-panel.tsx)
+
+### Manage Parking Lots
+
+The `Manage Parking Lots` page is admin-only.
+
+It supports:
+- creating parking lots in `locations`
+- editing an existing managed lot through a dedicated selected-lot editor
+- deactivating or reactivating lots
+- refreshing the operator app's active-location inventory after admin lot changes
+- keeping global lot administration separate from selected-lot setup
+
+Primary files:
+- [app/dashboard/manage-parking-lots/page.tsx](./app/dashboard/manage-parking-lots/page.tsx)
+- [components/dashboard/location-management-panel.tsx](./components/dashboard/location-management-panel.tsx)
+- [app/api/operator/locations/route.ts](./app/api/operator/locations/route.ts)
+- [lib/operatorAdminAccess.ts](./lib/operatorAdminAccess.ts)
 
 ### Parking Map
 
@@ -119,13 +179,13 @@ Capabilities are defined in:
 Current capability split:
 
 - `admin`
-  - full operator access
+  - full dashboard access, all-lot visibility, and operator assignment management
 - `operator`
-  - operational write access
+  - assigned-lot operational write access
 - `support`
-  - read-only operational visibility
+  - assigned-lot read-only operational visibility
 - `finance`
-  - dashboard, reservations, and audit visibility
+  - assigned-lot dashboard, reservations, and audit visibility
 
 The UI hides unavailable routes where appropriate, but API routes are the real enforcement boundary.
 
@@ -143,6 +203,7 @@ Main tables used:
 - `operator_events`
 - `admin_audit_log`
 - `admin_user_roles`
+- `operator_location_assignments`
 
 ## Realtime and Health
 
@@ -228,13 +289,17 @@ For production deployment:
 
 1. provision Supabase credentials securely
 2. ensure `admin_user_roles` is populated for every operator account
-3. confirm at least one active `locations` row exists
-4. verify the operator app can read and write:
+3. use the admin-only Access Control page to invite a new dashboard user or grant a role to an already-existing Supabase Auth user
+4. confirm at least one active `locations` row exists
+5. provision non-admin lot access through the admin-only Access Control page or through `operator_location_assignments.sql` during staging setup
+6. verify the operator app can read and write:
    - `parking_slots`
    - `parking_lot_layouts`
    - `operator_events`
-5. validate realtime connectivity, then confirm fallback polling still works when realtime is unavailable
-6. verify role behavior for:
+7. validate the dedicated `Manage Parking Lots` flow against the shared backend `locations` inventory and confirm `Parking Setup` stays selected-lot scoped
+8. confirm mobile clients see the same active lots after admin lot changes
+9. validate realtime connectivity, then confirm fallback polling still works when realtime is unavailable
+10. verify role behavior for:
    - `admin`
    - `operator`
    - `support`
@@ -278,5 +343,6 @@ Reset actions are location-scoped and confirmed with preview summaries before ex
 If work continues on this app, the next items should be:
 - audit export implementation
 - richer operator actions from reservation/session detail drawers
-- stricter schema-level role boundaries if more staff roles are introduced
+- staged verification of admin-managed dashboard-role, lot-management, and operator-assignment flows
+- staged verification of invitation-based dashboard onboarding and admin-managed lot flows
 - final browser/device pass for runtime ergonomics

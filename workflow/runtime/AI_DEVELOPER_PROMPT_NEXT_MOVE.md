@@ -18,79 +18,81 @@ Before acting on any prompt written here, read:
 
 ## Current Prompt
 
-### 2026-06-24 - Operator Parking Actions Entry Scan
+### 2026-06-25 - Add Dashboard Auth-User Onboarding From Access Control
 
 - `Objective`:
-  Build the first operator-facing `Parking Actions` workflow so an authenticated, location-assigned operator can scan or manually enter a reservation or walk-in entry QR and call the reviewed `/api/operator/gate-entry` route. The result should give operators a usable entry-confirmation surface without claiming exit confirmation is complete.
+  Implement the next Track K repo slice by letting admins onboard a new dashboard user from `Access Control` without requiring that Supabase Auth account to already exist, while preserving the accepted role-assignment, lot-assignment, and location-scoping behavior.
 
 - `Why now`:
-  The backend gate-entry confirmation SQL and operator route were approved with follow-ups. The strongest repo-executable gap is now connecting that approved backend contract to an operator UI that real staff can use. Track A staging proof, live Supabase execution, and real scanner hardware remain manual dependencies, while this slice can be implemented and validated in repo.
+  The current Track K foundation and the `Manage Parking Lots` separation slice are accepted. The highest-priority remaining repo-executable gap is the onboarding limitation explicitly called out in the accepted review, tracker, README, and readiness checklist: `Access Control` can currently grant a dashboard role only after a Supabase Auth user already exists.
 
 - `In scope`:
-  Add a `Parking Actions` navigation item in the operator dashboard for roles with the existing slot/status mutation capability.
-  Create an operator `Parking Actions` page with an `Entry Scan` workflow that accepts pasted QR payloads and, if practical with browser support, a camera scan affordance that gracefully falls back to manual entry.
-  Call `/api/operator/gate-entry` for entry confirmation and show clear success, idempotent replay, invalid pass, unauthorized-location, wrong-location, expired, cancelled, completed, and generic failure states.
-  Add manual entry confirmation affordances from reservation/session detail surfaces where the current data can safely supply or accept an entry-pass payload.
-  Include an `Exit Scan` section only as a planned or disabled workflow unless a backend paid-exit authorization contract already exists in the repo. Do not invent an exit mutation.
-  Keep the UI operational and restrained: concise operator copy, loading states, retry paths, and no marketing-style filler.
-  Add or update focused operator tests for route visibility, capability gating, request behavior, and the exit-scan blocked state.
-  Update durable workflow docs and readiness checklists if implementation reality changes.
+  Audit the current `Access Control` page, `/api/operator/dashboard-accounts` route, request schemas, admin helpers, and related docs before editing.
+  Extend the admin-only dashboard-account provisioning flow so an admin can onboard a new dashboard user by email through a server-side Supabase Admin API path instead of stopping at the current "existing Auth user only" limitation.
+  Prefer an invitation-based onboarding path that keeps password delivery and account acceptance in Supabase-owned flows rather than inventing local password handling.
+  Preserve the existing ability to grant or update a dashboard role for an already-existing Supabase Auth user.
+  Keep the role write to `admin_user_roles` server-side and audit-backed, and make the UI explicit about whether the action invited a new Auth user or updated an existing one.
+  Keep `Access Control` admin-only and preserve the accepted operator-to-lot assignment flow and non-admin assigned-location scoping.
+  Update operator docs and readiness wording so they truthfully describe the new onboarding capability and any remaining limits, including staging proof and bootstrap-admin follow-up.
+  Add focused tests for the new route or helper behavior, the request schema, the admin-only UI contract, and honest copy around what is and is not automated now.
 
 - `Out of scope`:
-  Do not implement paid-exit QR confirmation, payment-provider integration, exit grace mutation, penalty automation, compensation handling, staging SQL deployment, assignment provisioning, or real hardware scanner validation in this cycle.
-  Do not loosen operator assignment requirements or service-role boundaries.
-  Do not redesign unrelated dashboard pages.
+  Do not implement MFA, password reset UX, profile editing, or a full account-management console in this slice.
+  Do not claim live Supabase proof, email deliverability proof, or production-ready invitation operations in this cycle.
+  Do not replace the current `admin@example.com` bootstrap-admin convention with a final production-safe bootstrap model in this slice.
+  Do not broaden into customer-oversight tooling, admin analytics, payment work, exit authorization, or unrelated operator-surface redesign.
+  Do not reopen the accepted `Manage Parking Lots` or selected-lot `Parking Setup` behavior except for the narrowest incidental copy cleanup if it is trivial and directly touched.
 
 - `Dependencies to respect`:
-  The accepted gate-entry route requires exact persisted operator-location assignment before privileged mutation.
-  The `Parking Actions` page must use the existing operator auth, location context, capability model, route helpers, and design system patterns.
-  Exit confirmation remains blocked until the backend owns paid-exit authorization and leave-the-slot grace.
-  Keep the current debugger note visible; do not clear it unless the manual Android launch validation has actually happened.
+  `MASTER_PRODUCTION_PLAN.md` and `ACTIVE_EXECUTION_TRACKER.md` still place Track K ahead of lower-priority repo work.
+  The accepted Track K review explicitly says dashboard-role provisioning still assumes the target Supabase Auth user already exists.
+  Existing dashboard access is still granted only through `admin_user_roles`; preserve that model.
+  Existing assignment security depends on exact `operator_location_assignments` checks before privileged mutation; preserve that model untouched.
+  The debugger note about rerunnable `admin_hardening.sql` matters to staging sequencing, but it is a manual follow-up unless this onboarding slice truly touches that SQL.
 
 - `Constraints`:
-  Never expose the service-role key to the browser.
-  Treat user-entered QR payloads as untrusted input.
-  Keep entry confirmation idempotent from the operator perspective, but do not mask terminal-state failures as success.
-  Avoid claiming scanner hardware or live Supabase validation if only browser/manual-entry tests were run.
-  Preserve the existing monorepo structure and do not recreate root-level Expo files removed during cleanup.
+  Keep all privileged auth-user onboarding work server-side only.
+  Prefer the Supabase Admin invite flow rather than hand-rolled password creation or local credential generation.
+  Make the UI and docs honest that invitation-based onboarding still needs non-production Supabase proof and does not replace the broader bootstrap-admin decision.
+  Preserve the distinction between customer mobile users and dashboard accounts; do not imply that customer accounts automatically become dashboard users.
+  Keep the slice narrow enough for one reviewable cycle centered on dashboard auth-user onboarding from the existing `Access Control` surface.
 
 - `Required validation`:
   Run `npm --workspace apps/parking-app-operator run test`.
   Run `npm --workspace apps/parking-app-operator run build`.
-  Run `npm --workspace apps/mobile run test` if shared contracts or mobile-facing behavior changed.
   Run `git diff --check`.
-  Statically verify the new UI calls only the operator API route and never touches privileged Supabase credentials directly.
+  Statically verify admin-only route enforcement, the preserved existing-user provisioning path, the new onboarding path, the continued `admin_user_roles` gate, and the absence of widened non-admin permissions.
+  If no non-production Supabase target is available, state clearly that invitation delivery and live onboarding proof remain manual follow-ups.
 
 - `Success criteria`:
-  Operators have a discoverable `Parking Actions` menu.
-  Entry confirmation can be initiated from a pasted or scanned entry-pass payload and receives clear operator feedback.
-  The UI handles success, idempotent replay, malformed input, authorization failure, wrong-location or terminal-state failure, loading, and retry states.
-  Exit scan is visible as a planned flow but cannot falsely complete an exit without a backend contract.
-  Tests cover the new operator workflow boundaries.
-  Tracker and logs distinguish repo implementation from unperformed staging, assignment provisioning, hardware scan, and exit lifecycle proof.
+  An admin can initiate dashboard-user onboarding from `Access Control` without first creating the Supabase Auth account manually.
+  The existing "grant role to an already-existing Auth user" behavior still works and is not regressed.
+  The route remains admin-only, server-side, and audit-backed.
+  Non-admin location scoping and accepted lot-management behavior remain intact.
+  Docs and tests truthfully describe the new onboarding capability and the remaining staging or bootstrap limitations.
 
 - `Expected deliverable`:
-  A focused operator UI/client implementation for entry scan/manual gate confirmation, blocked exit scan framing, tests, updated docs if needed, a factual developer execution-log entry, tracker updates that preserve manual/staging gaps, and a baton handoff to Reviewer.
+  A focused Track K repo slice covering server-side dashboard auth-user onboarding, matching `Access Control` UI updates, truthful docs and tests, any narrow helper or schema additions required, and baton handoff to Reviewer.
 
 - `Files likely involved`:
-  `apps/parking-app-operator/components/layout/dashboard-layout.tsx`
-  `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx`
-  `apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx`
-  `apps/parking-app-operator/app/dashboard/reservations/page.tsx`
-  `apps/parking-app-operator/app/api/operator/gate-entry/route.ts`
+  `apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts`
+  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
+  `apps/parking-app-operator/lib/operatorAdminAccess.ts`
   `apps/parking-app-operator/lib/operatorRouteSchemas.ts`
-  `apps/parking-app-operator/tests/*.mjs`
-  `apps/parking-app-operator/tests/*.js`
+  `apps/parking-app-operator/README.md`
+  `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
+  `apps/parking-app-operator/tests/routeContractCoverage.test.js`
+  `apps/parking-app-operator/tests/routeRequestValidation.test.mjs`
+  any focused helper or contract test files needed for the onboarding path
   `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
-  `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
   `workflow/runtime/AI_WORKFLOW_STATE.md`
 
 - `Reviewer focus areas`:
-  Verify the page is capability-gated and location-context aware.
-  Verify the browser client calls only `/api/operator/gate-entry`.
-  Verify malformed, unauthorized, wrong-location, expired, cancelled, completed, duplicate-active, and generic error states are represented honestly.
-  Verify exit scan is not presented as working until the backend contract exists.
-  Verify docs and tracker keep staging SQL execution, assignment provisioning, scanner hardware validation, and exit lifecycle work open.
+  Verify the onboarding route and UI stay admin-only and do not widen non-admin privileges.
+  Verify the new onboarding path is server-side and keeps `admin_user_roles` as the actual dashboard access gate.
+  Verify the existing-user role-provisioning path is preserved rather than replaced.
+  Verify docs do not overclaim live invitation proof, email delivery guarantees, or production-safe bootstrap completion.
+  Verify any incidental UI polish did not reopen the accepted lot-management surface separation.
 
 - `Next owner after developer closeout`:
   `Reviewer`

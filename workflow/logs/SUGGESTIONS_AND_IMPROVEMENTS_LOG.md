@@ -28,6 +28,53 @@ Use this file for:
 
 ## Active Suggestions
 
+### 2026-06-24 - Admin Versus Operator Separation And Multi-Lot Control
+
+- `Suggestion summary`:
+  Reframe `parking-app-operator` as the shared admin and operator control app, then explicitly separate what admins can do versus what operators can do by account, role, and assigned parking-lot scope.
+- `Why this would help`:
+  The current operator assignment failure shows that location selection and operational authorization are still too manual and too easy to misunderstand. A clearer admin-versus-operator model with admin-managed assignments and visible multi-lot control is needed before the webapp can be trusted for real operations.
+- `Type`:
+  `Platform and operations improvement`
+- `Affected area`:
+  `operator/admin webapp`, `Supabase auth and role model`, `operator-location assignment flows`, `mobile/backend location parity`, and `seed/dev lot provisioning`
+- `Desired outcome`:
+  Keep `admin@example.com` as the current full-access bootstrap admin for non-production and make that account able to see and control the whole system.
+  Distinguish dashboard accounts from customer mobile users and formalize whether shared identities are allowed.
+  Let admins manage all parking lots, all operator assignments, and customer-facing oversight surfaces.
+  Let operators act only within the parking lots they are explicitly assigned to.
+  Add at least two more parking lots for easier end-to-end testing and make backend, operator, and mobile surfaces all reflect the same location set.
+- `Clarified next-slice preference`:
+  In the admin-side Access Control or an adjacent admin surface, add clean parking-lot management so admin can create and manage parking lots directly from the dashboard instead of relying on seed-only or manual backend setup.
+  Add operator-account management so admin can create or provision dashboard operator accounts and then assign those operators to one or more parking lots.
+  Ensure any admin-created or admin-managed parking lot changes reflect cleanly in the database and in the mobile app's available parking-lot list, not only inside the dashboard.
+  Keep `Parking Setup` scoped to the currently selected parking lot only, rather than using it as the place for global lot creation.
+  Add a new admin-only menu such as `Manage Parking Lots` for creating and managing parking-lot records across the whole system.
+  For editing an existing managed parking lot, prefer a selected-lot dropdown card or dedicated selected-lot editor rather than reusing the `Create Parking Lot` container as the edit surface.
+  Keep the operator-visible menu limited to operational pages only: `Dashboard`, `Live Reservations`, `Parking Actions`, `Parking Setup`, `Parking Map`, `Map Builder`, `Audit Trail`, and `Operator Tools` for reconciliation.
+  Rename the current `Admin Tools` operator-facing entry to `Operator Tools` for non-admin use, while keeping admin-only control surfaces such as `Access Control` and `Manage Parking Lots` off the operator menu.
+  Remove the location switcher for non-admin users because operators should work only within their single assigned parking lot.
+  Improve the admin lot switcher UI so the dropdown is readable and clearly visible.
+  Reorder the left navigation to: `Dashboard`, `Live Reservations`, `Parking Actions`, `Parking Setup`, `Parking Map`, `Map Builder`, `Audit Trail`, `Operator Tools`, then admin-only `Access Control` and `Manage Parking Lots`.
+- `Priority feeling`:
+  `Highest`
+- `Blocking or non-blocking`:
+  `Blocking for the next planner cycle because this now outranks the previously queued review/staging follow-ups`
+- `Extra notes or examples`:
+  This should likely produce a clearer admin control plane, explicit operator account provisioning or invitation rules, and a safer non-production bootstrap path that removes direct SQL dependence for day-to-day operator assignment.
+- `Suggested planner interpretation`:
+  Treat this as the next highest-priority planning brief. The most concrete next repo-executable slice should likely be:
+  1. admin-only `Manage Parking Lots` navigation and global lot-management UI
+  2. selected-lot-scoped `Parking Setup`
+  3. selected-lot editing that does not reuse the create-lot container
+  4. final operator/admin navigation, visibility, and location-switcher distinction
+  5. admin lot-switcher readability improvements
+  6. continued operator-account provisioning emphasis without duplicating already-tracked work
+  7. clean backend and mobile parity for available lots
+  Queue the current Parking Actions review, staging assignment rehearsal, exit-contract work, and other follow-ups after this identity-plus-multi-lot control slice.
+- `Status`:
+  `Absorbed into brief`
+
 ### 2026-06-23 - Operator Parking Actions With Entry And Exit QR Handling
 
 - `Suggestion summary`:

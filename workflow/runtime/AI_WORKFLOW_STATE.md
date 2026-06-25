@@ -7,54 +7,52 @@ If you are one of the personas, read this file before doing anything else.
 ## Current State
 
 - `Cycle ID`:
-  `2026-06-24-cycle-003-operator-parking-actions`
+  `2026-06-25-cycle-007-track-k-dashboard-auth-onboarding`
 
 - `Current owner`:
-  `Developer`
+  `Planner`
 
 - `Current phase`:
-  `Developer repo audit`
+  `Planner reprioritization`
 
 - `Status`:
-  `Planner alignment completed. The accepted gate-entry backend slice is now the foundation for the next repo-executable task: an operator Parking Actions entry scan/manual confirmation workflow that calls the reviewed gate-entry API while keeping exit scan blocked until the backend exit-authorization contract exists.`
+  `Reviewer accepted the Track K dashboard auth-user onboarding slice with follow-ups: Access Control can now invite a new Supabase Auth user or grant or update access for an existing one through the admin-only dashboard-account route, repo validation passed, and the docs or tracker now describe invitation-based onboarding truthfully while keeping live proof and bootstrap-admin work open. The user has now clarified the preferred next Track K repo slice: finalize operator-versus-admin menu visibility, remove the non-admin location switcher, improve admin lot-switcher readability, rename the operator-facing tools menu, and apply the agreed navigation order without duplicating already accepted operator-account provisioning work.`
 
 - `Primary objective`:
-  `Implement the operator-facing Parking Actions entry scan and manual confirmation surface, validate it, and preserve staging, assignment-provisioning, hardware-scan, payment, and exit-lifecycle gaps as explicit follow-ups.`
+  `Choose the next highest-value, dependency-aware unit of work after the accepted Track K dashboard auth-user onboarding slice, with the clarified operator/admin navigation and visibility adjustments treated as the preferred next priority.`
 
 - `Why this owner has the baton`:
-  `The planner reconciled the master plan, tracker, suggestion log, readiness checklists, Supabase guidance, and repo cleanup findings, then wrote a scoped developer brief for the next automation cycle.`
+  `The current reviewer decision accepted the onboarding slice, no code rework was requested, and the workflow now needs a fresh planner brief for the next cycle.`
 
 - `Required reads for the current owner`:
   1. [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md)
-  2. [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](./AI_DEVELOPER_PROMPT_NEXT_MOVE.md)
-  3. [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
-  4. [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
+  2. [MASTER_PRODUCTION_PLAN.md](../planning/MASTER_PRODUCTION_PLAN.md)
+  3. [ACTIVE_EXECUTION_TRACKER.md](../planning/ACTIVE_EXECUTION_TRACKER.md)
+  4. [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
   5. [AI_REVIEWER_REMARKS.md](../logs/AI_REVIEWER_REMARKS.md)
-  6. [AI_DEVELOPER_EXECUTION_LOG.md](../logs/AI_DEVELOPER_EXECUTION_LOG.md)
-  7. [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
-  8. [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
-  9. [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
-  10. [supabase/README.md](../../supabase/README.md)
+  6. [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
+  7. [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
+  8. [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
+  9. [SESSION_UPDATE.md](../temp/SESSION_UPDATE.md)
+  10. Any durable Track K, Track A, or Track D documents relevant to the next safe cycle
 
 - `Expected output from current owner`:
-  `A focused operator Parking Actions implementation, appropriate validation, factual execution-log entry, tracker/doc updates if reality changes, and baton handoff to Reviewer.`
+  `A precise next developer brief grounded in the accepted repo state, explicit reasoning about why that task is next now, any needed tracker or plan adjustments, and a baton handoff to Developer.`
 
 - `Exit criteria for this phase`:
-  - developer audits current operator layout, reservation detail sheets, gate-entry route, permission model, and tests before editing
-  - developer implements only the entry scan/manual confirmation slice that is supported by existing backend authority
-  - developer keeps exit scan visibly blocked or planned unless a backend exit contract already exists
-  - developer validates operator tests and build
-  - developer records remaining manual/staging/device/payment/exit gaps honestly
-  - developer updates the baton to Reviewer
+  - planner reads the accepted reviewer decision and current tracker reality before assigning new work
+  - planner chooses one dependency-aware next move that does not reopen already accepted scope without cause
+  - planner decides whether the next cycle should target Track K staging proof, broader Track K repo work, or another higher-priority tracked dependency
+  - planner updates `AI_DEVELOPER_PROMPT_NEXT_MOVE.md` with a concrete brief and updates this baton so the next owner is unambiguous
 
 - `Next owner after successful handoff`:
-  `Reviewer`
+  `Developer`
 
 - `Blocking dependencies`:
-  `No blocker for repo implementation. Live Supabase SQL execution, operator-location assignment provisioning, real scanner hardware validation, payment-provider integration, and backend exit-authorization remain external or future-cycle dependencies.`
+  `The accepted onboarding slice still needs live Supabase invitation delivery proof, first-login completion, dashboard-role and lot-management staging rehearsal, production-safe bootstrap-admin replacement, scanner hardware validation, and exit-contract work, but none of those block planner reprioritization.`
 
 - `Last updated`:
-  `2026-06-24`
+  `2026-06-25`
 
 ## Update Rules
 

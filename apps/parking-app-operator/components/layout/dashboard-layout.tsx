@@ -11,10 +11,13 @@ import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { LocationSwitcher } from './location-switcher';
 import {
   BarChart3,
+  ScanLine,
   Clock,
   CreditCard,
   Eye,
   Map,
+  MapPinned,
+  UsersRound,
   Zap,
   ShieldCheck,
   LogOut,
@@ -27,10 +30,13 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3, capability: 'view-dashboard' as const },
   { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock, capability: 'view-reservations' as const },
+  { name: 'Parking Actions', href: '/dashboard/parking-actions', icon: ScanLine, capability: 'edit-slot-status' as const },
   { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
   { name: 'Parking Map', href: '/dashboard/map', icon: Map, capability: 'view-parking-map' as const },
   { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap, capability: 'edit-map-layout' as const },
+  { name: 'Manage Parking Lots', href: '/dashboard/manage-parking-lots', icon: MapPinned, capability: 'manage-operator-access' as const },
   { name: 'Parking Setup', href: '/dashboard/parking-setup', icon: CreditCard, capability: 'manage-pricing' as const },
+  { name: 'Access Control', href: '/dashboard/access-control', icon: UsersRound, capability: 'manage-operator-access' as const },
   { name: 'Admin Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
 ];
 

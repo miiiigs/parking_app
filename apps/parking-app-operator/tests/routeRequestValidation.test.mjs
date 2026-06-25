@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   operatorAdminToolsRouteRequestSchema,
+  operatorDashboardAccountProvisionRouteRequestSchema,
   operatorLayoutRouteRequestSchema,
+  operatorLocationCreateRouteRequestSchema,
+  operatorLocationUpdateRouteRequestSchema,
   operatorSlotUpdateRouteRequestSchema,
 } from '../lib/operatorRouteSchemas.ts';
 
@@ -92,5 +95,49 @@ test('admin tools schema allows only production-supported actions', () => {
       },
     }).success,
     true,
+  );
+});
+
+test('dashboard account provisioning schema requires a valid email and supported role', () => {
+  assert.equal(
+    operatorDashboardAccountProvisionRouteRequestSchema.safeParse({
+      email: 'not-an-email',
+      role: 'operator',
+    }).success,
+    false,
+  );
+
+  assert.equal(
+    operatorDashboardAccountProvisionRouteRequestSchema.safeParse({
+      email: 'operator@example.com',
+      role: 'operator',
+      displayName: 'North Gate Operator',
+    }).success,
+    true,
+  );
+});
+
+test('parking lot management schemas require complete location details', () => {
+  assert.equal(
+    operatorLocationCreateRouteRequestSchema.safeParse({
+      name: 'BGC Pilot Site',
+      code: 'BGC-PILOT',
+      address: '26th Street, Bonifacio Global City',
+      city: 'Taguig',
+      isActive: true,
+    }).success,
+    true,
+  );
+
+  assert.equal(
+    operatorLocationUpdateRouteRequestSchema.safeParse({
+      locationId: 'not-a-uuid',
+      name: 'BGC Pilot Site',
+      code: 'BGC-PILOT',
+      address: '26th Street, Bonifacio Global City',
+      city: 'Taguig',
+      isActive: true,
+    }).success,
+    false,
   );
 });

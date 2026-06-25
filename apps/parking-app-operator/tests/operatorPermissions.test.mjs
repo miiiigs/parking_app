@@ -6,8 +6,16 @@ import { getOperatorCapabilities, hasOperatorCapability } from '../lib/operatorP
 test('admin has full operator capability set', () => {
   const capabilities = getOperatorCapabilities('admin');
   assert.equal(hasOperatorCapability('admin', 'edit-map-layout'), true);
+  assert.equal(hasOperatorCapability('admin', 'manage-operator-access'), true);
   assert.equal(capabilities.includes('view-dashboard'), true);
   assert.equal(capabilities.includes('view-audit'), true);
+});
+
+test('operator can operate assigned lots but cannot run admin-only controls', () => {
+  assert.equal(hasOperatorCapability('operator', 'edit-slot-status'), true);
+  assert.equal(hasOperatorCapability('operator', 'manage-operator-access'), false);
+  assert.equal(hasOperatorCapability('operator', 'manage-pricing'), false);
+  assert.equal(hasOperatorCapability('operator', 'run-reconciliation'), false);
 });
 
 test('support and finance are read-only', () => {

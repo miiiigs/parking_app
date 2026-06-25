@@ -37,6 +37,7 @@ If `Current owner` is not `Reviewer`, do not take over the cycle unless the user
 - challenge any premature status claim
 - decide whether work is approved, approved with follow-ups, changes requested, or blocked by dependency
 - identify any manual actions the user or operator must perform outside Codex
+- translate the current repo state into a concise testing-expectation snapshot so the user can quickly understand what should now work, what is only partial, and what is still missing before manual testing
 - route accepted work back to the planner
 - route rework back to the developer
 - decide whether temporary workflow artifacts created during the cycle should be deleted, retained briefly, or promoted into durable docs
@@ -71,6 +72,7 @@ If `Current owner` is not `Reviewer`, do not take over the cycle unless the user
 - do not leave resolved debugger logs active once the issue is clearly accepted and closed
 - do not leave completed suggestions looking active when they have already been absorbed or finished
 - do not clear debugger or suggestion records prematurely when they still carry useful context for the next planning step
+- do not make the user infer current product behavior only from findings; when a cycle changes visible behavior, summarize what a manual tester should expect now
 
 ## Required Output
 
@@ -85,6 +87,7 @@ Replace the active review section in `workflow/logs/AI_REVIEWER_REMARKS.md` with
 - `Findings`:
 - `Validation checked`:
 - `Decision`:
+- `Testing expectation snapshot`:
 - `Manual actions required`:
 - `Required rework`:
 - `Safe follow-ups`:
@@ -93,6 +96,8 @@ Replace the active review section in `workflow/logs/AI_REVIEWER_REMARKS.md` with
 - `Suggestion log disposition`:
 - `Next owner`:
 ```
+
+For `Testing expectation snapshot`, prefer a compact `Done`, `Partial`, and `Missing` breakdown when the cycle affected user-visible behavior, admin flows, operator flows, or backend-backed product capability.
 
 When there are findings, use severity tags such as:
 
@@ -130,13 +135,14 @@ Rules:
 - If there are material findings, list them first by severity.
 - Do not fix the code in reviewer mode.
 - If manual steps are needed, record them explicitly, including who should do them and what should happen after they are done.
+- Add a concise `Testing expectation snapshot` with `Done`, `Partial`, and `Missing` whenever the cycle changed behavior the user may manually test.
 - Decide whether temp workflow artifacts created in the cycle should be deleted, retained briefly, or promoted later.
 - Reset or clear debugger logs when the debug issue is accepted and no longer active.
 - Review suggestion and improvement entries when they were touched in the session and decide whether they should remain open, be marked completed, be marked absorbed, or be reset.
 
 Tasks:
 1. Assess the developer's latest cycle.
-2. Update workflow/logs/AI_REVIEWER_REMARKS.md with findings, decision, and next owner.
+2. Update workflow/logs/AI_REVIEWER_REMARKS.md with findings, decision, testing expectation snapshot, and next owner.
 3. Update workflow/runtime/AI_WORKFLOW_STATE.md so the baton returns to Developer for rework or Planner for the next cycle.
 4. Update workflow/planning/ACTIVE_EXECUTION_TRACKER.md only if review changes visible task status or reveals a blocker that belongs on the board.
 5. Clean up disposable files in workflow/temp/ when that decision is clear and safe.

@@ -5,10 +5,10 @@ Use this file as the quick human-readable reset note for the current working ses
 ## Current Reset Snapshot
 
 - `Session date`: `2026-06-24`
-- `Workflow state`: active, reorganized, and developer-ready
-- `Current baton owner`: `Developer`
-- `Current cycle`: `2026-06-24-cycle-003-operator-parking-actions`
-- `Primary live objective`: implement the operator-facing Parking Actions entry scan/manual confirmation workflow against the reviewed gate-entry API
+- `Workflow state`: active, reorganized, and planner-ready
+- `Current baton owner`: `Planner`
+- `Current cycle`: `2026-06-24-cycle-004-admin-operator-identity-multilot`
+- `Primary live objective`: choose the next repo-executable slice after the accepted Track K foundation review
 - `Automation cadence`: `Heartbeat dispatcher configured for every 5 minutes`
 - `Automation status`: `PAUSED`
 
@@ -49,7 +49,21 @@ Use this file as the quick human-readable reset note for the current working ses
 - Active workflow references were normalized so the current live files point to the new structure instead of the older root-level layout.
 - Reviewer guidance now explicitly reads debugger and suggestion logs and records whether they should be retained, completed, absorbed, rejected, or reset.
 - The review template now includes explicit `Debugger log disposition` and `Suggestion log disposition` fields.
-- The next automation goal is now written in [AI_DEVELOPER_PROMPT_NEXT_MOVE.md](../runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md), and the baton has been handed to `Developer`.
+- The developer prompt file now contains the new Track K brief for admin/operator identity separation, admin-managed lot assignment, dashboard-versus-customer account boundaries, and multi-lot parity.
+
+### Founder reprioritization
+
+- A new highest-priority request now overrides the prior review continuation:
+  - turn `parking-app-operator` into the shared admin-and-operator control app with explicit role separation
+  - keep `admin@example.com` as the current bootstrap admin for non-production
+  - distinguish dashboard identities from customer mobile identities
+  - let admin manage all lots and operator-to-lot assignments
+  - add at least two more parking lots and align backend, operator, and mobile location behavior
+- The tracker now records this as the top queue item under `Track K`.
+- Planner issued the first Track K developer brief and handed the baton to `Developer`.
+- Developer implemented the first Track K foundation slice and handed the baton to `Reviewer`.
+- Reviewer approved that Track K foundation slice with follow-ups and handed the baton to `Planner`.
+- Existing Parking Actions review, staging assignment rehearsal, exit-contract work, and cleanup rollout remain queued after this new planning slice.
 
 ### Project audit and cleanup
 
@@ -84,21 +98,29 @@ Use this file as the quick human-readable reset note for the current working ses
   - operator audit output
   - duplicate-scan idempotency
 - The operator API route exists for reservation and walk-in entry-pass confirmation.
+- The operator dashboard now exposes a `Parking Actions` page with browser/manual entry verification, plus manual fallback actions from reservation and session detail views.
 - Mobile no longer starts the session directly; it waits for and hydrates the backend-created session.
 - Reviewer-requested rework was implemented so:
   - exact persisted operator-to-location assignment is required before privileged gate mutation
   - terminal or completed rescans now fail instead of replaying as success
-- Reviewer approved the rework with follow-ups and returned the baton to `Planner`.
+- Reviewer approved the gate-entry rework with follow-ups, then Planner reprioritized around the higher-priority founder request and handed the baton to `Developer`.
 - The active tracker now records the repo-side rework as accepted while keeping staging proof, assignment provisioning, and scanner-client integration open.
 - The active suggestion backlog now contains an operator-side `Parking Actions` improvement request for entry scan, exit scan, and manual QR confirmation flows.
-- That suggestion has been marked `Absorbed into brief` because it is now the basis of the next developer cycle.
+- That suggestion has been marked `Absorbed into brief` because it was the basis of the just-completed entry-side Parking Actions developer cycle.
+- The active suggestion backlog now also contains a new highest-priority request for admin-versus-operator separation, operator assignment control, and multi-lot parity, and this now outranks the current review/staging queue.
 - The debugger log remains intentionally active because the Metro startup fix still needs one manual native launch confirmation on a real emulator or device before it should be reset.
+- The operator dashboard now has an admin-only `Access Control` surface and `/api/operator/location-assignments` route for server-backed operator-to-lot assignment management.
+- Non-admin dashboard location context is now filtered by explicit `operator_location_assignments` rows; admins retain all active locations.
+- Operator capabilities were narrowed so `operator` keeps assigned-lot parking operations but no longer receives admin-only pricing, reconciliation, reset, map-layout, or assignment-management powers.
+- `supabase/seed.sql` now includes three non-production lots: `BGC Pilot Site`, `Makati Business Hub`, and `Ortigas Center Deck`.
+- Reviewer re-ran `npm --workspace apps/parking-app-operator run test` and confirmed 35 of 35 tests pass on the accepted Track K slice.
 
 ## Manual Actions Still Required
 
 - Deploy the relevant Supabase SQL artifacts in a non-production environment, including:
   - gate-entry confirmation SQL
   - operator location assignment SQL
+- Verify the new `/dashboard/access-control` assignment flow against real staging dashboard accounts after the SQL rollout.
 - Provision at least one real operator-to-location assignment before live gate confirmation testing.
 - Rehearse valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scan cases against Supabase.
 - Connect and validate the real gate scanner or operator client against `/api/operator/gate-entry`.
@@ -108,8 +130,9 @@ Use this file as the quick human-readable reset note for the current working ses
 
 ## Planner Intake Notes For The Next Run
 
-- The baton has moved to `Developer`, so the next automation should implement the scoped Parking Actions brief rather than run another planning pass.
-- The most visible new planner input, the `Parking Actions` suggestion, has already been absorbed into the current developer brief.
+- The baton is now intentionally on `Planner`, so the next automation should choose the next highest-value repo-executable slice rather than continue reviewer work.
+- The accepted Track K foundation slice does not remove the need for staging assignment proof, production-safe admin bootstrap replacement, or broader admin control-plane follow-up.
+- The `Parking Actions` suggestion remains partially open and should stay queued after the new identity and multi-lot slice because exit verification still lacks a backend contract.
 - The debugger log should not be cleared yet because its remaining emulator/device check is still manual and unconfirmed.
 - Exit scan should remain visibly planned or disabled until a backend paid-exit authorization contract exists.
 
@@ -118,8 +141,12 @@ Use this file as the quick human-readable reset note for the current working ses
 - `git diff --check`: passed with line-ending warnings only.
 - `npm --workspace apps/mobile run test`: passed 37 of 37 tests.
 - `npm --workspace apps/mobile run typecheck`: passed.
-- `npm --workspace apps/parking-app-operator run test`: passed 31 of 31 tests.
+- `npm --workspace apps/parking-app-operator run test`: passed 32 of 32 tests.
 - `npm --workspace apps/parking-app-operator run build`: passed.
+- `npm --workspace apps/parking-app-operator run test`: passed 35 of 35 tests after the Track K slice.
+- `npm --workspace apps/parking-app-operator run build`: passed after the Track K slice.
+- `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests after the Track K seed update.
+- `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only after the Track K slice.
 
 ## Source Of Truth For The Next Run
 
