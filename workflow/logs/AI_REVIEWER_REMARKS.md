@@ -21,24 +21,27 @@ Use this file after the developer finishes a cycle and before the planner advanc
 
 ## Current Review
 
-### 2026-06-25 - Admin Customer Oversight Surface Review
+### 2026-06-25 - Track L UI Hardening Pass 1 Review
 
 - `Current move/task`:
-  Review the Track K slice that adds an admin-only customer oversight surface, supporting aggregation helper, customer-overlap route, updated navigation entry, and matching tests or docs.
+  Review the first Track L UI/UX hardening slice across launch-critical mobile screens and operator/admin dashboard surfaces.
 
 - `Scope reviewed`:
-  `apps/parking-app-operator/app/api/operator/customers/route.ts`
-  `apps/parking-app-operator/app/dashboard/customers/page.tsx`
-  `apps/parking-app-operator/lib/customerOversight.ts`
-  `apps/parking-app-operator/lib/operatorAdminAccess.ts`
+  `apps/mobile/src/features/parking/screens/ReservationScreen.tsx`
+  `apps/mobile/src/features/parking/screens/ArrivalScreen.tsx`
+  `apps/mobile/src/features/parking/screens/SessionScreen.tsx`
+  `apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx`
+  `apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx`
   `apps/parking-app-operator/components/layout/dashboard-layout.tsx`
-  `apps/parking-app-operator/tests/customerOversight.test.mjs`
-  `apps/parking-app-operator/tests/routeContractCoverage.test.js`
-  `apps/parking-app-operator/package.json`
-  `apps/parking-app-operator/README.md`
+  `apps/parking-app-operator/components/layout/location-switcher.tsx`
+  `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx`
+  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
+  `apps/parking-app-operator/app/dashboard/customers/page.tsx`
+  `apps/parking-app-operator/components/dashboard/location-management-panel.tsx`
+  `apps/mobile/PRODUCTION_READINESS_CHECKLIST.md`
   `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
-  `workflow/temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md`
+  `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md`
 
 - `Inputs reviewed`:
   `workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md`
@@ -47,46 +50,46 @@ Use this file after the developer finishes a cycle and before the planner advanc
   `workflow/planning/PROJECT_DOCUMENT_INDEX.md`
   `workflow/logs/DEBUGGER_OUTPUT_LOG.md`
   `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`
-  developer validation evidence, the new admin-only customer route and page, aggregation logic, navigation gating, focused tests, temp implementation note, and the updated operator docs
+  developer validation evidence, the changed mobile screen diffs, the changed operator/admin layout diffs, the readiness checklist updates, and the Track L temp viewport notes
 
 - `Findings`:
   No material repo-blocking findings remain for this slice.
-  The new `/api/operator/customers` route is admin-only, the `/dashboard/customers` page remains read-only, and non-admin roles do not gain global customer visibility through this implementation.
-  The repo now truthfully exposes customer-versus-dashboard overlap, recent location history, reservation or session summaries, and current contact-data limitations without claiming a richer customer profile system than the code actually supports.
-  Residual risk remains external rather than repo-blocking: the new page still needs non-production Supabase proof with real customer data, and the auth-admin user listing plus full-table aggregation approach is acceptable for the current early control-plane slice but should still be watched as volume grows.
+  The mobile changes stay focused on responsive padding, compact tab stacking, bounded content width, QR sizing, and safer timer/header wrapping; they do not alter reservation, walk-in, gate-entry, session, payment, or backend behavior.
+  The operator/admin changes stay focused on dashboard shell stacking, flexible location-switcher width, later dense-grid breakpoints, and customer-oversight card/table breakpoints; they do not broaden role visibility, route access, or admin/operator capabilities.
+  The developer documentation truthfully treats this as a first Track L repo slice, not a full UI signoff, and keeps live device/browser viewport proof open.
 
 - `Validation checked`:
-  Reviewed developer validation evidence: `npm --workspace apps/parking-app-operator run test` passed 43 of 43 tests, `npm --workspace apps/parking-app-operator run build` passed including `/api/operator/customers` and `/dashboard/customers`, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
-  Statically reviewed the route-level admin gate, page-level admin-only behavior, aggregation logic for reservation, session, payment, plate, and lot rollups, the new test-suite inclusion in `package.json`, and the updated README, checklist, tracker, and temp-note wording.
+  Reviewed developer validation evidence: `npm.cmd --workspace apps/mobile run test` passed 37 of 37 tests, `npm.cmd --workspace apps/mobile run typecheck` passed, `npm.cmd --workspace apps/parking-app-operator run test` passed 43 of 43 tests, `npm.cmd --workspace apps/parking-app-operator run build` passed, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
+  Reviewed the code-backed viewport notes and confirmed they are documented as static/code review notes rather than live screenshots or device recordings. The earlier PowerShell `npm` shim issue and duplicate concurrent `next build` collision are environmental/duplicate-run artifacts, not product failures, because the final `npm.cmd` validations passed.
 
 - `Decision`:
   `Approved with follow-ups`
 
 - `Testing expectation snapshot`:
-  `Done`: admins can now open `Customer Oversight`, search customer activity, filter dashboard-overlap versus customer-only records, review recent lot history, recent plates, reservation or session counts, payment state, and dashboard-account overlap, all through a read-only dashboard surface.
-  `Partial`: customer display names and contact details only appear when current Supabase Auth metadata or dashboard-role records already provide them, and the page is only repo-validated until non-production data is exercised in Supabase.
-  `Missing`: real-data staging proof for the new page, broader customer-support workflows, refunds or customer edits, bootstrap-admin replacement, Track D paid-exit authorization, scanner proof, and the broader Track K success-gate rehearsal.
+  `Done`: the named mobile reservation, arrival, session, walk-in confirm, and walk-in QR screens now have safer compact padding, tab, QR, footer, and text-wrap behavior in repo code; the named operator/admin surfaces now avoid dense two-column or table-first layouts until wider breakpoints and allow the top bar/location selector to stack more safely.
+  `Partial`: this was verified through code review, automated tests, typecheck, and build, plus code-backed viewport reasoning. It is not yet a live rendered device/browser proof pass.
+  `Missing`: full screen-by-screen Track L coverage, live small-phone/tall-phone mobile screenshots or device checks, live narrow-laptop/common-desktop dashboard proof, payment/exit page layout review, and any screenshot regression or accessibility instrumentation.
 
 - `Manual actions required`:
-  `Backend/DevOps` must verify the operator dashboard environment against a non-production Supabase project and confirm the new `/api/operator/customers` route can read real reservation, session, payment, and auth-user data safely.
-  `Admin/QA` must sign in as an admin against non-production data and verify search, overlap filtering, contact display, recent lot history, and read-only behavior on `/dashboard/customers`.
-  `Founder/Product` should still decide how much customer-support tooling is truly needed beyond this first read-only oversight slice and whether the auth-admin user listing approach remains acceptable for the expected pilot scale.
+  `QA/Release` should capture live small-phone and tall-phone checks for the changed mobile screens, including action reachability and QR readability.
+  `Admin/QA` should verify the refreshed dashboard shell, location switcher, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight layouts at narrow-laptop and common-desktop widths in a browser.
+  `Founder/Product` should decide whether the next Track L cycle continues broader UI hardening/live proof or yields to another launch blocker such as staging proof, gate/exit contracts, or observability.
 
 - `Required rework`:
   None required to accept this cycle.
 
 - `Safe follow-ups`:
-  Planner should now treat the next highest-value move as Track K staging proof for the accepted control-plane foundations, including the new customer oversight page, rather than assigning another repo customer-oversight slice immediately.
-  Track D exit-contract work, scanner proof, Track A staging bootstrap rehearsal, Track C cleanup rollout, and broader admin analytics remain later work.
+  Planner should keep Track L open for broader screen-by-screen hardening and live viewport proof, and should not treat payment implementation, exit authorization, staging Supabase proof, scanner validation, or bootstrap-admin hardening as completed by this UI slice.
+  If the next cycle remains Track L, prioritize live rendered proof and lower-risk untouched surfaces rather than reopening the accepted pass without new evidence.
 
 - `Temp artifact disposition`:
-  Retain `workflow/temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md` briefly for the next planner pass because it compactly records the new surface's data sources, intentional limits, and manual proof expectations.
+  Retain `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md` briefly for the next planner pass because it records the reviewed surfaces, code-backed viewport notes, and remaining Track L limits.
 
 - `Debugger log disposition`:
-  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The SQL hardening rerun and Metro Android launch both still need manual external validation.
+  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The SQL hardening rerun and Metro Android launch still need manual external validation and were not resolved by this UI review.
 
 - `Suggestion log disposition`:
-  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The admin-versus-operator suggestion is now materially advanced again, but the staging-proof follow-up and Parking Actions exit-contract work are still unfinished.
+  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The full UI/UX hardening suggestion has been absorbed into Track L and partially advanced, but it is not complete until broader coverage and live viewport proof are accepted.
 
 - `Next owner`:
   `Planner`

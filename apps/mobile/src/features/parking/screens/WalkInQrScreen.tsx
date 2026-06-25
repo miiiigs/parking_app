@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, Car, Clock, Zap } from 'lucide-react-native';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { ParkingDataStatusCard } from '../../../components/parking/ParkingDataStatusCard';
@@ -10,10 +10,12 @@ import { getRouteParam } from '../../auth/utils';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
+import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 
 export default function WalkInQrScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string; slotId?: string }>();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const { lots, isLoading, isRefreshing, status, error: dataError, lastSyncedAt, refresh } = useMobileParkingData();
   const booking = useParkingFlowStore((state) => state.booking);
   const issueWalkInEntryPass = useParkingFlowStore((state) => state.issueWalkInEntryPass);
@@ -148,14 +150,19 @@ export default function WalkInQrScreen() {
   const isUrgent = secondsRemaining <= 120;
   const isExpired = secondsRemaining <= 0;
   const progressPercent = ((600 - secondsRemaining) / 600) * 100;
+  const qrSize = isCompact ? 144 : 160;
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <AppScreenHeader title="Walk-In Entrance Pass" />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 18 : 22 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.contentFrame, { maxWidth: contentWidth }]}>
         <ParkingDataStatusCard
           status={status}
           error={dataError}
@@ -210,7 +217,7 @@ export default function WalkInQrScreen() {
 
           <View style={styles.qrBody}>
             <View style={[styles.qrFrame, styles.qrFrameFaded]}>
-              <QRCode value={qrValue} size={160} color="#0F766E" backgroundColor="#FFFFFF" />
+              <QRCode value={qrValue} size={qrSize} color="#0F766E" backgroundColor="#FFFFFF" />
             </View>
 
             <View style={styles.qrIdBadge}>
@@ -233,9 +240,10 @@ export default function WalkInQrScreen() {
         ) : null}
 
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 14 : 18 }]}>
         <AuthActionButton
           label={isExpired ? 'Entry Pass Expired' : isStarting ? 'Checking Entry...' : 'Check Gate Confirmation'}
           onPress={async () => {
@@ -277,7 +285,7 @@ export default function WalkInQrScreen() {
           </Text>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -322,9 +330,13 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   scrollContent: {
-    paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 24,
+    gap: 16,
+  },
+  contentFrame: {
+    width: '100%',
+    alignSelf: 'center',
     gap: 16,
   },
   heroCard: {
@@ -566,7 +578,7 @@ const styles = StyleSheet.create({
     paddingBottom: 26,
   },
   fullWidthButton: {
-    marginHorizontal: 20,
+    width: '100%',
   },
   footerHintRow: {
     flexDirection: 'row',
@@ -574,7 +586,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     marginTop: 9,
-    marginHorizontal: 20,
   },
   footerHint: {
     color: '#94A3B8',

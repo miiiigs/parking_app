@@ -11,7 +11,7 @@ import {
   X,
   Zap,
 } from 'lucide-react-native';
-import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ParkingLotLayoutMap } from '../../../components/parking/ParkingLotLayoutMap';
 import { ParkingMap } from '../../../components/parking/ParkingMap';
@@ -23,6 +23,7 @@ import { formatParkingPricingSummary, getReservationFeeForWindow } from '@parkin
 import { getRouteParam } from '../../auth/utils';
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
+import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import type { ParkingLot, ParkingSlot } from '../types';
@@ -48,6 +49,7 @@ function animateSheetTo(value: Animated.Value, nextValue: number) {
 export default function ReservationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string; mode?: string }>();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const auth = useMobileAuth();
   const { vehicles, selectedVehicle, selectedVehicleId, selectVehicle } = useMobileVehicles();
   const { lots, isLoading, error: dataError, refresh } = useMobileParkingData();
@@ -241,7 +243,7 @@ export default function ReservationScreen() {
   };
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <Stack.Screen
         options={{
           animation: 'none',
@@ -249,7 +251,7 @@ export default function ReservationScreen() {
         }}
       />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 16 : 20 }]}>
         <View style={styles.headerTopRow}>
           <Pressable onPress={() => router.replace('/home')} style={styles.backButton}>
             <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
@@ -265,17 +267,17 @@ export default function ReservationScreen() {
         </View>
       </View>
 
-      <View style={styles.modeTabsSection}>
-        <View style={styles.modeTabsShell}>
+      <View style={[styles.modeTabsSection, { paddingHorizontal: horizontalPadding }]}>
+        <View style={[styles.modeTabsShell, isCompact ? styles.modeTabsShellCompact : null]}>
           <Pressable
             onPress={() => {
               setMode('reserve');
               clearSelectedSlot();
               setErrorMessage(null);
             }}
-            style={[styles.modeTab, mode === 'reserve' ? styles.modeTabActive : null]}
+            style={[styles.modeTab, isCompact ? styles.modeTabCompact : null, mode === 'reserve' ? styles.modeTabActive : null]}
           >
-            <Text style={[styles.modeTabText, mode === 'reserve' ? styles.modeTabTextActive : null]}>Reserve in Advance</Text>
+            <Text style={[styles.modeTabText, isCompact ? styles.modeTabTextCompact : null, mode === 'reserve' ? styles.modeTabTextActive : null]}>Reserve in Advance</Text>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -290,71 +292,57 @@ export default function ReservationScreen() {
                 },
               });
             }}
-            style={[styles.modeTab, mode === 'walkin' ? styles.modeTabActive : null]}
+            style={[styles.modeTab, isCompact ? styles.modeTabCompact : null, mode === 'walkin' ? styles.modeTabActive : null]}
           >
             <Zap color={mode === 'walkin' ? '#0F766E' : '#64748B'} size={12} strokeWidth={2.3} />
-            <Text style={[styles.modeTabText, mode === 'walkin' ? styles.modeTabTextActive : null]}>Walk-In Parking</Text>
+            <Text style={[styles.modeTabText, isCompact ? styles.modeTabTextCompact : null, mode === 'walkin' ? styles.modeTabTextActive : null]}>Walk-In Parking</Text>
           </Pressable>
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.statsShell}>
-          <View style={styles.statsRow}>
-            <StatBlock label="Total Slots" value={String(lot.totalSlots)} />
-            <StatBlock label="Available" value={String(lot.availableSlots)} valueColor="#16A34A" />
-          </View>
-          <View style={styles.hoursRow}>
-            <Clock3 color="#64748B" size={12} strokeWidth={2.2} />
-            <Text style={styles.hoursText}>
-              <Text style={styles.hoursLabel}>Hours: </Text>
-              {displayHours}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.contentSection}>
-          <View style={styles.legendRow}>
-            <LegendChip label="available" tone="available" />
-            <LegendChip label="occupied" tone="occupied" />
-            <LegendChip label="reserved" tone="reserved" />
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={[styles.bodyContent, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 18 : 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.contentFrame, { maxWidth: contentWidth }]}>
+          <View style={styles.statsShell}>
+            <View style={styles.statsRow}>
+              <StatBlock label="Total Slots" value={String(lot.totalSlots)} />
+              <StatBlock label="Available" value={String(lot.availableSlots)} valueColor="#16A34A" />
+            </View>
+            <View style={styles.hoursRow}>
+              <Clock3 color="#64748B" size={12} strokeWidth={2.2} />
+              <Text style={styles.hoursText}>
+                <Text style={styles.hoursLabel}>Hours: </Text>
+                {displayHours}
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.mapShell}>
-            {lot.lotLayout ? (
-              <ParkingLotLayoutMap
-                style={styles.mapViewport}
-                lot={lot.lotLayout}
-                slots={lot.slots.map((slot, index) => ({
-                  id: slot.id,
-                  label: slot.number,
-                  status: slot.status ?? (slot.isAvailable ? 'available' : 'occupied'),
-                  displayOrder: index + 1,
-                }))}
-                selectedSlotId={selectedSlotId}
-                onSelectSlot={(slotId) => {
-                  const nextSlot = lot.slots.find((slot) => slot.id === slotId) ?? null;
-                  setErrorMessage(null);
-                  const nextSelectedSlot = nextSlot && nextSlot.isAvailable ? nextSlot : null;
-                  setSelectedSlot(nextSelectedSlot);
-                  if (mode === 'reserve' && lotId) {
-                    setReservationDraft({
-                      lotId,
-                      slotId: nextSelectedSlot?.id ?? null,
-                      arrivalWindowMinutes,
-                      plateNumber: normalizedPlateNumber,
-                    });
-                  }
-                }}
-              />
-            ) : (
-              <View style={styles.fallbackMapFrame}>
-                <ParkingMap
-                  slots={lot.slots}
-                  selectedSlotId={selectedSlotId ?? undefined}
-                  onSelectSlot={(slot) => {
+          <View style={styles.contentSection}>
+            <View style={styles.legendRow}>
+              <LegendChip label="available" tone="available" />
+              <LegendChip label="occupied" tone="occupied" />
+              <LegendChip label="reserved" tone="reserved" />
+            </View>
+
+            <View style={styles.mapShell}>
+              {lot.lotLayout ? (
+                <ParkingLotLayoutMap
+                  style={styles.mapViewport}
+                  lot={lot.lotLayout}
+                  slots={lot.slots.map((slot, index) => ({
+                    id: slot.id,
+                    label: slot.number,
+                    status: slot.status ?? (slot.isAvailable ? 'available' : 'occupied'),
+                    displayOrder: index + 1,
+                  }))}
+                  selectedSlotId={selectedSlotId}
+                  onSelectSlot={(slotId) => {
+                    const nextSlot = lot.slots.find((slot) => slot.id === slotId) ?? null;
                     setErrorMessage(null);
-                    const nextSelectedSlot = slot?.isAvailable ? slot : null;
+                    const nextSelectedSlot = nextSlot && nextSlot.isAvailable ? nextSlot : null;
                     setSelectedSlot(nextSelectedSlot);
                     if (mode === 'reserve' && lotId) {
                       setReservationDraft({
@@ -366,14 +354,34 @@ export default function ReservationScreen() {
                     }
                   }}
                 />
-              </View>
-            )}
+              ) : (
+                <View style={styles.fallbackMapFrame}>
+                  <ParkingMap
+                    slots={lot.slots}
+                    selectedSlotId={selectedSlotId ?? undefined}
+                    onSelectSlot={(slot) => {
+                      setErrorMessage(null);
+                      const nextSelectedSlot = slot?.isAvailable ? slot : null;
+                      setSelectedSlot(nextSelectedSlot);
+                      if (mode === 'reserve' && lotId) {
+                        setReservationDraft({
+                          lotId,
+                          slotId: nextSelectedSlot?.id ?? null,
+                          arrivalWindowMinutes,
+                          plateNumber: normalizedPlateNumber,
+                        });
+                      }
+                    }}
+                  />
+                </View>
+              )}
 
-            {!selectedSlot ? (
-              <View style={styles.mapHint}>
-                <Text style={styles.mapHintText}>Tap an available slot to continue.</Text>
-              </View>
-            ) : null}
+              {!selectedSlot ? (
+                <View style={styles.mapHint}>
+                  <Text style={styles.mapHintText}>Tap an available slot to continue.</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -417,7 +425,7 @@ export default function ReservationScreen() {
 
           <ScrollView
             style={styles.sheetScroll}
-            contentContainerStyle={styles.sheetScrollContent}
+            contentContainerStyle={[styles.sheetScrollContent, { paddingHorizontal: horizontalPadding, paddingBottom: isCompact ? 22 : 28 }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -642,7 +650,7 @@ export default function ReservationScreen() {
         onAddAnother={() => router.push('/edit-vehicle?mode=new')}
         onManageVehicles={() => router.push('/edit-vehicle')}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -774,6 +782,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#F1F5F9',
   },
+  modeTabsShellCompact: {
+    flexDirection: 'column',
+  },
   modeTab: {
     flex: 1,
     minHeight: 44,
@@ -782,6 +793,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  modeTabCompact: {
+    width: '100%',
   },
   modeTabActive: {
     backgroundColor: '#FFFFFF',
@@ -797,6 +811,10 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
   },
+  modeTabTextCompact: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
   modeTabTextActive: {
     color: '#0F766E',
     fontFamily: 'Poppins_600SemiBold',
@@ -808,6 +826,10 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 140,
     gap: 0,
+  },
+  contentFrame: {
+    width: '100%',
+    alignSelf: 'center',
   },
   statsShell: {
     backgroundColor: '#F0FDFA',

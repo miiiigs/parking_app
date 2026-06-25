@@ -306,7 +306,7 @@ export default function ParkingActionsPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
           <Card className="border-border bg-card">
             <CardHeader className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">

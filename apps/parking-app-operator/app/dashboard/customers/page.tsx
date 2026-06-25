@@ -217,7 +217,7 @@ export default function CustomerOversightPage() {
             <Card className="border-border bg-card">
               <CardHeader>
                 <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -240,7 +240,7 @@ export default function CustomerOversightPage() {
                         </Button>
                       ))}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground xl:self-center">
                       <span>Page size</span>
                       <select
                         value={pageSize}
@@ -282,7 +282,7 @@ export default function CustomerOversightPage() {
 
                 {!loading && !loadError ? (
                   <>
-                    <div className="grid gap-3 lg:hidden">
+                    <div className="grid gap-3 xl:hidden">
                       {items.map((item) => (
                         <Card key={item.userId} className="border-border bg-secondary/20">
                           <CardContent className="space-y-3 p-4">
@@ -298,7 +298,7 @@ export default function CustomerOversightPage() {
                                 {item.hasDashboardAccess ? `${item.dashboardRole ?? 'dashboard'} overlap` : 'customer only'}
                               </Badge>
                             </div>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                               <div>
                                 <div className="text-xs text-muted-foreground">Latest lot</div>
                                 <div className="font-medium text-foreground">{item.latestLocationName ?? 'No lot history'}</div>
@@ -329,7 +329,7 @@ export default function CustomerOversightPage() {
                       ))}
                     </div>
 
-                    <div className="hidden overflow-x-auto lg:block">
+                    <div className="hidden overflow-x-auto xl:block">
                       <table className="w-full min-w-[1160px] text-sm">
                         <thead>
                           <tr className="border-b border-border">

@@ -7,7 +7,7 @@ If you are one of the personas, read this file before doing anything else.
 ## Current State
 
 - `Cycle ID`:
-  `2026-06-25-cycle-009-track-k-customer-oversight`
+  `2026-06-25-cycle-010-track-l-ui-hardening-pass-1`
 
 - `Current owner`:
   `Planner`
@@ -16,13 +16,13 @@ If you are one of the personas, read this file before doing anything else.
   `Planner reprioritization`
 
 - `Status`:
-  `Reviewer accepted the Track K admin-only customer oversight slice with follow-ups. The operator dashboard now includes `/dashboard/customers`, `/api/operator/customers`, a shared customer aggregation helper, customer-versus-dashboard overlap visibility, search and pagination, and explicit data-limit messaging. Repo validation passed, so Planner should now choose the next highest-value move without reopening this accepted repo slice unless new evidence demands it.`
+  `Reviewer accepted the first Track L UI/UX hardening slice with follow-ups. The named mobile reservation, arrival, session, and walk-in screens plus the dashboard shell, location switcher, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight now have repo-backed responsive layout hardening. Live viewport proof, broader screen-by-screen UI hardening, and non-UI launch blockers remain open.`
 
 - `Primary objective`:
-  `Choose the next highest-value, dependency-aware unit of work after the accepted Track K customer-oversight slice, using the updated tracker, reviewer remarks, debugger log, suggestion log, and still-relevant temp notes.`
+  `Choose the next highest-value, dependency-aware unit of work after the accepted first Track L UI hardening slice, using the updated review decision, tracker, suggestion log, debugger log, and remaining manual proof gaps.`
 
 - `Why this owner has the baton`:
-  `The reviewer accepted the repo slice without requesting code rework, so the workflow now needs fresh planner reprioritization for the next cycle.`
+  `Reviewer found no material repo-blocking issues in the first Track L slice, accepted it with explicit live viewport and broader-coverage follow-ups, and returned the workflow to Planner for reprioritization.`
 
 - `Required reads for the current owner`:
   1. [AI_WORKFLOW_STATE.md](./AI_WORKFLOW_STATE.md)
@@ -33,24 +33,25 @@ If you are one of the personas, read this file before doing anything else.
   6. [PROJECT_DOCUMENT_INDEX.md](../planning/PROJECT_DOCUMENT_INDEX.md)
   7. [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
   8. [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
-  9. [TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md](../temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md)
-  10. [apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md](../../apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md)
-  11. Any durable Track K, Track A, or Track D documents relevant to the next safe cycle
+  9. [TRACK_L_UI_HARDENING_PASS_1_NOTES.md](../temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md)
+  10. [apps/mobile/PRODUCTION_READINESS_CHECKLIST.md](../../apps/mobile/PRODUCTION_READINESS_CHECKLIST.md)
+  11. [apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md](../../apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md)
+  12. Any durable Track L, Track K, Track D, Track H, or Track A evidence relevant to the next safe cycle
 
 - `Expected output from current owner`:
-  `A precise next developer brief grounded in the accepted repo state, explicit reasoning about why that task is next now, any needed tracker or plan adjustments, and a baton handoff to Developer.`
+  `A precise next developer brief grounded in the accepted repo state, explicit reasoning about whether the next cycle continues Track L or switches to another launch blocker, any needed tracker or plan adjustments, and a baton handoff to Developer.`
 
 - `Exit criteria for this phase`:
-  - planner reads the accepted reviewer decision and current tracker reality before assigning new work
-  - planner chooses one dependency-aware next move that does not reopen already accepted scope without cause
-  - planner decides whether the next cycle should target Track K staging proof, another repo slice, or a higher-priority tracked dependency
-  - planner updates `AI_DEVELOPER_PROMPT_NEXT_MOVE.md` with a concrete brief and updates this baton so the next owner is unambiguous
+  - planner reads the accepted Track L review and current tracker reality before assigning new work
+  - planner decides whether the next cycle should continue Track L for live viewport proof or broader UI coverage, or pivot to staging proof, paid-exit contract, observability, or another higher-value blocker
+  - planner keeps manual-only proof gaps distinct from repo-executable implementation work
+  - planner updates `AI_DEVELOPER_PROMPT_NEXT_MOVE.md` with one concrete next brief and updates this baton so the next owner is unambiguous
 
 - `Next owner after successful handoff`:
   `Developer`
 
 - `Blocking dependencies`:
-  `Non-production Supabase proof for the new customer oversight page, invitation onboarding, lot management, staging bootstrap rehearsal, scanner hardware validation, bootstrap-admin replacement, and the paid-exit contract all remain open external follow-ups, but none of them block planner reprioritization. The accepted customer-oversight slice also carries a known scaling consideration around auth-admin user listing and full-table aggregation that should be treated as a follow-up observation rather than a repo blocker at current pilot scale.`
+  `Live device/browser viewport proof for the first Track L slice, broader screen-by-screen UI hardening, non-production Supabase proof for the Track K control-plane surfaces, staging bootstrap rehearsal, scanner hardware validation, bootstrap-admin replacement, and the paid-exit contract all remain open follow-ups. Payment implementation remains intentionally deferred from the immediate workflow queue unless the separate consultation has already changed direction.`
 
 - `Last updated`:
   `2026-06-25`

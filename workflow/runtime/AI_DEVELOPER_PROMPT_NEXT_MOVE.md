@@ -18,78 +18,87 @@ Before acting on any prompt written here, read:
 
 ## Current Prompt
 
-### 2026-06-25 - Add Admin Customer Oversight Surface
+### 2026-06-25 - Track L UI/UX Hardening Pass 1 For Launch-Critical Surfaces
 
 - `Objective`:
-  Implement the next Track K repo slice by adding an admin-only customer oversight surface in `parking-app-operator` so admins can review customer contact and activity across lots without relying on direct database access.
+  Implement the first Track L repo slice by auditing and hardening the highest-risk launch-critical mobile and operator or admin surfaces for responsiveness, readability, spacing, and layout safety.
 
 - `Why now`:
-  The accepted Track K foundations already cover dashboard-role onboarding, lot assignment, lot management, and operator or admin navigation. The remaining highest-value repo gap in that track is broader admin customer oversight, while the Supabase proof items are still manual follow-ups outside the repo. The repo audit confirms the needed inputs already exist: reservations carry `user_id`, the dashboard already reads reservation, session, payment, and location data, and service-role auth helpers already exist for dashboard-user lookup and invite flows.
+  Founder priority shifted after the accepted Track K customer-oversight review. The repo now has enough functional depth that cramped layouts, clipped actions, weak spacing, and unreadable text are a bigger near-term trust risk than adding more surface area. Track L is now the top queue item, while payment implementation is intentionally deferred until a separate consultation defines direction.
 
 - `In scope`:
-  Audit the current reservation, session, payment, auth-admin, and dashboard layout contracts before editing.
-  Add a read-only admin-only customer oversight page and any matching server route or helper needed to load the data safely.
-  Use existing reservation, session, payment, location, and auth data to show a practical customer summary that helps admins support operations, such as customer identifier or contact details, latest or active lot context, recent reservation or session counts, recent payment state, recent vehicle plates, and latest activity timestamps.
-  Surface whether a customer identity also appears in `admin_user_roles` so admins can see dashboard-versus-customer overlap instead of guessing.
-  Keep the new surface clearly grouped with the admin-only control plane in the dashboard navigation without disturbing the already accepted operational-first ordering for non-admin users.
-  Add focused search, filtering, pagination, or compact summary behavior as needed so the page remains usable without trying to solve full analytics in one cycle.
-  Update focused tests and docs so the new admin-only surface, its read-only intent, and the identity-overlap visibility are described truthfully.
+  Compare this brief against the real repo state first and inventory the concrete issues that still exist on the named surfaces before editing.
+  Audit and fix the highest-severity mobile UI issues on `ReservationScreen`, `ArrivalScreen`, `SessionScreen`, `WalkInConfirmScreen`, and `WalkInQrScreen`, plus their route wrappers in `apps/mobile/app/` when those wrappers contribute to layout or safe-area problems.
+  Audit and fix the highest-severity operator or admin UI issues on `/dashboard`, `/dashboard/parking-actions`, `/dashboard/access-control`, `/dashboard/manage-parking-lots`, and `/dashboard/customers`.
+  Make only the supporting shared-layout changes that are directly needed for those surfaces, such as `dashboard-layout.tsx`, `location-switcher.tsx`, `parking-action-controls.tsx`, `location-management-panel.tsx`, `operation-detail-sheet.tsx`, or closely related shared UI wrappers.
+  Fix the real issues found around small-phone, normal-phone, tall-phone, narrow-laptop, and common desktop usage, including safe areas, keyboard overlap, scroll behavior, sticky action reachability, clipped content, unreadable text, cramped cards or forms, poor wrapping, and hidden primary actions.
+  Record any notable remaining UI risks that are intentionally left for a later Track L pass instead of silently implying the whole app was fully hardened.
 
 - `Out of scope`:
-  Do not broaden non-admin visibility into customer-wide data in this cycle.
-  Do not implement customer mutations, refunds, payment settlement tooling, manual compensation flows, support-ticket workflows, or finance analytics.
-  Do not reopen the accepted `Access Control`, `Manage Parking Lots`, invitation, assignment, `Operator Tools`, or location-switcher slices except for narrow navigation or shared helper touchpoints required by the new page.
-  Do not depend on new SQL migrations, new permanent schema objects, or staging-only Supabase proof work unless a tiny contract fix is truly required to read already-existing data.
+  Do not implement payment provider work, payment settlement, or the Track D paid-exit backend contract in this cycle.
+  Do not do staging-only Supabase proof, SQL migration work, role-model changes, or new backend business logic unless a tiny bug fix is strictly required to support a layout-safe screen.
+  Do not turn this into a broad redesign, design-token overhaul, or a whole-app visual refresh.
+  Do not spend cycle scope on lower-risk pages outside the named launch-critical surfaces unless a narrow shared fix unavoidably affects them.
 
 - `Dependencies to respect`:
-  `ACTIVE_EXECUTION_TRACKER.md` now records admin customer oversight as the next Track K repo slice, while staging proof for lot management and invitation onboarding remains a separate manual follow-up.
-  The current repo already enforces admin-only access-control and lot-management surfaces, explicit dashboard-versus-customer identity boundaries, non-admin location scoping, and accepted navigation grouping.
-  `supabase/schema.sql` already stores `reservations.user_id`, and the operator app already uses service-role-backed Supabase access plus auth-admin helpers in `operatorAdminAccess.ts`.
+  `ACTIVE_EXECUTION_TRACKER.md` now places Track L ahead of Track K staging proof, Track D staging proof, and the deferred payment work.
+  The accepted Track K customer-oversight page already exists and may receive UI hardening in this cycle, but its staging proof remains a separate manual follow-up.
   The debugger notes about rerunnable `admin_hardening.sql` and the Metro Android launch remain manual follow-ups and should not redirect this slice.
 
 - `Constraints`:
-  Keep the new surface admin-only and read-only unless a tiny supporting write is unavoidable, then justify it explicitly.
-  Prefer existing repo contracts and light helper additions over inventing a new customer-domain architecture.
-  Preserve the explicit boundary between customer mobile identities and dashboard access; overlap should be visible and explainable, not silently normalized.
-  Keep scope narrow enough for one reviewable cycle: customer visibility and summarization first, not full support operations or analytics.
-  Avoid leaking all-lot customer visibility into support, finance, or operator roles unless the repo already proves that access is intended and safe.
+  Implement only the missing UI hardening that is actually still absent in repo state.
+  Prefer surgical layout, spacing, typography, overflow, and discoverability fixes over rewriting flows or introducing new product behavior.
+  Preserve existing role gating, backend contracts, and accepted Track K behavior while improving the UI.
+  Keep the slice reviewable in one cycle; if not every issue can land, prioritize hidden actions, broken overflow, unreadable text, and unsafe scroll states first.
+  Payment-related screens may receive layout cleanup only if they are directly touched by shared fixes; payment feature implementation itself stays out of scope.
 
 - `Required validation`:
-  Run `npm --workspace apps/parking-app-operator run test`.
-  Run `npm --workspace apps/parking-app-operator run build`.
+  If mobile files change, run `npm --workspace apps/mobile run test` and `npm --workspace apps/mobile run typecheck`.
+  If operator files change, run `npm --workspace apps/parking-app-operator run test` and `npm --workspace apps/parking-app-operator run build`.
   Run `git diff --check`.
-  Statically verify admin-only route or navigation gating, read-only behavior, cross-lot customer summary accuracy, and explicit dashboard-account overlap signaling.
-  State clearly what customer identity fields are truly available from current repo data versus what still remains unavailable without deeper auth or schema work.
+  Include truthful manual viewport-check notes for the changed surfaces across at least one small-phone or tall-phone case and one narrow-laptop or common-desktop dashboard case.
+  Call out any remaining layout or readability risks instead of implying the full Track L pass is complete.
 
 - `Success criteria`:
-  Admins have a usable dashboard surface for reviewing customer activity across lots without direct SQL.
-  The page makes customer-versus-dashboard identity overlap visible when it exists.
-  Non-admin roles do not gain new global customer visibility.
-  The slice uses existing repo data safely and does not overclaim staging proof, bootstrap replacement, or finance-support workflow completion.
-  Tests and docs match the resulting route, gating, and data limitations truthfully.
+  The named launch-critical surfaces no longer have obvious clipped or hidden primary actions, broken wrapping, unreadable text sizing, or non-scroll-safe states in the real repo UI.
+  Shared layout fixes remain compatible with the accepted operator or admin role boundaries and Track K customer-oversight behavior.
+  Validation and notes truthfully distinguish what was fixed now versus what remains for later UI hardening.
 
 - `Expected deliverable`:
-  A focused Track K repo slice adding an admin-only customer oversight page plus any supporting route or helper code, navigation entry, focused tests, truthful docs, execution-log update, and baton handoff to Reviewer.
+  A focused Track L repo slice that hardens the highest-risk launch-critical mobile and operator or admin surfaces, updates any truthful readiness or tracker notes needed by the changed UI, appends the execution log, and hands the baton to Reviewer.
 
 - `Files likely involved`:
-  `apps/parking-app-operator/app/dashboard/`
-  `apps/parking-app-operator/app/api/operator/`
+  `apps/mobile/src/features/parking/screens/ReservationScreen.tsx`
+  `apps/mobile/src/features/parking/screens/ArrivalScreen.tsx`
+  `apps/mobile/src/features/parking/screens/SessionScreen.tsx`
+  `apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx`
+  `apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx`
+  `apps/mobile/app/reservation/[lotId].tsx`
+  `apps/mobile/app/arrival.tsx`
+  `apps/mobile/app/session.tsx`
+  `apps/mobile/app/walkin-confirm.tsx`
+  `apps/mobile/app/walkin-qr.tsx`
+  `apps/parking-app-operator/app/dashboard/page.tsx`
+  `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx`
+  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
+  `apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx`
+  `apps/parking-app-operator/app/dashboard/customers/page.tsx`
   `apps/parking-app-operator/components/layout/dashboard-layout.tsx`
-  `apps/parking-app-operator/lib/operatorAdminAccess.ts`
-  `apps/parking-app-operator/lib/operatorScopedQueries.ts`
-  `apps/parking-app-operator/lib/types.ts`
-  `apps/parking-app-operator/tests/`
-  `apps/parking-app-operator/README.md`
+  `apps/parking-app-operator/components/layout/location-switcher.tsx`
+  `apps/parking-app-operator/components/dashboard/parking-action-controls.tsx`
+  `apps/parking-app-operator/components/dashboard/location-management-panel.tsx`
+  `apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx`
+  `apps/mobile/PRODUCTION_READINESS_CHECKLIST.md`
   `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
   `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
   `workflow/runtime/AI_WORKFLOW_STATE.md`
 
 - `Reviewer focus areas`:
-  Verify the new customer oversight surface is admin-only, read-only, and does not leak global customer data to non-admin roles.
-  Verify the implementation uses real current repo data rather than placeholder claims, especially for customer identity and dashboard-access overlap.
-  Verify navigation changes stay narrowly grouped with the admin control plane and do not disturb the accepted operational-first non-admin experience.
-  Verify docs and tests describe both the new visibility and any remaining data limitations truthfully.
+  Verify the developer fixed real layout and readability issues on the named surfaces rather than doing an unvalidated cosmetic sweep.
+  Verify the changes preserve current functional behavior, role gating, and the accepted Track K customer-oversight behavior.
+  Verify validation coverage matches the touched app surfaces and that any remaining UI risks are documented truthfully.
+  Verify payment or backend scope did not creep back into this UI hardening slice.
 
 - `Next owner after developer closeout`:
   `Reviewer`

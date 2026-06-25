@@ -14,7 +14,7 @@ export function LocationSwitcher() {
 
   if (locations.length === 0) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">
+      <div className="inline-flex w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground sm:w-auto">
         <MapPin className="h-4 w-4" />
         No active parking location
       </div>
@@ -26,7 +26,7 @@ export function LocationSwitcher() {
 
   if (user?.role !== 'admin') {
     return (
-      <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 shadow-sm">
+      <div className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 shadow-sm">
         <MapPin className="h-4 w-4 flex-shrink-0 text-primary" />
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Assigned lot</div>
@@ -42,11 +42,11 @@ export function LocationSwitcher() {
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 shadow-sm">
+    <div className="flex w-full min-w-0 flex-col items-start gap-2 rounded-xl border border-border bg-secondary/40 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:gap-3">
       <MapPin className="h-4 w-4 flex-shrink-0 text-primary" />
-      <div className="min-w-0">
+      <div className="min-w-0 w-full">
         <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Active lot</div>
-        <div className="flex items-center gap-2">
+        <div className="mt-1 flex w-full flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={selectedValue}
             disabled={isPending}
@@ -79,7 +79,7 @@ export function LocationSwitcher() {
                 }
               });
             }}
-            className="min-w-[240px] max-w-[320px] rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition focus:border-primary"
+            className="w-full min-w-0 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition focus:border-primary sm:min-w-[220px] sm:max-w-[320px]"
           >
             {locations.map((location) => (
               <option key={location.id} value={location.id}>

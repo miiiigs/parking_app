@@ -113,8 +113,8 @@ This is the intended production flow the app should align to:
 - [~] Reservation lifecycle is backend-aware, but some customer-facing fallback or sample-data behavior still needs production-safe tightening
 - [~] The repo now presents entry-pass-first reservation and walk-in UX, and repo-side backend gate confirmation with parking-grace session activation has been accepted; production scanner integration, staging execution, exit grace, penalty, and compensation enforcement remain open
 - [~] Walk-in flow is significantly more real than before, but timeout automation and full operator visibility are not complete
-- [~] Mobile UI and UX are broad in coverage, but launch-quality error copy, recovery states, and field-validated scanning UX are not complete
-- [~] Operator web UX is operationally meaningful, but heavy views, detail actions, and high-volume ergonomics still need hardening
+- [~] Mobile UI and UX are broad in coverage, but launch-quality error copy, recovery states, responsive behavior, text legibility, spacing quality, and field-validated scanning UX are not complete
+- [~] Operator web UX is operationally meaningful, but responsive behavior, readability, heavy views, detail actions, and high-volume ergonomics still need hardening
 - [~] Admin and operator role concepts exist, but the app still needs explicit admin-versus-operator separation, admin-managed lot assignment, and clearer customer-versus-dashboard account boundaries
 - [~] Security posture has real foundations, but rate limiting, abuse protection, secret review, and end-to-end hardening are unfinished
 - [~] Observability exists only as early state surfaces and partial realtime visibility, not as a production telemetry stack
@@ -136,6 +136,7 @@ This is the intended production flow the app should align to:
 
 - [ ] Broad commercial rollout is not yet safe
 - [ ] Payments remain operationally incomplete for real-money production use
+- [ ] A complete production-style UI and UX hardening pass across mobile and operator or admin surfaces is still required before pilot confidence is realistic
 - [ ] Current repo flow now has a repo-accepted backend-owned operator gate confirmation contract, but still lacks an operator scanner client, exit-authorization QR handling, and automated penalty or compensation enforcement
 - [ ] The current webapp still needs explicit `admin` versus `operator` experience separation, admin-managed operator assignment, and shared mobile/backend multi-lot parity before broader operations can be trusted
 - [ ] Walk-in lifecycle still needs server housekeeping and richer operator visibility before it can be trusted at scale
@@ -312,6 +313,8 @@ Still required:
 - [ ] Improve stale-slot, offline, retry, and degraded-state customer messaging
 - [ ] Add launch-quality copy and visual trust signals across critical states
 - [ ] Add issue-reporting or contact-support paths at reservation, entry, conflict, payment, and exit failure points
+- [ ] Run a complete screen-by-screen responsiveness pass across launch-critical mobile screens, including safe-area handling, small-phone behavior, keyboard overlap, scroll safety, and action visibility
+- [ ] Audit and fix text size, contrast, spacing, container sizing, and touch-target clarity across the mobile experience
 - [ ] Validate the real ergonomics of reservation, gate entry, parking grace, payment, exit, and receipt flows on-device
 - [ ] Ensure settings and account-management surfaces match actual backend capability rather than placeholder expectations
 
@@ -345,6 +348,8 @@ Still required:
 - [ ] Add shift handoff, unresolved issue logging, and incident communication UX
 - [ ] Improve resilience and ergonomic behavior for high-volume operational use
 - [ ] Improve degraded-state banners, fallback handling, and realtime failure visibility
+- [ ] Run a complete responsive-layout and readability pass across the operator and admin pages, including narrow laptop widths, dense tables, drawers, cards, forms, and action areas
+- [ ] Audit and fix font legibility, contrast, spacing, container sizing, and viewport overflow across dashboard surfaces
 
 Success gate:
 - Operators can run a live site through normal traffic, mismatches, walk-ins, disputes, and degraded conditions without direct engineering or database intervention.
@@ -645,10 +650,11 @@ What must happen before pilot:
 2. Connect the accepted gate-entry backend contract to an operator-facing Parking Actions scan and manual confirmation surface.
 3. Complete Phase 3 and Phase 4 hardening around exit authorization, grace periods, penalties, compensation, and customer failure lifecycle.
 4. Finish Phase 5 and Phase 7 gaps around walk-in operator visibility and server housekeeping.
-5. Build Phase 6 real payment integration and finance-safe settlement.
+5. Run a full UI and UX hardening pass across mobile plus operator or admin surfaces, fixing responsiveness, readability, spacing, and container-sizing issues before broader launch confidence claims.
 6. Build Phase 8 observability and incident readiness before any live commercial traffic.
 7. Run Phase 9 real-device validation and release discipline.
 8. Execute Phase 10 controlled pilot readiness.
+9. Return to Phase 6 payment integration after the separate payment consultation defines the intended direction for React Native and backend settlement.
 
 ## First Automated Workflow Cycle Recommendation
 

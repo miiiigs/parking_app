@@ -25,6 +25,7 @@ Use this document to decide what we do next, what is blocked, and what can be de
 - Backend-complete reservation lifecycle
 - Backend-complete walk-in lifecycle
 - Gate-entry and exit QR lifecycle
+- Mobile and operator/admin UI/UX responsiveness and readability hardening
 - Real payment integration and settlement
 - Expiry, no-show, and housekeeping automation
 - Observability and analytics baseline
@@ -566,17 +567,86 @@ Remaining gap before success gate:
 - Invitation-based dashboard onboarding now exists in repo, but live email delivery, first-login completion, and staging proof are still future work.
 - The first admin-only customer oversight surface now exists in repo, but real-data staging proof plus broader support workflows and admin analytics still remain outside this first foundation slice.
 
+## Track L - UI/UX Responsiveness, Readability, and Layout Hardening
+
+Priority:
+- `P0`
+
+Status:
+- `In progress - the first launch-critical repo slice was accepted by review and now hardens the mobile reservation, arrival, session, and walk-in surfaces plus the operator/admin dashboard shell, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight for better responsiveness and action visibility; broader UI hardening and live viewport proof still remain open`
+
+Owner:
+- `Mobile` + `Operator` + `QA/Release`
+
+Why this is next:
+- The product now has enough functional depth that layout breakage, unreadable text, weak spacing, cramped containers, and inconsistent responsive behavior are becoming a bigger near-term trust risk than adding more surface area. A full screen and page hardening pass should happen before this workflow returns to deferred payment implementation.
+
+Tasks:
+- [x] Inventory the launch-critical mobile screens and operator or admin pages that must be reviewed in this pass.
+- [ ] Audit mobile screens for small-phone, normal-phone, and tall-phone responsiveness, including safe areas, keyboard overlap, scroll behavior, sticky actions, and clipped content.
+- [ ] Audit operator and admin pages for narrow desktop and laptop responsiveness, including sidebar behavior, page-header wrapping, cards, tables, forms, drawers, and modal overflow.
+- [ ] Fix unreadable text sizes, low-contrast pairings, weak spacing rhythm, cramped containers, and poor action density where found.
+- [ ] Fix layout overflow, hidden actions, broken wrapping, and non-scroll-safe states across both apps where found.
+- [ ] Ensure critical actions remain discoverable and usable on the affected screens after the layout fixes.
+- [ ] Run the right validation for the touched surfaces, including builds, tests, and practical viewport checks.
+- [ ] Leave real payment implementation out of scope for this track until the separate payment consultation defines direction.
+
+Success gate:
+- Launch-critical mobile screens and operator or admin pages have completed a real responsiveness and readability pass, the highest-severity UI issues have been fixed in repo code, and the remaining UI risks are explicitly documented rather than hidden.
+
+Dependencies:
+- none
+
+Rollback/fallback:
+- if the full pass cannot land at once, prioritize the reservation, arrival, session, walk-in, dashboard, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight surfaces first and defer lower-risk pages explicitly
+
+Future polish:
+- dedicated design tokens
+- stronger accessibility instrumentation
+- screenshot regression checks
+
+Validation method:
+- targeted app builds and existing automated tests for touched files
+- screen and viewport review across the most important mobile and dashboard surfaces
+- manual check for text readability, spacing, and action visibility after implementation
+- `npm.cmd --workspace apps/mobile run test`
+- `npm.cmd --workspace apps/mobile run typecheck`
+- `npm.cmd --workspace apps/parking-app-operator run test`
+- `npm.cmd --workspace apps/parking-app-operator run build`
+- `git -c safe.directory=C:/dev/parking_app diff --check`
+
+Implementation:
+- [apps/mobile/src/features/parking/screens/ReservationScreen.tsx](../apps/mobile/src/features/parking/screens/ReservationScreen.tsx)
+- [apps/mobile/src/features/parking/screens/ArrivalScreen.tsx](../apps/mobile/src/features/parking/screens/ArrivalScreen.tsx)
+- [apps/mobile/src/features/parking/screens/SessionScreen.tsx](../apps/mobile/src/features/parking/screens/SessionScreen.tsx)
+- [apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx](../apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx)
+- [apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx](../apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx)
+- [apps/parking-app-operator/components/layout/dashboard-layout.tsx](../apps/parking-app-operator/components/layout/dashboard-layout.tsx)
+- [apps/parking-app-operator/components/layout/location-switcher.tsx](../apps/parking-app-operator/components/layout/location-switcher.tsx)
+- [apps/parking-app-operator/app/dashboard/parking-actions/page.tsx](../apps/parking-app-operator/app/dashboard/parking-actions/page.tsx)
+- [apps/parking-app-operator/app/dashboard/access-control/page.tsx](../apps/parking-app-operator/app/dashboard/access-control/page.tsx)
+- [apps/parking-app-operator/app/dashboard/customers/page.tsx](../apps/parking-app-operator/app/dashboard/customers/page.tsx)
+- [apps/parking-app-operator/components/dashboard/location-management-panel.tsx](../apps/parking-app-operator/components/dashboard/location-management-panel.tsx)
+- [workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md](../temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md)
+
+Remaining gap before success gate:
+- A first repo-backed hardening slice now exists, but the full screen-by-screen UI pass is still incomplete.
+- Live rendered viewport proof on real small phones, tall phones, and narrow laptop browsers still remains open; this cycle relied on code-backed layout review plus automated validation rather than screenshots or device capture.
+- Lower-priority surfaces outside this pass, including payment and other dashboard pages, still need later Track L review.
+- Payment-related screens may still receive layout cleanup, but payment feature implementation itself remains intentionally deferred from this workflow.
+
 ## Do Next Queue
 
 These are the next tasks we should actively execute in order.
 
-1. `Track K` staging follow-up: prove admin lot management, invitation-based dashboard onboarding, and the new customer oversight surface against Supabase in non-production.
-2. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
-3. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
-4. `Track D` plus `Track H` repo follow-up: define the backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real.
-5. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
-6. `Track E`: payment provider decision and backend settlement design.
+1. `Track L` next decision: either continue broader screen-by-screen UI hardening and live viewport proof, or deliberately switch to the next launch blocker if planner judges staging proof or backend contract work higher value.
+2. `Track K` staging follow-up: prove admin lot management, invitation-based dashboard onboarding, and the new customer oversight surface against Supabase in non-production.
+3. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
+4. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
+5. `Track D` plus `Track H` repo follow-up: define the backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real.
+6. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
 7. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
+8. `Track E`: payment provider decision and backend settlement design after the separate payment consultation defines the intended direction.
 
 ## Recommended Parallel Work Split
 

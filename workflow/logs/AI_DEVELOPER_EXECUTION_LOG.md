@@ -689,3 +689,38 @@ Do not use this file as the strategic roadmap or the active priority board.
 
 - `Recommended next move`:
   Reviewer should verify the new customer oversight route and page are truly admin-only and read-only, confirm the customer-versus-dashboard overlap behavior is accurate and not overstated, and make sure the tracker or checklist now point next to staging proof rather than another repo customer-oversight slice.
+
+### 2026-06-25 - Track L UI/UX Hardening Pass 1 For Launch-Critical Surfaces
+
+- `Current move/task`:
+  Implement the first Track L repo slice by auditing and hardening the highest-risk launch-critical mobile and operator/admin surfaces for responsiveness, readability, spacing, and layout safety, while keeping payment implementation and staging-only proof out of scope.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K control-plane foundations, the session screen already used the shared mobile responsive metrics hook, and the operator dashboard already had mobile/table/card fallbacks on some pages such as reservations and audit.
+  The current repo still left several concrete layout risks in the named launch-critical surfaces: fixed-width location switching in the dashboard shell, dense multi-column operator/admin layouts switching too early on narrower laptop widths, customer oversight forcing its large table at `lg`, and several mobile launch screens still using fixed paddings and compact-unfriendly tab or header layouts.
+
+- `What I completed now`:
+  Updated the operator dashboard shell and location switcher so the top bar can stack more safely on tighter widths, the collapsed sidebar centers icon-only navigation more cleanly, and the active-lot control no longer forces an overly rigid width.
+  Shifted early two-column or multi-column layouts later on the launch-critical operator/admin surfaces by updating `Parking Actions`, `Access Control`, `Manage Parking Lots`, and the customer-oversight responsive breakpoints.
+  Updated `Customer Oversight` so the card-first fallback stays active until `xl` widths and the compact card details drop to one column sooner, reducing cramped narrow-laptop and small-width presentation.
+  Hardened the launch-critical mobile reservation and walk-in-confirm flows with responsive paddings, bounded content width, and compact stacked tabs instead of always forcing a dense two-tab row.
+  Hardened the arrival and walk-in QR screens with responsive paddings and more compact QR sizing for smaller phones.
+  Hardened the active session screen by reducing compact header/timer footprint, allowing timer metadata to wrap, and replacing the broken location separator text with a safe ASCII `-`.
+  Added `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md` to capture the reviewed surfaces, concrete issues fixed, code-backed viewport notes, and the remaining UI risks for reviewer context.
+  Updated the Track L tracker entry plus the mobile and operator readiness checklists so the repo now truthfully records this first UI hardening slice and its remaining live-viewport gaps.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `npm.cmd --workspace apps/parking-app-operator run test`: passed 43 of 43 tests.
+  `npm.cmd --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript, static page generation, and route discovery including the touched dashboard routes.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Manual viewport-check notes for small-phone and narrow-laptop behavior were recorded in `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md`, but they are code-backed review notes rather than live device/browser screenshots.
+
+- `Still open`:
+  This first Track L slice does not complete the full screen-by-screen UI pass; payment, exit, and lower-priority dashboard surfaces still need later review.
+  Real-device and real-browser viewport proof for small phones, tall phones, narrow laptops, and common desktop widths still remains open.
+  The cycle intentionally did not touch payment implementation, staging-only Supabase proof, role-model changes, or new backend business logic.
+
+- `Recommended next move`:
+  Reviewer should verify that the responsive shell and breakpoint changes really improve the named launch-critical surfaces without regressing role gating or user flows, confirm that the validation evidence and viewport notes are described truthfully, and decide whether this first Track L slice is acceptable before planner scopes the next UI hardening pass.
