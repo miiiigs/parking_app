@@ -21,22 +21,24 @@ Use this file after the developer finishes a cycle and before the planner advanc
 
 ## Current Review
 
-### 2026-06-25 - Dashboard Auth-User Onboarding Review
+### 2026-06-25 - Admin Customer Oversight Surface Review
 
 - `Current move/task`:
-  Review the Track K slice that lets admins onboard a dashboard user from `Access Control` by inviting a new Supabase Auth user when needed while preserving the existing role-provisioning path for already-existing Auth users.
+  Review the Track K slice that adds an admin-only customer oversight surface, supporting aggregation helper, customer-overlap route, updated navigation entry, and matching tests or docs.
 
 - `Scope reviewed`:
-  `apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts`
-  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
+  `apps/parking-app-operator/app/api/operator/customers/route.ts`
+  `apps/parking-app-operator/app/dashboard/customers/page.tsx`
+  `apps/parking-app-operator/lib/customerOversight.ts`
   `apps/parking-app-operator/lib/operatorAdminAccess.ts`
-  `apps/parking-app-operator/lib/operatorRouteSchemas.ts`
-  `apps/parking-app-operator/tests/locationContext.test.mjs`
+  `apps/parking-app-operator/components/layout/dashboard-layout.tsx`
+  `apps/parking-app-operator/tests/customerOversight.test.mjs`
   `apps/parking-app-operator/tests/routeContractCoverage.test.js`
+  `apps/parking-app-operator/package.json`
   `apps/parking-app-operator/README.md`
   `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
-  `workflow/temp/SESSION_UPDATE.md`
+  `workflow/temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md`
 
 - `Inputs reviewed`:
   `workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md`
@@ -45,46 +47,46 @@ Use this file after the developer finishes a cycle and before the planner advanc
   `workflow/planning/PROJECT_DOCUMENT_INDEX.md`
   `workflow/logs/DEBUGGER_OUTPUT_LOG.md`
   `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`
-  current onboarding route, Access Control UI copy, helper-layer invite and lookup logic, focused contract coverage, doc updates, temporary session recap, and developer validation evidence
+  developer validation evidence, the new admin-only customer route and page, aggregation logic, navigation gating, focused tests, temp implementation note, and the updated operator docs
 
 - `Findings`:
   No material repo-blocking findings remain for this slice.
-  The onboarding route remains admin-only, keeps privileged Auth-user onboarding on the server side through the Supabase Admin API, preserves the existing-user provisioning path, and still uses `admin_user_roles` as the actual dashboard access gate.
-  Residual risk remains external rather than repo-blocking: live invite delivery, first-login completion, non-production Supabase proof, and the broader bootstrap-admin replacement are still manual or future-cycle follow-ups.
+  The new `/api/operator/customers` route is admin-only, the `/dashboard/customers` page remains read-only, and non-admin roles do not gain global customer visibility through this implementation.
+  The repo now truthfully exposes customer-versus-dashboard overlap, recent location history, reservation or session summaries, and current contact-data limitations without claiming a richer customer profile system than the code actually supports.
+  Residual risk remains external rather than repo-blocking: the new page still needs non-production Supabase proof with real customer data, and the auth-admin user listing plus full-table aggregation approach is acceptable for the current early control-plane slice but should still be watched as volume grows.
 
 - `Validation checked`:
-  Reviewed developer validation evidence: `npm --workspace apps/parking-app-operator run test` passed 41 of 41 tests, `npm --workspace apps/parking-app-operator run build` passed, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
-  Statically reviewed the actual dashboard-account route, the shared admin helper invite and lookup path, the Access Control onboarding copy, the request schema, the helper-level invite assertions, the route contract coverage, and the updated README, checklist, and tracker wording.
+  Reviewed developer validation evidence: `npm --workspace apps/parking-app-operator run test` passed 43 of 43 tests, `npm --workspace apps/parking-app-operator run build` passed including `/api/operator/customers` and `/dashboard/customers`, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
+  Statically reviewed the route-level admin gate, page-level admin-only behavior, aggregation logic for reservation, session, payment, plate, and lot rollups, the new test-suite inclusion in `package.json`, and the updated README, checklist, tracker, and temp-note wording.
 
 - `Decision`:
   `Approved with follow-ups`
 
 - `Testing expectation snapshot`:
-  `Done`: admins can now use `Access Control` to grant or update a dashboard role for an existing Supabase Auth user or invite a new dashboard user by email while preparing the `admin_user_roles` record server-side.
-  `Partial`: the repo now reflects invitation-based onboarding and the preserved existing-user path truthfully, but that behavior is only code-validated until a non-production Supabase environment proves real invitation delivery, first sign-in completion, and post-invite access behavior end to end.
-  `Missing`: production-safe bootstrap-admin replacement, broader admin customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof for the accepted admin control-plane flows.
+  `Done`: admins can now open `Customer Oversight`, search customer activity, filter dashboard-overlap versus customer-only records, review recent lot history, recent plates, reservation or session counts, payment state, and dashboard-account overlap, all through a read-only dashboard surface.
+  `Partial`: customer display names and contact details only appear when current Supabase Auth metadata or dashboard-role records already provide them, and the page is only repo-validated until non-production data is exercised in Supabase.
+  `Missing`: real-data staging proof for the new page, broader customer-support workflows, refunds or customer edits, bootstrap-admin replacement, Track D paid-exit authorization, scanner proof, and the broader Track K success-gate rehearsal.
 
 - `Manual actions required`:
-  `Backend/DevOps` must deploy and verify the current Supabase SQL and dashboard environment baseline in a non-production project before treating invitation-based onboarding as staging-ready.
-  `Admin/QA` must use real Supabase Auth users to verify `/dashboard/access-control` can both invite a new dashboard user and grant or update a role for an existing one, including the first-login completion path after invitation delivery.
-  `Operator/QA` must confirm that invited or updated dashboard accounts still obey the accepted location-assignment model once they sign in, and that non-admin accounts continue to see only explicitly assigned lots.
-  `Founder/Product` should still define the production-safe replacement for the current `admin@example.com` bootstrap convention before broader rollout.
+  `Backend/DevOps` must verify the operator dashboard environment against a non-production Supabase project and confirm the new `/api/operator/customers` route can read real reservation, session, payment, and auth-user data safely.
+  `Admin/QA` must sign in as an admin against non-production data and verify search, overlap filtering, contact display, recent lot history, and read-only behavior on `/dashboard/customers`.
+  `Founder/Product` should still decide how much customer-support tooling is truly needed beyond this first read-only oversight slice and whether the auth-admin user listing approach remains acceptable for the expected pilot scale.
 
 - `Required rework`:
   None required to accept this cycle.
 
 - `Safe follow-ups`:
-  Planner should choose between the manual non-production proof queue for the accepted admin-control-plane flows and the next repo slice for broader Track K admin customer-oversight or bootstrap hardening.
-  Broader admin customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof remain later work.
+  Planner should now treat the next highest-value move as Track K staging proof for the accepted control-plane foundations, including the new customer oversight page, rather than assigning another repo customer-oversight slice immediately.
+  Track D exit-contract work, scanner proof, Track A staging bootstrap rehearsal, Track C cleanup rollout, and broader admin analytics remain later work.
 
 - `Temp artifact disposition`:
-  Retain `workflow/temp/SESSION_UPDATE.md` only as a temporary human recap. It trails the current accepted review state and should not be treated as live workflow truth.
+  Retain `workflow/temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md` briefly for the next planner pass because it compactly records the new surface's data sources, intentional limits, and manual proof expectations.
 
 - `Debugger log disposition`:
-  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The Metro fix and rerunnable SQL hardening both still have manual external validation steps pending.
+  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The SQL hardening rerun and Metro Android launch both still need manual external validation.
 
 - `Suggestion log disposition`:
-  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The admin/operator separation suggestion is substantially advanced but not fully finished, and the Parking Actions suggestion still has unfinished exit-contract follow-up.
+  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The admin-versus-operator suggestion is now materially advanced again, but the staging-proof follow-up and Parking Actions exit-contract work are still unfinished.
 
 - `Next owner`:
   `Planner`

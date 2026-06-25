@@ -10,6 +10,7 @@ This app is built for:
 - admin-managed operator-to-lot assignments
 - admin-managed parking-lot inventory and metadata
 - admin-managed dashboard-user onboarding and dashboard-role provisioning through Supabase Auth
+- admin-only customer oversight across reservation, session, payment, and dashboard-overlap data
 - separate global lot administration and selected-lot parking setup surfaces
 - explicit active-location context
 - live lot monitoring through the applied parking map
@@ -52,6 +53,10 @@ Location context entry points:
 - [app/api/operator/location/route.ts](./app/api/operator/location/route.ts)
 - [lib/operatorLocationServer.ts](./lib/operatorLocationServer.ts)
 - [lib/operatorLocation.ts](./lib/operatorLocation.ts)
+
+Current header behavior:
+- admins can switch the active dashboard lot from the header control
+- non-admin roles now see an assigned-lot summary instead of a selectable location switcher
 
 ### Access Control
 
@@ -104,6 +109,27 @@ Primary files:
 - [app/api/operator/locations/route.ts](./app/api/operator/locations/route.ts)
 - [lib/operatorAdminAccess.ts](./lib/operatorAdminAccess.ts)
 
+### Customer Oversight
+
+The `Customer Oversight` page is admin-only.
+
+It supports:
+- reviewing customer contact details already available through Supabase Auth metadata
+- summarizing recent reservation, session, payment, and lot history across all locations
+- surfacing customer-versus-dashboard identity overlap when a customer also exists in `admin_user_roles`
+- keeping the surface read-only so customer support visibility does not silently become an account-mutation tool
+
+Current limitations:
+- customer display names only appear when current Supabase Auth metadata or dashboard-role records already provide them
+- vehicle history is derived from reservation plate numbers rather than a dedicated cross-customer fleet view
+- refunds, customer edits, and support-ticket workflows are still future work
+
+Primary files:
+- [app/dashboard/customers/page.tsx](./app/dashboard/customers/page.tsx)
+- [app/api/operator/customers/route.ts](./app/api/operator/customers/route.ts)
+- [lib/customerOversight.ts](./lib/customerOversight.ts)
+- [lib/operatorAdminAccess.ts](./lib/operatorAdminAccess.ts)
+
 ### Parking Map
 
 The live map is now the main lot operations surface.
@@ -154,9 +180,11 @@ Primary files:
 - [components/dashboard/recent-reservations.tsx](./components/dashboard/recent-reservations.tsx)
 - [components/dashboard/operation-detail-sheet.tsx](./components/dashboard/operation-detail-sheet.tsx)
 
-### Admin Tools
+### Operator Tools
 
-Admin tooling is location-scoped and preview-driven.
+The UI labels this surface `Operator Tools`, while the route path remains `/dashboard/admin-tools` for continuity.
+
+It is location-scoped and preview-driven.
 
 Supported actions:
 - reconciliation
@@ -179,9 +207,9 @@ Capabilities are defined in:
 Current capability split:
 
 - `admin`
-  - full dashboard access, all-lot visibility, and operator assignment management
+  - full dashboard access, all-lot visibility, operator assignment management, and customer oversight
 - `operator`
-  - assigned-lot operational write access
+  - assigned-lot operational write access plus reconciliation visibility
 - `support`
   - assigned-lot read-only operational visibility
 - `finance`

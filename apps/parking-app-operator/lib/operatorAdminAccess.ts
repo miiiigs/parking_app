@@ -304,6 +304,55 @@ export async function findAuthUserByEmail({
   return null;
 }
 
+export async function listAuthUsersByIds({
+  url,
+  serviceRoleKey,
+  userIds,
+  adminClient,
+}: {
+  url: string;
+  serviceRoleKey: string;
+  userIds: string[];
+  adminClient?: AuthAdminClientLike;
+}) {
+  if (userIds.length === 0) {
+    return [] as AuthUserLookup[];
+  }
+
+  const remainingIds = new Set(userIds);
+  const matchedUsers: AuthUserLookup[] = [];
+  const client = adminClient ?? getAuthAdminClient(url, serviceRoleKey);
+
+  let page = 1;
+  const perPage = 200;
+
+  while (remainingIds.size > 0) {
+    const { data, error } = await client.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      throw new Error(`Unable to look up Supabase Auth users (${error.message}).`);
+    }
+
+    for (const user of data.users) {
+      if (remainingIds.has(user.id)) {
+        matchedUsers.push(toAuthUserLookup(user));
+        remainingIds.delete(user.id);
+      }
+    }
+
+    if (data.users.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return matchedUsers;
+}
+
 export async function inviteAuthUserByEmail({
   url,
   serviceRoleKey,

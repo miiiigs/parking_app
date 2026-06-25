@@ -162,6 +162,43 @@ export interface AuditListResponse {
   };
 }
 
+export interface CustomerOversightItem {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  dashboardRole: 'admin' | 'operator' | 'support' | 'finance' | null;
+  hasDashboardAccess: boolean;
+  latestLocationId: string | null;
+  latestLocationName: string | null;
+  visitedLocationNames: string[];
+  recentVehiclePlates: string[];
+  totalReservations: number;
+  activeReservations: number;
+  completedReservations: number;
+  noShowReservations: number;
+  activeSessions: number;
+  completedSessions: number;
+  latestReservationAt: TimestampValue | null;
+  latestSessionAt: TimestampValue | null;
+  latestPaymentStatus: PaymentRecord['status'] | null;
+  latestPaymentAmount: number | null;
+  latestPaidAt: TimestampValue | null;
+  latestActivityAt: TimestampValue | null;
+}
+
+export interface CustomerOversightResponse {
+  items: CustomerOversightItem[];
+  pagination: PaginationMeta;
+  summary: {
+    totalCustomers: number;
+    activeCustomers: number;
+    dashboardOverlapCount: number;
+    missingContactCount: number;
+  };
+  limitations: string[];
+}
+
 export interface User {
   id: string;
   email?: string;

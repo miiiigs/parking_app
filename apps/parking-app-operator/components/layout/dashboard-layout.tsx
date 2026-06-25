@@ -14,12 +14,12 @@ import {
   ScanLine,
   Clock,
   CreditCard,
-  Eye,
   Map,
-  MapPinned,
-  UsersRound,
   Zap,
+  Eye,
   ShieldCheck,
+  UsersRound,
+  MapPinned,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -31,13 +31,14 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3, capability: 'view-dashboard' as const },
   { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock, capability: 'view-reservations' as const },
   { name: 'Parking Actions', href: '/dashboard/parking-actions', icon: ScanLine, capability: 'edit-slot-status' as const },
-  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
+  { name: 'Parking Setup', href: '/dashboard/parking-setup', icon: CreditCard, capability: 'manage-pricing' as const },
   { name: 'Parking Map', href: '/dashboard/map', icon: Map, capability: 'view-parking-map' as const },
   { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap, capability: 'edit-map-layout' as const },
-  { name: 'Manage Parking Lots', href: '/dashboard/manage-parking-lots', icon: MapPinned, capability: 'manage-operator-access' as const },
-  { name: 'Parking Setup', href: '/dashboard/parking-setup', icon: CreditCard, capability: 'manage-pricing' as const },
+  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
+  { name: 'Operator Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
   { name: 'Access Control', href: '/dashboard/access-control', icon: UsersRound, capability: 'manage-operator-access' as const },
-  { name: 'Admin Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
+  { name: 'Customer Oversight', href: '/dashboard/customers', icon: UsersRound, capability: 'manage-operator-access' as const },
+  { name: 'Manage Parking Lots', href: '/dashboard/manage-parking-lots', icon: MapPinned, capability: 'manage-operator-access' as const },
 ];
 
 interface DashboardLayoutProps {
@@ -47,7 +48,7 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, fullWidth = false }: DashboardLayoutProps) {
   const pathname = usePathname();
-  const { user, activeLocation } = useAuth();
+  const { user } = useAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
@@ -167,15 +168,15 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
           </button>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
             <LocationSwitcher />
-            <div className="min-w-0 text-right">
-              <div className="truncate text-sm font-medium text-foreground">{activeLocation?.name ?? 'No location selected'}</div>
-              <div className="text-sm text-muted-foreground">
+            <div className="text-right">
+              <div className="text-sm font-medium text-foreground">
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',
                 })}
               </div>
+              <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{user?.role ?? 'dashboard'}</div>
             </div>
           </div>
         </header>
@@ -185,7 +186,7 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
         {/* Page Content */}
         <main className="flex-1 overflow-auto bg-background">
           <div
-            key={activeLocation?.id ?? 'no-location'}
+            key="dashboard-content"
             className={fullWidth ? 'w-full p-4 sm:p-6' : 'mx-auto w-full max-w-[1600px] p-4 sm:p-6'}
           >
             {children}

@@ -44,6 +44,7 @@ export default function AdminToolsPage() {
   const metrics = data?.metrics ?? null;
   const canRunReconciliation = hasOperatorCapability(user?.role, 'run-reconciliation');
   const canResetSlots = hasOperatorCapability(user?.role, 'reset-slot-statuses');
+  const canManagePricing = hasOperatorCapability(user?.role, 'manage-pricing');
 
   const latestRun = reconciliationRuns[0] ?? null;
 
@@ -136,9 +137,9 @@ export default function AdminToolsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Admin Tools</h1>
+          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Operator Tools</h1>
           <p className="text-muted-foreground">
-            Operational controls ported from the hardened admin workflow.
+            Location-scoped operational controls for reconciliation and guarded corrective actions.
           </p>
         </div>
 
@@ -224,18 +225,22 @@ export default function AdminToolsPage() {
 
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-foreground">Parking Setup Moved</CardTitle>
+            <CardTitle className="text-lg font-semibold text-foreground">Parking Setup</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <p className="text-sm text-foreground">Pricing, rates, and grace periods now live on their own page.</p>
+              <p className="text-sm text-foreground">Pricing, rates, and grace periods stay on their own lot-scoped page.</p>
               <p className="text-sm text-muted-foreground">
-                Use Parking Setup to manage billing rules without mixing them into reconciliation and reset actions.
+                {canManagePricing
+                  ? 'Use Parking Setup to manage billing rules without mixing them into reconciliation and reset actions.'
+                  : 'Pricing changes stay in the admin-only Parking Setup page and are intentionally separate from operator reconciliation work.'}
               </p>
             </div>
-            <Button asChild variant="outline" className="min-w-[180px]">
-              <Link href="/dashboard/parking-setup">Open Parking Setup</Link>
-            </Button>
+            {canManagePricing ? (
+              <Button asChild variant="outline" className="min-w-[180px]">
+                <Link href="/dashboard/parking-setup">Open Parking Setup</Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
 

@@ -2,21 +2,21 @@
 
 Use this file as the quick human-readable reset note for the current working session.
 
-## Current Reset Snapshot
+## Current Snapshot
 
-- `Session date`: `2026-06-24`
-- `Workflow state`: active, reorganized, and planner-ready
+- `Session date`: `2026-06-25`
+- `Workflow state`: `active, automation-aligned, and planner-ready`
 - `Current baton owner`: `Planner`
-- `Current cycle`: `2026-06-24-cycle-004-admin-operator-identity-multilot`
-- `Primary live objective`: choose the next repo-executable slice after the accepted Track K foundation review
+- `Current cycle`: `2026-06-25-cycle-009-track-k-customer-oversight`
+- `Primary live objective`: `choose the next highest-value repo or staging slice after the accepted Track K customer-oversight implementation`
 - `Automation cadence`: `Heartbeat dispatcher configured for every 5 minutes`
-- `Automation status`: `PAUSED`
+- `Automation status`: `SAFE TO RUN`
 
-## What Changed In This Session
+## What The Automation Already Completed
 
-### Workflow organization
+### Workflow system and automation
 
-- Reorganized the `workflow/` package by usage:
+- Reorganized the reusable workflow into clearer folders:
   - `workflow/guide/`
   - `workflow/planning/`
   - `workflow/runtime/`
@@ -24,129 +24,152 @@ Use this file as the quick human-readable reset note for the current working ses
   - `workflow/manual/`
   - `workflow/personas/`
   - `workflow/temp/`
-- Added folder-level `README.md` files so each workflow area is easier to understand in a fresh thread or another project.
-- Updated the main workflow map in [workflow/README.md](../README.md).
+- Kept the planner, developer, and reviewer baton flow intact while making the workflow easier to reuse in other projects.
+- Added manual-support paths for:
+  - debugger investigation
+  - suggestions and improvement intake
+  - temp session notes and temp implementation notes
+- Updated the reviewer contract so each accepted cycle now leaves a clearer testing expectation snapshot with `Done`, `Partial`, and `Missing`.
+- Kept the automation dispatcher aligned to a fixed-cadence heartbeat model with a `5 minute` schedule.
 
-### Manual support additions
+### Product and platform progress accepted by reviewer
 
-- Added the reusable debugger support path:
-  - [DEBUGGER_CALL_TEMPLATE.md](../manual/DEBUGGER_CALL_TEMPLATE.md)
-  - [DEBUGGER_OUTPUT_LOG.md](../logs/DEBUGGER_OUTPUT_LOG.md)
-  - [DEBUGGER_PERSONA.md](../personas/DEBUGGER_PERSONA.md)
-- Added the reusable suggestions and improvements path:
-  - [SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md](../manual/SUGGESTIONS_AND_IMPROVEMENTS_TEMPLATE.md)
-  - [SUGGESTIONS_AND_IMPROVEMENTS_LOG.md](../logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md)
-- Planner guidance now explicitly allows future cycles to consider:
-  - active debugger findings
-  - manually captured suggestions and small improvement requests
+- Accepted the backend-owned gate-entry flow and entry confirmation path.
+- Accepted the first `Parking Actions` operator surface for entry scan and manual entry verification fallback.
+- Accepted operator-location assignment enforcement so privileged actions require real lot assignment.
+- Accepted the admin-versus-operator control-plane foundation.
+- Accepted admin-only `Access Control` for dashboard-role provisioning and operator assignment management.
+- Accepted admin-managed parking-lot management and selected-lot `Parking Setup` separation.
+- Accepted multi-lot seeded development data and shared location parity direction.
+- Accepted invitation-based dashboard-account onboarding support for new dashboard users.
+- Accepted the operator/admin navigation cleanup:
+  - operator-only operational menu visibility
+  - admin-only control-plane entries hidden from operators
+  - `Admin Tools` relabeled to `Operator Tools` for operator-facing use
+  - non-admin location switcher removed
+  - admin lot switcher readability improved
+  - agreed left-navigation order applied
+- Accepted the first admin-only `Customer Oversight` surface with read-only customer activity visibility and dashboard-account overlap visibility.
 
-### Workflow contract updates
+## Reviewer-Aligned Status Summary
 
-- The full operating guide was kept as the main durable explanation in [THREE_PERSONA_DEVELOPMENT_WORKFLOW.md](../guide/THREE_PERSONA_DEVELOPMENT_WORKFLOW.md).
-- The automation specification now reflects the reorganized folder structure in [CODEX_AUTOMATION_DISPATCHER_SPEC.md](../guide/CODEX_AUTOMATION_DISPATCHER_SPEC.md).
-- The live dispatcher heartbeat cadence is now `5 minutes` instead of `20 minutes`.
-- Persona contracts were aligned to the new paths under `planning`, `runtime`, `logs`, and `manual`.
-- Active workflow references were normalized so the current live files point to the new structure instead of the older root-level layout.
-- Reviewer guidance now explicitly reads debugger and suggestion logs and records whether they should be retained, completed, absorbed, rejected, or reset.
-- The review template now includes explicit `Debugger log disposition` and `Suggestion log disposition` fields.
-- The developer prompt file now contains the new Track K brief for admin/operator identity separation, admin-managed lot assignment, dashboard-versus-customer account boundaries, and multi-lot parity.
+### Done and accepted in repo
 
-### Founder reprioritization
+- `Track D`: reservation entry QR and backend-confirmed gate-entry activation foundation
+- `Track H`: first operator `Parking Actions` page for entry verification and manual fallback
+- `Track K`: admin/operator identity separation foundation
+- `Track K`: admin-only `Access Control`
+- `Track K`: operator-to-location assignment management route and flow
+- `Track K`: admin-managed parking-lot creation and editing
+- `Track K`: selected-lot-only `Parking Setup`
+- `Track K`: admin-side operator or dashboard account provisioning support
+- `Track K`: non-admin assigned-lot-only visibility behavior
+- `Track K`: multi-lot development seed baseline
+- `Track K`: admin-only customer oversight page and API
+- `Track K`: navigation and location-control cleanup requested in suggestions
 
-- A new highest-priority request now overrides the prior review continuation:
-  - turn `parking-app-operator` into the shared admin-and-operator control app with explicit role separation
-  - keep `admin@example.com` as the current bootstrap admin for non-production
-  - distinguish dashboard identities from customer mobile identities
-  - let admin manage all lots and operator-to-lot assignments
-  - add at least two more parking lots and align backend, operator, and mobile location behavior
-- The tracker now records this as the top queue item under `Track K`.
-- Planner issued the first Track K developer brief and handed the baton to `Developer`.
-- Developer implemented the first Track K foundation slice and handed the baton to `Reviewer`.
-- Reviewer approved that Track K foundation slice with follow-ups and handed the baton to `Planner`.
-- Existing Parking Actions review, staging assignment rehearsal, exit-contract work, and cleanup rollout remain queued after this new planning slice.
+### Partial or still needs proof
 
-### Project audit and cleanup
+- Admin lot management is built in repo but still needs non-production Supabase proof.
+- Dashboard-account invitation flow is built in repo but still needs live invite delivery and first-login validation.
+- Customer oversight is built in repo but still needs real-data staging proof.
+- Multi-lot parity is implemented in repo directionally, but still needs real end-to-end validation across dashboard, backend, and mobile.
+- Gate-entry and assignment enforcement are implemented in repo, but real staging scan scenarios and operator validation are still pending.
+- `admin@example.com` is still only a non-production bootstrap convention and still needs a production-safe replacement path.
 
-- Rechecked the project against the master plan across mobile, operator/admin, Supabase, workflow state, usability, backend integration, and commercial readiness.
-- Removed stale tracked root files that duplicated or confused the monorepo app entry points:
-  - `App.js`
-  - `index.js`
-  - `app.json`
-  - `_ReservationScreen.orig.tsx`
-- Removed generated root build/test logs:
-  - `apk-build*.log`
-  - `mobile-tests*.log`
-- Updated the root README, mobile readiness checklist, operator readiness checklist, Supabase rollout guidance, project document index, master plan, and tracker so they reflect the current gate-entry-first reality.
+### Missing or not yet completed
 
-## Product And Cycle State
+- Backend paid-exit authorization contract
+- Exit QR verification lifecycle
+- Exit grace, penalty, and compensation behavior
+- Full customer-support workflows beyond read-only oversight
+- Broader admin analytics and observability surfaces
+- Production bootstrap-admin replacement
+- Full staging bootstrap and rollback rehearsal
+- Real scanner hardware proof
+- Full real-device production-style validation
 
-### Product direction currently in force
+## What Reviewer Says You Should Do Manually
 
-- `MASTER_PRODUCTION_PLAN.md` remains the controlling product contract.
-- The intended customer flow is still gate-entry-first:
-  - reservation or walk-in entry pass is scanned by gate or operator
-  - backend confirmation becomes authoritative
-  - mobile observes backend session state instead of self-starting it
-  - parking grace, metered timing, exit grace, penalties, compensation, and billing remain part of the broader lifecycle
+- Deploy and verify the current Supabase SQL and environment baseline in a non-production environment.
+- Verify `Access Control`, `Manage Parking Lots`, and selected-lot `Parking Setup` against real Supabase-backed dashboard accounts.
+- Test invited or newly provisioned dashboard users end to end, including first login and correct role behavior.
+- Create and verify real operator-to-location assignments before relying on gate-entry actions.
+- Confirm the new `/dashboard/customers` customer oversight surface against real reservation, session, payment, and auth data.
+- Rehearse the staging bootstrap and rollback flow from the current environment baseline.
+- Validate the real scanner or operator scanning client against the gate-entry flow.
+- Re-run the mobile Android launch and real-device checks where the debugger and release readiness notes still require manual confirmation.
 
-### Active implementation state
+## What You Should Test Next
 
-- Gate-entry confirmation is now implemented as a privileged backend transition with:
-  - durable entry confirmation
-  - parking grace timing
-  - slot occupancy mutation
-  - operator audit output
-  - duplicate-scan idempotency
-- The operator API route exists for reservation and walk-in entry-pass confirmation.
-- The operator dashboard now exposes a `Parking Actions` page with browser/manual entry verification, plus manual fallback actions from reservation and session detail views.
-- Mobile no longer starts the session directly; it waits for and hydrates the backend-created session.
-- Reviewer-requested rework was implemented so:
-  - exact persisted operator-to-location assignment is required before privileged gate mutation
-  - terminal or completed rescans now fail instead of replaying as success
-- Reviewer approved the gate-entry rework with follow-ups, then Planner reprioritized around the higher-priority founder request and handed the baton to `Developer`.
-- The active tracker now records the repo-side rework as accepted while keeping staging proof, assignment provisioning, and scanner-client integration open.
-- The active suggestion backlog now contains an operator-side `Parking Actions` improvement request for entry scan, exit scan, and manual QR confirmation flows.
-- That suggestion has been marked `Absorbed into brief` because it was the basis of the just-completed entry-side Parking Actions developer cycle.
-- The active suggestion backlog now also contains a new highest-priority request for admin-versus-operator separation, operator assignment control, and multi-lot parity, and this now outranks the current review/staging queue.
-- The debugger log remains intentionally active because the Metro startup fix still needs one manual native launch confirmation on a real emulator or device before it should be reset.
-- The operator dashboard now has an admin-only `Access Control` surface and `/api/operator/location-assignments` route for server-backed operator-to-lot assignment management.
-- Non-admin dashboard location context is now filtered by explicit `operator_location_assignments` rows; admins retain all active locations.
-- Operator capabilities were narrowed so `operator` keeps assigned-lot parking operations but no longer receives admin-only pricing, reconciliation, reset, map-layout, or assignment-management powers.
-- `supabase/seed.sql` now includes three non-production lots: `BGC Pilot Site`, `Makati Business Hub`, and `Ortigas Center Deck`.
-- Reviewer re-ran `npm --workspace apps/parking-app-operator run test` and confirmed 35 of 35 tests pass on the accepted Track K slice.
+### Highest-value manual testing
 
-## Manual Actions Still Required
+1. Sign in as `admin@example.com` in non-production.
+2. Open `Access Control` and:
+   - invite a new dashboard user
+   - grant or update a dashboard role
+   - assign an operator to a parking lot
+3. Open `Manage Parking Lots` and:
+   - create a new lot
+   - edit an existing lot
+   - verify the lot appears correctly in lot-backed surfaces
+4. Sign in as an operator account and confirm:
+   - only operational pages are visible
+   - no admin-only pages are visible
+   - there is no location switcher
+   - the assigned lot is the only operational context available
+5. Open `Parking Actions` and test valid and invalid entry verification paths.
+6. Open `Customer Oversight` as admin and test:
+   - search
+   - overlap filter behavior
+   - recent lot history
+   - contact-data visibility limits
+7. Validate mobile lot availability and reservation or session location behavior against the updated multi-lot data.
 
-- Deploy the relevant Supabase SQL artifacts in a non-production environment, including:
-  - gate-entry confirmation SQL
-  - operator location assignment SQL
-- Verify the new `/dashboard/access-control` assignment flow against real staging dashboard accounts after the SQL rollout.
-- Provision at least one real operator-to-location assignment before live gate confirmation testing.
-- Rehearse valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scan cases against Supabase.
-- Connect and validate the real gate scanner or operator client against `/api/operator/gate-entry`.
-- Re-run `npm --workspace apps/mobile run android` on the intended emulator or device to fully close the Metro debugger item before resetting the debugger log.
-- Keep Track A environment bootstrap and rollback rehearsal open.
-- Keep Track C scheduler rollout and real-device mobile validation open.
+### Scenario coverage still worth checking
 
-## Planner Intake Notes For The Next Run
+- valid scan
+- duplicate active scan
+- expired QR
+- cancelled reservation
+- completed reservation
+- wrong-location attempt
+- unauthorized operator-location attempt
+- concurrent scan behavior
 
-- The baton is now intentionally on `Planner`, so the next automation should choose the next highest-value repo-executable slice rather than continue reviewer work.
-- The accepted Track K foundation slice does not remove the need for staging assignment proof, production-safe admin bootstrap replacement, or broader admin control-plane follow-up.
-- The `Parking Actions` suggestion remains partially open and should stay queued after the new identity and multi-lot slice because exit verification still lacks a backend contract.
-- The debugger log should not be cleared yet because its remaining emulator/device check is still manual and unconfirmed.
-- Exit scan should remain visibly planned or disabled until a backend paid-exit authorization contract exists.
+## What Your Suggestions Are Covered By
 
-## Validation Run In This Session
+### Covered already
 
-- `git diff --check`: passed with line-ending warnings only.
-- `npm --workspace apps/mobile run test`: passed 37 of 37 tests.
-- `npm --workspace apps/mobile run typecheck`: passed.
-- `npm --workspace apps/parking-app-operator run test`: passed 32 of 32 tests.
-- `npm --workspace apps/parking-app-operator run build`: passed.
-- `npm --workspace apps/parking-app-operator run test`: passed 35 of 35 tests after the Track K slice.
-- `npm --workspace apps/parking-app-operator run build`: passed after the Track K slice.
-- `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests after the Track K seed update.
-- `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only after the Track K slice.
+- Admin-versus-operator separation is now materially implemented.
+- Admin can manage parking lots from the dashboard.
+- `Parking Setup` is now scoped to the currently selected lot.
+- Managed parking-lot editing no longer depends on reusing the create form as the main edit pattern.
+- Operator-facing navigation was cleaned up and reordered.
+- Admin-only control-plane entries are separated from operator-visible operations.
+- Operator account provisioning emphasis has already been absorbed into the implemented admin control-plane work.
+- Customer oversight for admin now exists as a first read-only support surface.
+
+### Covered partially
+
+- End-to-end multi-lot parity is only partially proven because staging proof is still pending.
+- Operator-account onboarding exists in repo, but live invite flow still needs testing.
+- Parking Actions currently covers entry-side handling better than exit-side handling.
+
+### Still not covered yet
+
+- Full exit QR processing
+- paid-exit authorization contract
+- richer dispute, compensation, and manual exception flows
+- broader customer support actions such as edits, refunds, or deeper account tooling
+- production-safe admin bootstrap replacement
+
+## Best Next Automation Focus
+
+- `Track K` staging proof for the accepted admin control-plane and customer-oversight foundations
+- `Track D` and `Track H` staging proof for assignment-backed gate-entry flows
+- `Track A` staging bootstrap and rollback rehearsal
+- `Track D` repo follow-up for paid-exit authorization and exit verification lifecycle
 
 ## Source Of Truth For The Next Run
 
@@ -163,13 +186,12 @@ Use this file as the quick human-readable reset note for the current working ses
 
 ## Reset Notes
 
-- This file is a temporary session summary, not the durable source of truth.
-- Historical developer and reviewer details remain in the logs.
-- Older root-level workflow path references may still appear inside historical log entries; the live workflow files now use the reorganized structure.
-- After commit and acknowledgment, this file can be cleared manually to mark the next clean session start.
+- This file is a temporary human summary, not the durable source of truth.
+- Reviewer history remains authoritative in `workflow/logs/AI_REVIEWER_REMARKS.md`.
+- After commit and acknowledgment, this file can be cleared manually when you want a fresh next-session reset.
 
 ## Suggested Commit Message
 
 ```text
-feat(parking): align gate-entry workflow and prepare operator parking actions
+feat(workflow): consolidate automation progress and align admin control-plane follow-ups
 ```

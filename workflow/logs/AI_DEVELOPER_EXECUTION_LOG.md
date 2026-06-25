@@ -623,3 +623,69 @@ Do not use this file as the strategic roadmap or the active priority board.
 
 - `Recommended next move`:
   Reviewer should verify that the new onboarding route and UI stay admin-only, preserve the existing-user provisioning path, keep `admin_user_roles` as the actual dashboard access gate, and update the tracker and docs truthfully without implying live invitation proof or bootstrap-admin completion.
+
+### 2026-06-25 - Finalize Operator/Admin Navigation And Location Visibility
+
+- `Current move/task`:
+  Implement the next Track K repo slice so the operator dashboard navigation, location control, and operational-tools labeling match the accepted admin-versus-operator direction without reopening the accepted admin-only control-plane foundations.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K foundations in place: admin-only `Access Control`, admin-only `Manage Parking Lots`, selected-lot `Parking Setup`, invitation-based dashboard onboarding, durable operator-to-lot assignment enforcement, and non-admin location scoping in backend or dashboard data reads.
+  The tracker and planner brief already identified the remaining gap precisely: the live repo still used the old sidebar order, still labeled the reconciliation surface `Admin Tools`, and still rendered a selectable location switcher for non-admin roles.
+
+- `What I completed now`:
+  Reordered `apps/parking-app-operator/components/layout/dashboard-layout.tsx` to the agreed operational-first sequence and kept admin-only control-plane entries grouped at the end.
+  Renamed the operator-facing reconciliation surface to `Operator Tools` in the live menu and page copy while intentionally keeping the route path at `/dashboard/admin-tools` for minimal routing risk.
+  Reworked `apps/parking-app-operator/components/layout/location-switcher.tsx` so admins keep a clearer, more readable active-lot selector, while non-admin roles now see an assigned-lot summary instead of a selectable switcher.
+  Simplified the top-bar location area so the location control itself carries the lot context and the duplicate lot-name readout is removed.
+  Narrowly restored `run-reconciliation` to the `operator` role in `apps/parking-app-operator/lib/operatorPermissions.ts` so non-admin operators can reach the renamed `Operator Tools` surface without regaining pricing, assignment, map-layout, or other admin-only powers.
+  Updated `apps/parking-app-operator/app/dashboard/admin-tools/page.tsx` copy to match the new `Operator Tools` label and hid the `Parking Setup` shortcut from non-admin users while keeping the pricing explanation truthful.
+  Updated focused contract coverage and capability tests so the new order, labeling, non-admin no-switcher behavior, and narrow reconciliation reachability are checked in repo tests.
+  Updated the operator README, readiness checklist, and active execution tracker so the durable docs now reflect the final navigation and location-control behavior truthfully.
+  A production build refreshed `apps/parking-app-operator/next-env.d.ts` from the development routes reference to the current `.next/types/routes.d.ts` reference during Next.js route typing.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 42 of 42 tests, including the updated navigation, location-control, and capability assertions.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/dashboard/admin-tools`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Mobile automated tests were not rerun in this slice because the work stayed inside the operator dashboard, its docs, and workflow artifacts.
+
+- `Still open`:
+  The route path still remains `/dashboard/admin-tools` for continuity even though the UI label is now `Operator Tools`; reviewer should confirm that this minimal-risk choice is acceptable for the current slice.
+  Live Supabase proof for invitation onboarding, lot-management flows, role-assignment staging rehearsal, bootstrap-admin replacement, scanner hardware validation, and exit-contract work all remain external or future-cycle follow-ups.
+  Broader customer-oversight tooling and admin analytics remain outside this repo slice.
+
+- `Recommended next move`:
+  Reviewer should verify the final sidebar order, non-admin no-switcher behavior, improved admin switcher readability, narrow operator reconciliation capability, stable `/dashboard/admin-tools` route choice, and truthful docs or tracker wording.
+
+### 2026-06-25 - Add Admin Customer Oversight Surface
+
+- `Current move/task`:
+  Implement the next Track K repo slice by adding an admin-only customer oversight surface in `parking-app-operator` so admins can review customer contact, activity, lot history, payment state, and dashboard-account overlap without direct SQL.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K control-plane foundations in place: admin-only `Access Control`, invitation-backed dashboard onboarding, durable operator-to-lot assignment enforcement, dedicated `Manage Parking Lots`, selected-lot `Parking Setup`, final operator-admin navigation separation, and shared reservation, session, payment, location, and dashboard-role data sources.
+  The planner brief was also correct that `reservations.user_id` and the existing Supabase auth-admin helpers already gave the repo enough foundation for a first read-only customer oversight slice.
+
+- `What I completed now`:
+  Added `apps/parking-app-operator/app/api/operator/customers/route.ts` as an admin-only service-role-backed route that reads reservations, sessions, payments, slot-to-location mappings, dashboard-role overlap, and Supabase Auth user metadata into a paginated customer oversight response.
+  Added `apps/parking-app-operator/lib/customerOversight.ts` so customer aggregation, activity rollups, payment summarization, plate history, and visited-location shaping stay testable outside the route.
+  Extended `apps/parking-app-operator/lib/operatorAdminAccess.ts` with `listAuthUsersByIds` so the new oversight route can safely look up customer email, phone, and display-name metadata through the Supabase Admin API.
+  Added `apps/parking-app-operator/app/dashboard/customers/page.tsx` as an admin-only read-only control-plane surface with search, overlap filtering, pagination, summary cards, explicit data-limit notices, and responsive customer activity views.
+  Updated `apps/parking-app-operator/components/layout/dashboard-layout.tsx` so `Customer Oversight` is grouped with the admin-only control plane in navigation without changing non-admin visibility.
+  Added `apps/parking-app-operator/tests/customerOversight.test.mjs`, expanded `apps/parking-app-operator/tests/routeContractCoverage.test.js`, and updated `apps/parking-app-operator/package.json` so the new aggregation and route-contract coverage are actually included in the operator test suite.
+  Updated `apps/parking-app-operator/README.md`, `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`, `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`, and `workflow/temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md` so the repo and workflow docs now describe the new surface, its data sources, and its intentional limits truthfully.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 43 of 43 tests after adding the new customer oversight aggregation test and route-contract coverage.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/api/operator/customers` and `/dashboard/customers`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Statically verified the new route stays admin-only, the page stays read-only, navigation keeps the surface grouped with admin-only entries, and the UI explicitly communicates current data boundaries instead of implying deeper support tooling already exists.
+
+- `Still open`:
+  The new page still needs non-production Supabase proof against real customer, reservation, and auth data.
+  Customer display names remain limited to whatever Supabase Auth metadata or dashboard-role records already provide; this slice does not invent a richer customer profile system.
+  Broader customer-support workflows, admin analytics, bootstrap-admin replacement, and the Track D paid-exit contract remain outside this repo slice.
+
+- `Recommended next move`:
+  Reviewer should verify the new customer oversight route and page are truly admin-only and read-only, confirm the customer-versus-dashboard overlap behavior is accurate and not overstated, and make sure the tracker or checklist now point next to staging proof rather than another repo customer-oversight slice.
