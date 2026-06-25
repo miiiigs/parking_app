@@ -54,6 +54,55 @@ test('gate entry route is authenticated, location-scoped, and invokes the servic
   assert.equal(routeSchemas.includes('operatorGateEntryRouteRequestSchema'), true);
 });
 
+test('parking actions ui exposes entry verification and keeps exit verification explicitly blocked', () => {
+  const layout = readSource('../components/layout/dashboard-layout.tsx');
+  const parkingActionsPage = readSource('../app/dashboard/parking-actions/page.tsx');
+  const detailSheet = readSource('../components/dashboard/operation-detail-sheet.tsx');
+  const parkingActionControls = readSource('../components/dashboard/parking-action-controls.tsx');
+
+  assert.equal(layout.includes("/dashboard/parking-actions"), true);
+  assert.equal(layout.includes("capability: 'edit-slot-status'"), true);
+  assert.equal(parkingActionsPage.includes('/api/operator/gate-entry'), true);
+  assert.equal(parkingActionsPage.includes('Scan QR'), true);
+  assert.equal(parkingActionsPage.includes('Verify Entry QR'), true);
+  assert.equal(parkingActionsPage.includes('Verify Exit QR'), true);
+  assert.equal(parkingActionsPage.includes('backend exit authorization contract exists'), true);
+  assert.equal(detailSheet.includes('Parking Actions'), true);
+  assert.equal(parkingActionControls.includes('Entry QR verified.'), true);
+  assert.equal(parkingActionControls.includes('Verify Exit QR'), true);
+});
+
+test('access control is admin-only and manages durable operator lot assignments server-side', () => {
+  const layout = readSource('../components/layout/dashboard-layout.tsx');
+  const accessControlPage = readSource('../app/dashboard/access-control/page.tsx');
+  const assignmentsRoute = readSource('../app/api/operator/location-assignments/route.ts');
+  const dashboardAccountsRoute = readSource('../app/api/operator/dashboard-accounts/route.ts');
+  const locationServer = readSource('../lib/operatorLocationServer.ts');
+  const permissions = readSource('../lib/operatorPermissions.ts');
+  const seedSql = readSource('../../../supabase/seed.sql');
+
+  assert.equal(layout.includes('/dashboard/access-control'), true);
+  assert.equal(layout.includes("capability: 'manage-operator-access'"), true);
+  assert.equal(accessControlPage.includes('/api/operator/location-assignments'), true);
+  assert.equal(accessControlPage.includes('/api/operator/dashboard-accounts'), true);
+  assert.equal(accessControlPage.includes('Invite or Grant Dashboard Access'), true);
+  assert.equal(accessControlPage.includes('Admin access required'), true);
+  assert.equal(assignmentsRoute.includes("operatorUser?.role === 'admin'"), true);
+  assert.equal(assignmentsRoute.includes('createOperatorLocationAssignment'), true);
+  assert.equal(assignmentsRoute.includes('deleteOperatorLocationAssignment'), true);
+  assert.equal(assignmentsRoute.includes('admin_audit_log'), true);
+  assert.equal(dashboardAccountsRoute.includes("operatorUser?.role === 'admin'"), true);
+  assert.equal(dashboardAccountsRoute.includes('findAuthUserByEmail'), true);
+  assert.equal(dashboardAccountsRoute.includes('inviteAuthUserByEmail'), true);
+  assert.equal(dashboardAccountsRoute.includes('upsertDashboardRoleAccount'), true);
+  assert.equal(dashboardAccountsRoute.includes('admin_audit_log'), true);
+  assert.equal(locationServer.includes("currentUser.role !== 'admin'"), true);
+  assert.equal(locationServer.includes('listOperatorLocationAssignments'), true);
+  assert.equal(permissions.includes("'manage-operator-access'"), true);
+  assert.equal(seedSql.includes('Makati Business Hub'), true);
+  assert.equal(seedSql.includes('Ortigas Center Deck'), true);
+});
+
 test('admin tools route keeps only reconciliation and slot reset actions in production', () => {
   const adminToolsRoute = readSource('../app/api/operator/admin-tools/route.ts');
 
@@ -97,11 +146,26 @@ test('reservations and audit pages use server-backed pagination and export paths
 test('parking setup lives on its own page instead of the admin tools screen', () => {
   const adminToolsPage = readSource('../app/dashboard/admin-tools/page.tsx');
   const parkingSetupPage = readSource('../app/dashboard/parking-setup/page.tsx');
+  const manageParkingLotsPage = readSource('../app/dashboard/manage-parking-lots/page.tsx');
+  const dashboardLayout = readSource('../components/layout/dashboard-layout.tsx');
   const pricingPanel = readSource('../components/dashboard/pricing-settings-panel.tsx');
+  const locationManagementPanel = readSource('../components/dashboard/location-management-panel.tsx');
 
   assert.equal(adminToolsPage.includes('Parking Pricing'), false);
+  assert.equal(dashboardLayout.includes('/dashboard/manage-parking-lots'), true);
+  assert.equal(dashboardLayout.includes("capability: 'manage-operator-access'"), true);
+  assert.equal(manageParkingLotsPage.includes('Manage Parking Lots'), true);
+  assert.equal(manageParkingLotsPage.includes('LocationManagementPanel'), true);
   assert.equal(parkingSetupPage.includes('Parking Setup'), true);
+  assert.equal(parkingSetupPage.includes('Manage Parking Lots'), true);
   assert.equal(parkingSetupPage.includes('PricingSettingsPanel'), true);
+  assert.equal(parkingSetupPage.includes('LocationManagementPanel'), false);
+  assert.equal(parkingSetupPage.includes('Selected dashboard lot'), true);
   assert.equal(pricingPanel.includes('/api/operator/admin-tools'), true);
   assert.equal(pricingPanel.includes('Grace Periods'), true);
+  assert.equal(locationManagementPanel.includes('/api/operator/locations'), true);
+  assert.equal(locationManagementPanel.includes('Create Parking Lot'), true);
+  assert.equal(locationManagementPanel.includes('Edit Managed Parking Lot'), true);
+  assert.equal(locationManagementPanel.includes('Save selected lot'), true);
+  assert.equal(locationManagementPanel.includes('/dashboard/parking-setup'), true);
 });

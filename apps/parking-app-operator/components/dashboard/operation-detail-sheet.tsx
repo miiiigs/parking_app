@@ -3,6 +3,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  ReservationParkingActions,
+  SessionParkingActions,
+} from '@/components/dashboard/parking-action-controls';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -214,6 +218,13 @@ export function ReservationDetailSheet({
               </div>
 
               <div className="space-y-3">
+                <div className="text-sm font-semibold text-foreground">Parking Actions</div>
+                <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                  <ReservationParkingActions reservation={reservation} />
+                </div>
+              </div>
+
+              <div className="space-y-3">
                 <div className="text-sm font-semibold text-foreground">Linked Session</div>
                 {linkedSession ? (
                   <div className="rounded-lg border border-border bg-secondary/20 p-4">
@@ -320,6 +331,13 @@ export function SessionDetailSheet({
                 <DetailBlock label="Ended At" value={formatDateTime(session.endedAt)} />
                 <DetailBlock label="Billed Amount" value={formatCurrency(session.amount)} />
                 <DetailBlock label="Linked Reservation" value={reservation?.reservationId ?? 'No linked reservation'} />
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-foreground">Parking Actions</div>
+                <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                  <SessionParkingActions session={session} reservation={reservation} />
+                </div>
               </div>
 
               <div className="space-y-3">

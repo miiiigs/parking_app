@@ -1,5 +1,8 @@
 import { cookies } from 'next/headers';
 
+import type { AuthenticatedOperatorUser } from './operatorAuth';
+import { getCurrentOperatorUser } from './operatorAuth';
+import { listOperatorLocationAssignments } from './operatorLocationAccess';
 import { getOperatorSupabaseConfig } from './supabase';
 import {
   fetchOperatorLocations,
@@ -23,24 +26,51 @@ export type OperatorLocationContext = {
   selectedLocationId: string | null;
 };
 
-export async function resolveOperatorLocationContext(): Promise<OperatorLocationContext> {
+function emptyLocationContext(): OperatorLocationContext {
+  return {
+    locations: [],
+    activeLocation: null,
+    selectedLocationId: null,
+  };
+}
+
+export async function resolveOperatorLocationContext(operatorUser?: AuthenticatedOperatorUser | null): Promise<OperatorLocationContext> {
   const config = getOperatorSupabaseConfig();
   if (!config?.url || !config.serviceRoleKey) {
-    return {
-      locations: [],
-      activeLocation: null,
-      selectedLocationId: null,
-    };
+    return emptyLocationContext();
+  }
+
+  const currentUser = operatorUser ?? await getCurrentOperatorUser();
+  if (!currentUser) {
+    return emptyLocationContext();
   }
 
   const cookieStore = await cookies();
   const selectedLocationId = cookieStore.get(OPERATOR_LOCATION_COOKIE)?.value ?? null;
   const headers = getServiceHeaders(config.serviceRoleKey);
-  const locations = await fetchOperatorLocations(config.url, headers);
-  const activeLocation = pickOperatorLocation(locations, selectedLocationId);
+  const allLocations = await fetchOperatorLocations(config.url, headers);
+
+  if (currentUser.role !== 'admin') {
+    const assignments = await listOperatorLocationAssignments({
+      url: config.url,
+      serviceRoleKey: config.serviceRoleKey,
+      userId: currentUser.id,
+    });
+    const assignedLocationIds = new Set(assignments.map((assignment) => assignment.location_id));
+    const scopedLocations = allLocations.filter((location) => assignedLocationIds.has(location.id));
+    const activeLocation = pickOperatorLocation(scopedLocations, selectedLocationId);
+
+    return {
+      locations: scopedLocations,
+      activeLocation,
+      selectedLocationId: activeLocation?.id ?? null,
+    };
+  }
+
+  const activeLocation = pickOperatorLocation(allLocations, selectedLocationId);
 
   return {
-    locations,
+    locations: allLocations,
     activeLocation,
     selectedLocationId: activeLocation?.id ?? null,
   };

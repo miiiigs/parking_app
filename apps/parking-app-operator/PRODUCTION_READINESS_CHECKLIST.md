@@ -1,6 +1,6 @@
 # Parking App Operator Production Readiness Checklist
 
-Last reassessed: 2026-06-08
+Last reassessed: 2026-06-25
 
 ## Completed In This Pass
 
@@ -22,6 +22,18 @@ Last reassessed: 2026-06-08
   - [app/api/operator/layout/route.ts](./app/api/operator/layout/route.ts)
   - [app/api/operator/slots/route.ts](./app/api/operator/slots/route.ts)
   - [app/api/operator/admin-tools/route.ts](./app/api/operator/admin-tools/route.ts)
+- [x] Add the service-role-backed gate-entry confirmation API with durable operator/location assignment checks.
+- [x] Add an operator-facing Parking Actions page that calls the gate-entry API for entry scan/manual confirmation.
+- [x] Add an admin-only Access Control page and server route for operator-to-lot assignment management.
+- [x] Add admin-side parking-lot management backed by `locations` with operator-side active-location refresh after lot changes.
+- [x] Add dashboard-role provisioning for existing Supabase Auth users through the admin-only Access Control page.
+- [x] Add invitation-based dashboard auth-user onboarding from the admin-only Access Control page so provisioning no longer depends on a pre-created Supabase Auth account.
+- [x] Scope non-admin dashboard location context to explicit `operator_location_assignments` rows.
+- [ ] Keep exit scan/confirmation actions blocked until the backend paid-exit authorization contract exists.
+- [ ] Prove admin-managed assignment creation/removal against a non-production Supabase project.
+- [ ] Prove admin-managed lot create, update, deactivate, and reactivation flows against a non-production Supabase project.
+- [ ] Prove dashboard-role provisioning and invitation-based onboarding against real Supabase Auth users in a non-production project.
+- [ ] Validate at least three active seeded lots across operator and mobile surfaces in staging.
 - [ ] Break the dashboard contract into dedicated paginated endpoints for reservations, payments, audit logs, and reconciliation history instead of one large aggregate payload.
 - [ ] Add structured error logging and request correlation IDs for operator API routes.
 - [ ] Add idempotency protection for high-risk writes such as map apply, rollback, slot resets, and status changes.
@@ -50,6 +62,9 @@ Last reassessed: 2026-06-08
 
 ## Suggested Next Features
 
+- [ ] Complete the backend paid-exit authorization contract so the now-visible exit scan and manual verification surface can become real.
+- [ ] Full non-production proof for invitation delivery, first sign-in completion, and bootstrap-admin replacement.
+- [ ] Broader admin customer-oversight tooling beyond assignments, lot management, and dashboard roles.
 - [ ] Shift handoff log with unresolved issues and operator notes.
 - [ ] Real audit export with CSV or PDF download history.
 - [ ] Alerting for slot or session mismatches and realtime degradation.

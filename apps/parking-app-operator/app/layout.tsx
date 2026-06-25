@@ -39,7 +39,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   const initialUser = await getCurrentOperatorUser()
-  const locationContext = await resolveOperatorLocationContext()
+  const locationContext = await resolveOperatorLocationContext(initialUser)
 
   return (
     <html lang="en" className="dark">

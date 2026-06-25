@@ -1,8 +1,0 @@
-{
-  "plugins": [
-    "expo-secure-store"
-  ],
-  "android": {
-    "package": "com.miiigs.smartparkingreservationsystem"
-  }
-}

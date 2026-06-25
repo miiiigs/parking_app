@@ -28,6 +28,31 @@ The previous debugger log was accepted and cleared by review.
 
 ## Active Debug Session
 
+### 2026-06-25 - Admin hardening SQL rerun fails on existing trigger
+
+- `Issue summary`:
+  Running `supabase/admin_hardening.sql` failed with `ERROR: 42710: trigger "set_admin_user_roles_updated_at" for relation "admin_user_roles" already exists`.
+- `Why debugger was called`:
+  Manual Supabase setup was blocked by a repeat-run failure in a core hardening script that should be safe to reapply in non-production environments.
+- `Scope inspected`:
+  `workflow/planning/MASTER_PRODUCTION_PLAN.md`, `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`, `workflow/runtime/AI_WORKFLOW_STATE.md`, `workflow/logs/DEBUGGER_OUTPUT_LOG.md`, `supabase/admin_hardening.sql`, `supabase/schema.sql`, and `supabase/README.md`.
+- `Observed root cause`:
+  `supabase/admin_hardening.sql` created the `set_admin_user_roles_updated_at` trigger unconditionally even though the rest of the file already uses `drop trigger if exists ...` for rerunnable audit-trigger setup. On a second run, Postgres rejected the duplicate trigger creation.
+- `What was changed`:
+  Added `drop trigger if exists set_admin_user_roles_updated_at on admin_user_roles;` immediately before recreating the trigger in `supabase/admin_hardening.sql`.
+- `Validation run`:
+  Re-read the patched SQL and confirmed the failing trigger now uses the same idempotent drop-and-recreate pattern as the other triggers in the file.
+  Verified the relevant trigger definitions in `supabase/admin_hardening.sql` now appear in safe rerunnable pairs.
+- `Manual actions still required`:
+  Re-run `supabase/admin_hardening.sql` in Supabase.
+  If that succeeds, continue with the next SQL files in the documented order and note any further non-idempotent objects that surface.
+- `Residual risk or follow-up`:
+  This fixes the reported trigger collision only. A real non-production Supabase bootstrap rehearsal is still needed to catch any other migration-order or repeat-run gaps across the broader SQL baseline.
+- `Suggested planner note`:
+  Treat this as a migration-discipline hardening fix under Track A and Track K follow-up work, not as a completed staging proof.
+- `Resolution status`:
+  `Patched, manual validation required`
+
 ### 2026-06-23 - Expo Android startup crash from Metro watching sibling Next build output
 
 - `Issue summary`:

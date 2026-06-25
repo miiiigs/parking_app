@@ -32,5 +32,8 @@ Project-specific technical evidence, rollout guides, design decisions, environme
 - [apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md](../apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md)
   Operator dashboard production-readiness checklist.
 
+- [supabase/README.md](../supabase/README.md)
+  Supabase bootstrap, RLS, walk-in cleanup, and gate-entry confirmation rollout guidance.
+
 - [ANDROID_BUILD_CHECKLIST.md](../ANDROID_BUILD_CHECKLIST.md)
   Root-level Android build checklist currently used by the repo.

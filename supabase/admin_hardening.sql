@@ -6,6 +6,7 @@ create table if not exists admin_user_roles (
   updated_at timestamptz not null default now()
 );
 
+drop trigger if exists set_admin_user_roles_updated_at on admin_user_roles;
 create trigger set_admin_user_roles_updated_at
 before update on admin_user_roles
 for each row execute function set_updated_at();

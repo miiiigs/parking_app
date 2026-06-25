@@ -98,6 +98,38 @@ export const operatorGateEntryRouteRequestSchema = z.object({
   entryPass: z.string().trim().min(1),
 });
 
+const uuidString = z.string().trim().uuid();
+const operatorRoleSchema = z.enum(['admin', 'operator', 'support', 'finance']);
+const managedLocationString = z.string().trim().min(1).max(160);
+
+export const operatorLocationAssignmentRouteRequestSchema = z.object({
+  userId: uuidString,
+  locationId: uuidString,
+});
+
+export const operatorDashboardAccountProvisionRouteRequestSchema = z.object({
+  email: z.string().trim().email(),
+  role: operatorRoleSchema,
+  displayName: z.string().trim().max(120).optional().default(''),
+});
+
+export const operatorLocationCreateRouteRequestSchema = z.object({
+  name: managedLocationString,
+  code: z.string().trim().min(1).max(40),
+  address: managedLocationString,
+  city: managedLocationString,
+  isActive: z.boolean().optional().default(true),
+});
+
+export const operatorLocationUpdateRouteRequestSchema = z.object({
+  locationId: uuidString,
+  name: managedLocationString,
+  code: z.string().trim().min(1).max(40),
+  address: managedLocationString,
+  city: managedLocationString,
+  isActive: z.boolean(),
+});
+
 export const operatorAdminToolsRouteRequestSchema = z.object({
   action: z.enum(['reconcile', 'reset-slots', 'update-pricing']),
   preview: z.boolean().optional().default(false),

@@ -8,6 +8,7 @@ export type OperatorCapability =
   | 'edit-slot-status'
   | 'edit-map-layout'
   | 'manage-pricing'
+  | 'manage-operator-access'
   | 'run-reconciliation'
   | 'reset-slot-statuses';
 
@@ -20,6 +21,7 @@ const ROLE_CAPABILITIES: Record<OperatorRole, OperatorCapability[]> = {
     'edit-slot-status',
     'edit-map-layout',
     'manage-pricing',
+    'manage-operator-access',
     'run-reconciliation',
     'reset-slot-statuses',
   ],
@@ -29,10 +31,6 @@ const ROLE_CAPABILITIES: Record<OperatorRole, OperatorCapability[]> = {
     'view-audit',
     'view-parking-map',
     'edit-slot-status',
-    'edit-map-layout',
-    'manage-pricing',
-    'run-reconciliation',
-    'reset-slot-statuses',
   ],
   support: ['view-dashboard', 'view-reservations', 'view-audit', 'view-parking-map'],
   finance: ['view-dashboard', 'view-reservations', 'view-audit'],

@@ -65,6 +65,10 @@ The operator webapp currently covers:
 - pricing settings and reconciliation utilities
 - location context, layout safety, and operator permission logic
 
+Current structural limit:
+
+- the webapp still behaves mostly like one shared operations surface, not yet as a clearly separated `admin plus operator` control plane with distinct global versus lot-scoped powers
+
 ### Backend and data platform
 
 The backend currently includes:
@@ -107,10 +111,11 @@ This is the intended production flow the app should align to:
 
 - [~] Environment and deployment discipline exists in fragments, but the durable production operating layer needs to be re-solidified
 - [~] Reservation lifecycle is backend-aware, but some customer-facing fallback or sample-data behavior still needs production-safe tightening
-- [~] The repo now presents entry-pass-first reservation and walk-in UX, but gate confirmation, session activation authority, and grace or penalty enforcement are not yet fully backend-owned
+- [~] The repo now presents entry-pass-first reservation and walk-in UX, and repo-side backend gate confirmation with parking-grace session activation has been accepted; production scanner integration, staging execution, exit grace, penalty, and compensation enforcement remain open
 - [~] Walk-in flow is significantly more real than before, but timeout automation and full operator visibility are not complete
 - [~] Mobile UI and UX are broad in coverage, but launch-quality error copy, recovery states, and field-validated scanning UX are not complete
 - [~] Operator web UX is operationally meaningful, but heavy views, detail actions, and high-volume ergonomics still need hardening
+- [~] Admin and operator role concepts exist, but the app still needs explicit admin-versus-operator separation, admin-managed lot assignment, and clearer customer-versus-dashboard account boundaries
 - [~] Security posture has real foundations, but rate limiting, abuse protection, secret review, and end-to-end hardening are unfinished
 - [~] Observability exists only as early state surfaces and partial realtime visibility, not as a production telemetry stack
 - [~] Commercial billing logic exists only as a foundation, not as a gateway-backed settlement system
@@ -118,7 +123,8 @@ This is the intended production flow the app should align to:
 ### Confirmed not done
 
 - [ ] Real payment provider integration and finance-safe settlement lifecycle
-- [ ] Gate-entry QR activation, parking grace timing, and exit-grace QR expiry aligned end to end in production code
+- [ ] Gate-entry QR activation has a reviewed backend contract, but scanner-client integration, staging proof, paid-exit grace, and exit-grace QR expiry are not yet aligned end to end in production code
+- [ ] The dashboard still needs a production-safe admin control plane for global lot management, operator-account assignment, and customer-versus-dashboard identity boundaries
 - [ ] Server-owned expiry, no-show, and housekeeping automation
 - [ ] Full production-safe environment, rollback, and release discipline
 - [ ] End-to-end security hardening for mobile, webapp, privileged routes, and SQL functions
@@ -130,7 +136,8 @@ This is the intended production flow the app should align to:
 
 - [ ] Broad commercial rollout is not yet safe
 - [ ] Payments remain operationally incomplete for real-money production use
-- [ ] Current repo flow is closer to the intended gate-entry-first lifecycle, but still lacks backend-owned operator or gate confirmation, exit-authorization QR handling, and automated penalty or compensation enforcement
+- [ ] Current repo flow now has a repo-accepted backend-owned operator gate confirmation contract, but still lacks an operator scanner client, exit-authorization QR handling, and automated penalty or compensation enforcement
+- [ ] The current webapp still needs explicit `admin` versus `operator` experience separation, admin-managed operator assignment, and shared mobile/backend multi-lot parity before broader operations can be trusted
 - [ ] Walk-in lifecycle still needs server housekeeping and richer operator visibility before it can be trusted at scale
 - [ ] Penalty, compensation, and support escalation behavior are not yet modeled end to end as backend-owned commercial flows
 - [ ] Some environment or rollout documentation was intentionally removed as outdated and now needs current-state replacement
@@ -237,6 +244,8 @@ Already done:
 
 Still required:
 - [ ] Finalize production auth posture for customer launch
+- [ ] Separate customer mobile identities from operator/admin dashboard identities and define whether shared-account overlap is allowed
+- [ ] Define the bootstrap admin path and the production-safe operator/admin provisioning model
 - [ ] Review all privileged server routes and service-role usage for least privilege
 - [ ] Audit `security definer` SQL functions for production safety
 - [ ] Add rate limiting and abuse protections for auth, reservation, walk-in, and operator actions
@@ -266,7 +275,7 @@ Already done:
 
 Still required:
 - [ ] Tighten reservation concurrency and slot-state race handling
-- [ ] Model gate-entry confirmation, parking grace, metered-session start, paid-exit grace, and penalty states as backend-authoritative transitions
+- [~] Model gate-entry confirmation, parking grace, metered-session start, paid-exit grace, and penalty states as backend-authoritative transitions. Gate-entry and parking-grace activation are implemented in repo; paid-exit grace and penalty states remain open.
 - [ ] Complete server-owned expiry, no-show, and stale-state cleanup behavior
 - [ ] Ensure walk-in inventory rules cannot corrupt reserved inventory
 - [ ] Ensure all status transitions remain backend-authoritative under retries and partial failures
@@ -328,8 +337,11 @@ Already done:
 
 Still required:
 - [ ] Break heavy aggregate views into paginated or more specialized data contracts
+- [ ] Split the shared operations app into explicit `admin` and `operator` experiences, where admin owns all-lot control and operators stay restricted to assigned locations
+- [ ] Add admin-managed parking-lot assignment and operator-account management so normal lot assignment does not require direct SQL
+- [ ] Add multi-lot parity across backend, mobile, and dashboard surfaces, including at least two more testing lots in backend-backed data
 - [ ] Add richer detail drawers, operator notes, and safe destructive-action approval flows
-- [ ] Add gate-entry, conflict, compensation, and exit-overstay visibility plus operator exception actions
+- [ ] Add operator-facing Parking Actions for entry scan, manual gate confirmation, conflict, compensation, exit scan, and exit-overstay exception handling
 - [ ] Add shift handoff, unresolved issue logging, and incident communication UX
 - [ ] Improve resilience and ergonomic behavior for high-volume operational use
 - [ ] Improve degraded-state banners, fallback handling, and realtime failure visibility
@@ -521,13 +533,13 @@ What must happen before pilot:
 ### 3. Gate-entry and exit QR lifecycle is not yet aligned in production code
 
 Risk:
-- the product still relies on app-side continuation and incomplete backend authority instead of a full gate-confirmed and exit-authorized lifecycle
+- the product now has backend authority for gate entry in repo code, but still lacks the operator-facing scanner client, live staging proof, and full exit-authorized lifecycle
 
 Impact:
 - trust loss, wrong-slot friction, operator rescue burden, and unclear penalty handling
 
 What must happen before pilot:
-- one backend-owned gate-entry, grace-period, payment, exit, penalty, and recovery contract with real-device validation
+- one operator-usable gate-entry scan path, staging-proven backend confirmation, grace-period, payment, exit, penalty, and recovery contract with real-device validation
 
 ### 4. Walk-in is closer to production than before, but not finished
 
@@ -630,23 +642,23 @@ What must happen before pilot:
 ## Suggested Immediate Execution Order
 
 1. Re-solidify Phase 1 environment and release operations now that outdated docs were intentionally removed.
-2. Complete Phase 3 and Phase 4 hardening around the intended gate-entry, grace-period, penalty, and customer failure lifecycle.
-3. Finish Phase 5 and Phase 7 gaps around walk-in operator visibility and server housekeeping.
-4. Build Phase 6 real payment integration and finance-safe settlement.
-5. Build Phase 8 observability and incident readiness before any live commercial traffic.
-6. Run Phase 9 real-device validation and release discipline.
-7. Execute Phase 10 controlled pilot readiness.
+2. Connect the accepted gate-entry backend contract to an operator-facing Parking Actions scan and manual confirmation surface.
+3. Complete Phase 3 and Phase 4 hardening around exit authorization, grace periods, penalties, compensation, and customer failure lifecycle.
+4. Finish Phase 5 and Phase 7 gaps around walk-in operator visibility and server housekeeping.
+5. Build Phase 6 real payment integration and finance-safe settlement.
+6. Build Phase 8 observability and incident readiness before any live commercial traffic.
+7. Run Phase 9 real-device validation and release discipline.
+8. Execute Phase 10 controlled pilot readiness.
 
 ## First Automated Workflow Cycle Recommendation
 
-The first planner cycle after this plan refresh should focus on:
+The next planner cycle after the accepted gate-entry backend slice should focus on:
 
-- reconciling [ACTIVE_EXECUTION_TRACKER.md](./ACTIVE_EXECUTION_TRACKER.md) with this updated master plan and the current repo reality
-- deciding whether the first implementation cycle should target:
-  - Phase 1 environment and release operations re-solidification, or
-  - Phase 3 or Phase 7 walk-in and housekeeping completion
+- turning the reviewed gate-entry API into an operator-facing Parking Actions entry scan and manual confirmation workflow
+- keeping exit scan visible as a planned flow while blocking actual exit confirmation on a backend-owned paid-exit authorization contract
+- preserving Track A staging bootstrap, SQL deployment, and concurrency rehearsal as explicit manual follow-ups
 
-That first cycle should not assume the older tracker wording is still fully aligned with the refreshed plan.
+That cycle should not imply that exit authorization, payments, penalties, or live database proof are complete.
 
 ## Validation Baseline For This Plan Update
 

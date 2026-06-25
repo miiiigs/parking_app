@@ -17,18 +17,21 @@ It is the primary mobile app in the repository.
 - [x] Auth screen and login route
 - [x] Notification scheduling and workflow recovery foundation
 - [x] Receipt capture and save flow
+- [x] Entry-pass-first reservation and walk-in UX that waits for backend gate/operator confirmation before session activation
+- [x] Parking-grace session display based on backend session fields when available
 
 ## In progress
 
 - [ ] Replace the remaining sample-only UI assumptions with backend-first data
-- [ ] Add camera-based QR scanning for on-site validation
+- [ ] Validate the gate-entry-first reservation, walk-in, session, payment, exit, and receipt journey on real Android hardware
 - [ ] Add receipt sharing/export parity beyond local save
 - [ ] Add payment backend integration
 - [ ] Add route-level and device-level tests
 
 ## Next
 
-- [ ] Build the backend contract for reservations, sessions, and payments
+- [ ] Remove stale slot-validation scanner expectations from production-facing copy and tests where gate-entry-first behavior is now canonical
 - [ ] Replace prototype UI copy and placeholders with production-facing UX
 - [ ] Add location-aware live refresh and realtime sync
 - [ ] Add customer history, receipt archive, and notification preferences
+- [ ] Connect payment and exit authorization UX to a real backend/payment provider contract
