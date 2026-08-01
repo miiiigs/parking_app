@@ -205,7 +205,7 @@ export default function AccessControlPage() {
         ) : null}
 
         {isAdmin ? (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 2xl:grid-cols-2">
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -329,7 +329,7 @@ export default function AccessControlPage() {
         ) : null}
 
         {isAdmin ? (
-          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="grid gap-4 2xl:grid-cols-[0.9fr_1.1fr]">
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-lg">Current Dashboard Accounts</CardTitle>

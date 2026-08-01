@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { formatParkingPricingSummary } from '@parking/shared';
 import { formatTime } from '../../../utils/format';
+import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 
 type ArrivalStage = 'qr' | 'cancelled';
 
@@ -17,6 +18,7 @@ function formatCurrency(amount: number) {
 
 export default function ArrivalScreen() {
   const router = useRouter();
+  const { horizontalPadding, isCompact } = useResponsiveMetrics();
   const booking = useParkingFlowStore((state) => state.booking);
   const session = useParkingFlowStore((state) => state.session);
   const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
@@ -26,6 +28,7 @@ export default function ArrivalScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const isPollingRef = useRef(false);
 
   useEffect(() => {
     if (hasHydrated && !booking && !session) {
@@ -38,6 +41,45 @@ export default function ArrivalScreen() {
       router.replace('/session');
     }
   }, [router, session]);
+
+  useEffect(() => {
+    if (!booking?.reservationId || session) {
+      return;
+    }
+
+    let active = true;
+
+    const pollForConfirmation = async () => {
+      if (!active || isPollingRef.current) {
+        return;
+      }
+
+      try {
+        isPollingRef.current = true;
+        const confirmedSession = await refreshSession();
+        if (active && confirmedSession) {
+          router.replace('/session');
+        }
+      } catch {
+        // Keep silent background polling non-disruptive; manual checks surface errors.
+      } finally {
+        isPollingRef.current = false;
+      }
+    };
+
+    const initialTimer = setTimeout(() => {
+      void pollForConfirmation();
+    }, 1200);
+    const intervalId = setInterval(() => {
+      void pollForConfirmation();
+    }, 5000);
+
+    return () => {
+      active = false;
+      clearTimeout(initialTimer);
+      clearInterval(intervalId);
+    };
+  }, [booking?.reservationId, refreshSession, router, session]);
   const reservation = booking ?? session;
 
   const entryQrValue = useMemo(() => {
@@ -56,6 +98,7 @@ export default function ArrivalScreen() {
   const cancellationCharge = reservationFee / 2;
   const releaseAmount = reservationFee - cancellationCharge;
   const pricingSummary = formatParkingPricingSummary(reservation.pricingConfig);
+  const qrSize = isCompact ? 148 : 164;
   const reservationStartTime = formatTime(reservation.createdAt);
   const reservationExpiryTime = reservation.expiresAt
     ? formatTime(reservation.expiresAt)
@@ -95,7 +138,7 @@ export default function ArrivalScreen() {
 
   if (stage === 'cancelled') {
     return (
-      <View style={styles.cancelledRoot}>
+      <SafeAreaView style={styles.cancelledRoot}>
         <View style={styles.cancelledIcon}>
           <X color="#DC2626" size={32} strokeWidth={2.4} />
         </View>
@@ -109,14 +152,14 @@ export default function ArrivalScreen() {
           <InfoRow label="Status" value="Released" valueTone="danger" />
         </View>
         <AuthActionButton label="Back to Home" onPress={() => router.replace('/home')} style={styles.fullWidthButton} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.confirmScroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.confirmHeader}>
+        <View style={[styles.confirmHeader, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 20 : 24 }]}>
           <View style={styles.confirmHeaderIcon}>
             <Check color="#FFFFFF" size={24} strokeWidth={2.8} />
           </View>
@@ -124,10 +167,10 @@ export default function ArrivalScreen() {
           <Text style={styles.confirmHeaderCopy}>Your slot is secured and your entry pass is ready for gate validation.</Text>
         </View>
 
-        <View style={styles.confirmContent}>
+        <View style={[styles.confirmContent, { paddingHorizontal: horizontalPadding }]}>
           <View style={styles.qrCard}>
             <View style={styles.qrFrame}>
-              <QRCode value={entryQrValue} size={164} color="#1E293B" backgroundColor="#FFFFFF" />
+              <QRCode value={entryQrValue} size={qrSize} color="#1E293B" backgroundColor="#FFFFFF" />
             </View>
             <View style={styles.qrCodeBadge}>
               <Text style={styles.qrCodeBadgeText}>{reservation.reservationCode}</Text>
@@ -156,6 +199,8 @@ export default function ArrivalScreen() {
               After entry is confirmed, your active session begins immediately and uses the lot&apos;s entry grace period while you proceed to your slot.
             </Text>
           </View>
+
+          <Text style={styles.syncHint}>This screen checks for operator or gate confirmation automatically every few seconds.</Text>
 
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
@@ -196,7 +241,7 @@ export default function ArrivalScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -242,14 +287,12 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   confirmContent: {
-    paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 28,
     gap: 14,
   },
   confirmHeader: {
     alignItems: 'center',
-    paddingTop: 24,
     paddingBottom: 18,
     backgroundColor: '#ECFDF5',
     borderBottomWidth: 1,
@@ -391,6 +434,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+  },
+  syncHint: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   fullWidthButton: {
     width: '100%',

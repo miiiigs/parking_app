@@ -24,6 +24,23 @@ This is the primary mobile app in the repository.
 2. `npm --workspace apps/mobile run start`
 3. `npm --workspace apps/mobile run android` or `npm --workspace apps/mobile run ios`
 
+## PayMongo Test Setup
+
+1. Add your PayMongo public test key to `apps/mobile/.env`:
+   `EXPO_PUBLIC_PAYMONGO_PUBLIC_KEY=pk_test_...`
+2. Set your PayMongo secret test key for the deployed Supabase Edge Function:
+   `npx supabase secrets set PAYMONGO_SECRET_KEY=sk_test_...`
+3. Deploy the payment function:
+   `npx supabase functions deploy paymongo-checkout`
+4. Restart the Expo dev server after changing `.env` so the app picks up the public key.
+
+## Current Payment Flow
+
+- Cards use PayMongo Payment Intents and stay inside the app unless PayMongo or the issuing bank requires 3DS authentication.
+- GCash and Maya still open their approval flow outside the app, then return to the payment screen.
+- QR Ph generates inside the app, can be scanned by a wallet or banking app, and can also be saved to photos for testing.
+- For production, register PayMongo webhooks for `payment.paid` and `payment.failed` so paid sessions can be confirmed server-to-server.
+
 ## Structure
 
 - `app/` route entrypoints for Expo Router

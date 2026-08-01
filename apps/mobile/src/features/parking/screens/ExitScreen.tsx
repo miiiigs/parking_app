@@ -15,7 +15,7 @@ function formatCurrency(amount: number) {
 
 export default function ExitScreen() {
   const router = useRouter();
-  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
   const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const paymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
@@ -39,7 +39,7 @@ export default function ExitScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
           <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View style={styles.heroHeader}>
+            <View style={[styles.heroHeader, { marginHorizontal: -horizontalPadding }, isCompact ? styles.heroHeaderCompact : null]}>
               <View style={styles.successBubble}>
                 <Check color="#FFFFFF" size={30} strokeWidth={2.8} />
               </View>
@@ -50,7 +50,7 @@ export default function ExitScreen() {
             <View style={styles.content}>
               <View style={styles.qrCard}>
                 <View style={styles.qrFrame}>
-                  <QRCode value={completedSession.exitCode} size={130} color="#0F766E" backgroundColor="#FFFFFF" />
+                  <QRCode value={completedSession.exitCode} size={isCompact ? 118 : 130} color="#0F766E" backgroundColor="#FFFFFF" />
                 </View>
 
                 <View style={styles.exitCodeBadge}>
@@ -123,7 +123,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1FAE5',
     borderBottomWidth: 1,
     borderBottomColor: '#A7F3D0',
-    marginHorizontal: -16,
+  },
+  heroHeaderCompact: {
+    paddingTop: 24,
+    paddingBottom: 20,
   },
   successBubble: {
     width: 64,
@@ -144,6 +147,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 30,
     fontFamily: 'Poppins_700Bold',
+    textAlign: 'center',
   },
   successCopy: {
     color: '#64748B',
@@ -151,6 +155,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: 'Poppins_400Regular',
     marginTop: 6,
+    textAlign: 'center',
   },
   content: {
     gap: 16,
@@ -185,6 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
   },
   noticeChip: {
     marginTop: 14,
@@ -237,6 +243,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+    flex: 1,
+    minWidth: 0,
   },
   ticketValue: {
     color: '#1E293B',

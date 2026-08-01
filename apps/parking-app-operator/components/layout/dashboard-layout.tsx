@@ -14,12 +14,12 @@ import {
   ScanLine,
   Clock,
   CreditCard,
-  Eye,
   Map,
-  MapPinned,
-  UsersRound,
   Zap,
+  Eye,
   ShieldCheck,
+  UsersRound,
+  MapPinned,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -31,13 +31,14 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3, capability: 'view-dashboard' as const },
   { name: 'Live Reservations', href: '/dashboard/reservations', icon: Clock, capability: 'view-reservations' as const },
   { name: 'Parking Actions', href: '/dashboard/parking-actions', icon: ScanLine, capability: 'edit-slot-status' as const },
-  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
+  { name: 'Parking Setup', href: '/dashboard/parking-setup', icon: CreditCard, capability: 'manage-pricing' as const },
   { name: 'Parking Map', href: '/dashboard/map', icon: Map, capability: 'view-parking-map' as const },
   { name: 'Map Builder', href: '/dashboard/map-builder', icon: Zap, capability: 'edit-map-layout' as const },
-  { name: 'Manage Parking Lots', href: '/dashboard/manage-parking-lots', icon: MapPinned, capability: 'manage-operator-access' as const },
-  { name: 'Parking Setup', href: '/dashboard/parking-setup', icon: CreditCard, capability: 'manage-pricing' as const },
+  { name: 'Audit Trail', href: '/dashboard/audit', icon: Eye, capability: 'view-audit' as const },
+  { name: 'Operator Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
   { name: 'Access Control', href: '/dashboard/access-control', icon: UsersRound, capability: 'manage-operator-access' as const },
-  { name: 'Admin Tools', href: '/dashboard/admin-tools', icon: ShieldCheck, capability: 'run-reconciliation' as const },
+  { name: 'Customer Oversight', href: '/dashboard/customers', icon: UsersRound, capability: 'manage-operator-access' as const },
+  { name: 'Manage Parking Lots', href: '/dashboard/manage-parking-lots', icon: MapPinned, capability: 'manage-operator-access' as const },
 ];
 
 interface DashboardLayoutProps {
@@ -47,7 +48,7 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, fullWidth = false }: DashboardLayoutProps) {
   const pathname = usePathname();
-  const { user, activeLocation } = useAuth();
+  const { user } = useAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
@@ -66,7 +67,7 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       {mobileSidebarOpen ? (
         <button
           type="button"
@@ -78,7 +79,7 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-screen flex-col border-r border-border bg-card transition-all duration-300 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-screen min-h-0 flex-col border-r border-border bg-card transition-all duration-300 ${
           mobileSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full w-64 lg:translate-x-0'
         } lg:relative lg:z-auto`}
         style={{ width: showExpandedSidebar ? '16rem' : '5rem' }}
@@ -107,11 +108,11 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
                   active
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
+                } ${showExpandedSidebar ? 'justify-start' : 'justify-center px-2'}`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 {showExpandedSidebar && <span className="text-sm font-medium">{item.name}</span>}
@@ -152,30 +153,34 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
       {/* Main Content */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-4 sm:px-6">
-          <button
-            onClick={() => setMobileSidebarOpen((current) => !current)}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
-          >
-            {mobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-          <button
-            onClick={() => setSidebarExpanded((current) => !current)}
-            className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:block"
-          >
-            {sidebarExpanded ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
-          </button>
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-            <LocationSwitcher />
-            <div className="min-w-0 text-right">
-              <div className="truncate text-sm font-medium text-foreground">{activeLocation?.name ?? 'No location selected'}</div>
-              <div className="text-sm text-muted-foreground">
+        <header className="flex flex-col gap-3 border-b border-border bg-card px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-center justify-between gap-2 xl:w-auto">
+            <button
+              onClick={() => setMobileSidebarOpen((current) => !current)}
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
+            >
+              {mobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={() => setSidebarExpanded((current) => !current)}
+              className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:block"
+            >
+              {sidebarExpanded ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+            </button>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between xl:justify-end">
+            <div className="min-w-0 sm:flex-1 xl:max-w-[460px]">
+              <LocationSwitcher />
+            </div>
+            <div className="text-left sm:text-right">
+              <div className="text-sm font-medium text-foreground">
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',
                 })}
               </div>
+              <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{user?.role ?? 'dashboard'}</div>
             </div>
           </div>
         </header>
@@ -185,8 +190,8 @@ export function DashboardLayout({ children, fullWidth = false }: DashboardLayout
         {/* Page Content */}
         <main className="flex-1 overflow-auto bg-background">
           <div
-            key={activeLocation?.id ?? 'no-location'}
-            className={fullWidth ? 'w-full p-4 sm:p-6' : 'mx-auto w-full max-w-[1600px] p-4 sm:p-6'}
+            key="dashboard-content"
+            className={fullWidth ? 'w-full p-3 sm:p-6' : 'mx-auto w-full max-w-[1600px] p-3 sm:p-6'}
           >
             {children}
           </div>

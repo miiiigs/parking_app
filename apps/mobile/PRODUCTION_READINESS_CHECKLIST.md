@@ -19,11 +19,14 @@ It is the primary mobile app in the repository.
 - [x] Receipt capture and save flow
 - [x] Entry-pass-first reservation and walk-in UX that waits for backend gate/operator confirmation before session activation
 - [x] Parking-grace session display based on backend session fields when available
+- [x] Launch-critical reservation, arrival, session, and walk-in screens now use responsive padding, safer compact-state stacking, and less overflow-prone action layout for smaller phones
+- [x] Payment, exit, receipt, menu, profile, and payment-method screens now have safer compact wrapping for fee rows, receipt metadata, action controls, wallet/card rows, and account fields
 
 ## In progress
 
 - [ ] Replace the remaining sample-only UI assumptions with backend-first data
 - [ ] Validate the gate-entry-first reservation, walk-in, session, payment, exit, and receipt journey on real Android hardware
+- [ ] Capture live small-phone and tall-phone viewport proof for the responsive reservation, walk-in, payment, exit, receipt, menu, profile, and payment-method screens
 - [ ] Add receipt sharing/export parity beyond local save
 - [ ] Add payment backend integration
 - [ ] Add route-level and device-level tests

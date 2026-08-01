@@ -11,11 +11,12 @@ test('admin has full operator capability set', () => {
   assert.equal(capabilities.includes('view-audit'), true);
 });
 
-test('operator can operate assigned lots but cannot run admin-only controls', () => {
+test('operator can operate assigned lots and reach reconciliation without regaining admin-only controls', () => {
   assert.equal(hasOperatorCapability('operator', 'edit-slot-status'), true);
+  assert.equal(hasOperatorCapability('operator', 'run-reconciliation'), true);
   assert.equal(hasOperatorCapability('operator', 'manage-operator-access'), false);
   assert.equal(hasOperatorCapability('operator', 'manage-pricing'), false);
-  assert.equal(hasOperatorCapability('operator', 'run-reconciliation'), false);
+  assert.equal(hasOperatorCapability('operator', 'reset-slot-statuses'), false);
 });
 
 test('support and finance are read-only', () => {

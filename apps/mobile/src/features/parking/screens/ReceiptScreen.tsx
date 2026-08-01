@@ -18,7 +18,7 @@ function formatCurrency(amount: number) {
 
 export default function ReceiptScreen() {
   const router = useRouter();
-  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const completedSession = useParkingFlowStore((state) => state.completedSession);
   const hasHydrated = useParkingFlowStore((state) => state.hasHydrated);
   const resetFlow = useParkingFlowStore((state) => state.resetFlow);
@@ -122,12 +122,12 @@ export default function ReceiptScreen() {
                 <View style={styles.dashedDivider} />
 
                 <View style={styles.receiptSection}>
-                  <View style={styles.metaRow}>
+                  <View style={[styles.metaRow, isCompact ? styles.metaRowCompact : null]}>
                     <View>
                       <Text style={styles.metaLabel}>RECEIPT NO.</Text>
                       <Text style={styles.metaValue}>{completedSession.receiptNumber}</Text>
                     </View>
-                    <View style={styles.metaRight}>
+                    <View style={[styles.metaRight, isCompact ? styles.metaRightCompact : null]}>
                       <Text style={styles.metaLabel}>DATE & TIME</Text>
                       <Text style={styles.metaDate}>{formatDateTime(completedSession.endTime)}</Text>
                     </View>
@@ -303,9 +303,16 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
+  metaRowCompact: {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+  },
   metaRight: {
     alignItems: 'flex-end',
     flexShrink: 1,
+  },
+  metaRightCompact: {
+    alignItems: 'flex-start',
   },
   metaLabel: {
     color: '#94A3B8',
@@ -344,6 +351,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
+    flex: 1,
+    minWidth: 0,
   },
   receiptRowValue: {
     color: '#1E293B',
@@ -365,12 +374,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+    flex: 1,
+    minWidth: 0,
   },
   amountValue: {
     color: '#1E293B',
     fontSize: 14,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   totalRow: {
     flexDirection: 'row',
@@ -387,12 +400,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 21,
     fontFamily: 'Poppins_700Bold',
+    flex: 1,
   },
   totalValue: {
     color: '#0F766E',
     fontSize: 20,
     lineHeight: 25,
     fontFamily: 'Poppins_700Bold',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   paymentMethodRow: {
     flexDirection: 'row',
@@ -406,12 +422,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
+    flex: 1,
   },
   paymentMethodValue: {
     color: '#1E293B',
     fontSize: 13,
     lineHeight: 18,
     fontFamily: 'Poppins_500Medium',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   footerSection: {
     alignItems: 'center',

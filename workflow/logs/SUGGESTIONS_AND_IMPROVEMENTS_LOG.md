@@ -28,6 +28,43 @@ Use this file for:
 
 ## Active Suggestions
 
+### 2026-06-25 - Full UI/UX, Responsiveness, And Readability Hardening Pass
+
+- `Suggestion summary`:
+  Run a complete UI and UX hardening pass across the mobile app and the shared operator or admin webapp, focusing on responsiveness, readability, spacing, container sizing, and practical screen usability before deeper payment work continues in this workflow.
+- `Why this would help`:
+  The product now has meaningful functional depth, but the next serious quality risk is that some screens or pages may still feel cramped, overflow on smaller sizes, use text that is hard to read, or rely on layouts that are not yet production-comfortable for real users and operators.
+- `Type`:
+  `UX hardening and production-readiness improvement`
+- `Affected area`:
+  `mobile app`, `operator/admin webapp`, `shared UI patterns`, `responsive layout behavior`, and `release-readiness confidence`
+- `Desired outcome`:
+  Audit every important mobile screen and operator or admin page for:
+  responsiveness on realistic device and browser sizes,
+  readable font sizing and contrast,
+  safe spacing and container sizing,
+  no clipped, overlapping, or hidden actions,
+  safe scroll behavior and keyboard behavior,
+  and practical operator usability during real workflows.
+  Fix the most important UI and UX issues in repo code rather than only documenting them.
+  Keep payment implementation out of this workflow priority for now because payment direction will be handled in a separate React Native consultation.
+- `Priority feeling`:
+  `Highest`
+- `Blocking or non-blocking`:
+  `Blocking for the next planner cycle because this should become the immediate workflow focus before lower-priority polish or the deferred payment implementation work`
+- `Extra notes or examples`:
+  This should be treated as a real implementation and validation pass, not just a visual opinion review. The cycle should actively check mobile screens, operator/admin pages, overflow risk, unsafe text sizing, weak contrast, weak spacing, and layout breakage on smaller or tighter viewports.
+- `Suggested planner interpretation`:
+  Treat this as the next highest-priority automation brief.
+  The most concrete next slice should likely be:
+  1. inventory the launch-critical mobile screens and operator/admin pages that need review
+  2. run a repo-backed responsiveness and readability audit
+  3. fix the highest-severity layout, spacing, and legibility issues
+  4. validate the changes with the right builds, tests, and screen checks
+  5. leave payment implementation out of scope for this workflow slice until the separate payment consultation defines direction
+- `Status`:
+  `Absorbed into brief`
+
 ### 2026-06-24 - Admin Versus Operator Separation And Multi-Lot Control
 
 - `Suggestion summary`:

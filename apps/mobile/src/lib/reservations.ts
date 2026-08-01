@@ -647,6 +647,9 @@ export async function endParkingSession(request: {
   reservationId: string;
   billedAmount?: number | null;
   billedMinutes?: number | null;
+  paymentProvider?: 'gcash' | 'maya' | 'manual' | 'paymongo';
+  paymentReference?: string | null;
+  paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
 }) {
   const supabase = getSupabaseClient() as any;
   const useLocalFlow = await shouldUseLocalFlow();
@@ -665,6 +668,9 @@ export async function endParkingSession(request: {
     p_reservation_id: request.reservationId,
     p_billed_minutes: request.billedMinutes ?? null,
     p_billed_amount: request.billedAmount ?? null,
+    p_payment_reference: request.paymentReference ?? undefined,
+    p_payment_provider: request.paymentProvider ?? undefined,
+    p_payment_status: request.paymentStatus ?? undefined,
   });
 
   if (error) {

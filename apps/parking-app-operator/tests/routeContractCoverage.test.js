@@ -72,9 +72,31 @@ test('parking actions ui exposes entry verification and keeps exit verification 
   assert.equal(parkingActionControls.includes('Verify Exit QR'), true);
 });
 
+test('dashboard navigation and location controls reflect the final operator-admin separation', () => {
+  const layout = readSource('../components/layout/dashboard-layout.tsx');
+  const locationSwitcher = readSource('../components/layout/location-switcher.tsx');
+
+  assert.equal(layout.includes('Operator Tools'), true);
+  assert.equal(layout.includes('Customer Oversight'), true);
+  assert.equal(layout.includes('Admin Tools'), false);
+  assert.equal(layout.includes('/dashboard/admin-tools'), true);
+  assert.equal(layout.indexOf('/dashboard/parking-setup') < layout.indexOf('/dashboard/map'), true);
+  assert.equal(layout.indexOf('/dashboard/map') < layout.indexOf('/dashboard/map-builder'), true);
+  assert.equal(layout.indexOf('/dashboard/map-builder') < layout.indexOf('/dashboard/audit'), true);
+  assert.equal(layout.indexOf('/dashboard/audit') < layout.indexOf('/dashboard/admin-tools'), true);
+  assert.equal(layout.indexOf('/dashboard/admin-tools') < layout.indexOf('/dashboard/access-control'), true);
+  assert.equal(layout.indexOf('/dashboard/access-control') < layout.indexOf('/dashboard/customers'), true);
+  assert.equal(layout.indexOf('/dashboard/customers') < layout.indexOf('/dashboard/manage-parking-lots'), true);
+  assert.equal(locationSwitcher.includes("user?.role !== 'admin'"), true);
+  assert.equal(locationSwitcher.includes('Assigned lot'), true);
+  assert.equal(locationSwitcher.includes('Active lot'), true);
+});
+
 test('access control is admin-only and manages durable operator lot assignments server-side', () => {
   const layout = readSource('../components/layout/dashboard-layout.tsx');
   const accessControlPage = readSource('../app/dashboard/access-control/page.tsx');
+  const customersPage = readSource('../app/dashboard/customers/page.tsx');
+  const customersRoute = readSource('../app/api/operator/customers/route.ts');
   const assignmentsRoute = readSource('../app/api/operator/location-assignments/route.ts');
   const dashboardAccountsRoute = readSource('../app/api/operator/dashboard-accounts/route.ts');
   const locationServer = readSource('../lib/operatorLocationServer.ts');
@@ -82,8 +104,16 @@ test('access control is admin-only and manages durable operator lot assignments 
   const seedSql = readSource('../../../supabase/seed.sql');
 
   assert.equal(layout.includes('/dashboard/access-control'), true);
+  assert.equal(layout.includes('/dashboard/customers'), true);
   assert.equal(layout.includes("capability: 'manage-operator-access'"), true);
   assert.equal(accessControlPage.includes('/api/operator/location-assignments'), true);
+  assert.equal(customersPage.includes('/api/operator/customers'), true);
+  assert.equal(customersPage.includes('Customer Oversight'), true);
+  assert.equal(customersPage.includes('Admin access required'), true);
+  assert.equal(customersRoute.includes("operatorUser?.role === 'admin'"), true);
+  assert.equal(customersRoute.includes('listAuthUsersByIds'), true);
+  assert.equal(customersRoute.includes('buildCustomerOversightItems'), true);
+  assert.equal(customersRoute.includes('Only admin users can view customer oversight.'), true);
   assert.equal(accessControlPage.includes('/api/operator/dashboard-accounts'), true);
   assert.equal(accessControlPage.includes('Invite or Grant Dashboard Access'), true);
   assert.equal(accessControlPage.includes('Admin access required'), true);
@@ -105,6 +135,8 @@ test('access control is admin-only and manages durable operator lot assignments 
 
 test('admin tools route keeps only reconciliation and slot reset actions in production', () => {
   const adminToolsRoute = readSource('../app/api/operator/admin-tools/route.ts');
+  const adminToolsPage = readSource('../app/dashboard/admin-tools/page.tsx');
+  const permissions = readSource('../lib/operatorPermissions.ts');
 
   assert.equal(adminToolsRoute.includes('buildScopedReconciliationPlan'), true);
   assert.equal(adminToolsRoute.includes('hasOperatorCapability'), true);
@@ -114,6 +146,9 @@ test('admin tools route keeps only reconciliation and slot reset actions in prod
   assert.equal(adminToolsRoute.includes("event_type: 'reconciliation_completed'"), true);
   assert.equal(adminToolsRoute.includes("'reset-slots'"), true);
   assert.equal(adminToolsRoute.includes("'reset-demo'"), false);
+  assert.equal(adminToolsPage.includes('Operator Tools'), true);
+  assert.equal(adminToolsPage.includes('Pricing changes stay in the admin-only Parking Setup page'), true);
+  assert.equal(permissions.includes("'run-reconciliation'"), true);
 });
 
 test('reservations and audit pages use server-backed pagination and export paths', () => {

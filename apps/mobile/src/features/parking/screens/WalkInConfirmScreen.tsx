@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Car, ChevronDown, ChevronLeft, Check, CreditCard, MapPin, Zap } from 'lucide-react-native';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AuthActionButton, AuthLogo } from '../../auth/components/AuthPrimitives';
 import { getRouteParam } from '../../auth/utils';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
 import { ParkingDataStatusCard } from '../../../components/parking/ParkingDataStatusCard';
 import { VehiclePickerSheet } from '../../../components/parking/VehiclePickerSheet';
+import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
@@ -16,6 +17,7 @@ import { formatParkingPricingSummary } from '@parking/shared';
 export default function WalkInConfirmScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string; slotId?: string }>();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const { lots, isLoading, isRefreshing, status, error, lastSyncedAt, refresh } = useMobileParkingData();
   const { vehicles, selectedVehicle, selectedVehicleId, selectVehicle } = useMobileVehicles();
   const storedPaymentMethod = useWalkInPreferencesStore((state) => state.paymentMethod);
@@ -85,7 +87,7 @@ export default function WalkInConfirmScreen() {
   }
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea}>
       <Stack.Screen
         options={{
           animation: 'none',
@@ -93,7 +95,7 @@ export default function WalkInConfirmScreen() {
         }}
       />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 16 : 20 }]}>
         <View style={styles.headerTopRow}>
           <Pressable onPress={() => router.replace('/home')} style={styles.backButton}>
             <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
@@ -109,22 +111,26 @@ export default function WalkInConfirmScreen() {
         </View>
       </View>
 
-      <View style={styles.modeTabsSection}>
-        <View style={styles.modeTabsShell}>
+      <View style={[styles.modeTabsSection, { paddingHorizontal: horizontalPadding }]}>
+        <View style={[styles.modeTabsShell, isCompact ? styles.modeTabsShellCompact : null]}>
           <Pressable
             onPress={() => router.push({ pathname: '/reservation/[lotId]', params: { lotId: lot.id } })}
-            style={styles.modeTab}
+            style={[styles.modeTab, isCompact ? styles.modeTabCompact : null]}
           >
-            <Text style={styles.modeTabText}>Reserve in Advance</Text>
+            <Text style={[styles.modeTabText, isCompact ? styles.modeTabTextCompact : null]}>Reserve in Advance</Text>
           </Pressable>
-          <Pressable style={[styles.modeTab, styles.modeTabActive]}>
+          <Pressable style={[styles.modeTab, isCompact ? styles.modeTabCompact : null, styles.modeTabActive]}>
             <Zap color="#0F766E" size={12} strokeWidth={2.3} />
-            <Text style={[styles.modeTabText, styles.modeTabTextActive]}>Walk-In Parking</Text>
+            <Text style={[styles.modeTabText, isCompact ? styles.modeTabTextCompact : null, styles.modeTabTextActive]}>Walk-In Parking</Text>
           </Pressable>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 18 : 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.contentFrame, { maxWidth: contentWidth }]}>
         <ParkingDataStatusCard
           status={status}
           error={error}
@@ -236,6 +242,7 @@ export default function WalkInConfirmScreen() {
           })()}
           disabled={!slot ? false : !canProceed}
         />
+        </View>
       </ScrollView>
 
       <Modal animationType="slide" transparent visible={showPaymentSheet} onRequestClose={() => setShowPaymentSheet(false)}>
@@ -282,7 +289,7 @@ export default function WalkInConfirmScreen() {
         onAddAnother={() => router.push('/edit-vehicle?mode=new')}
         onManageVehicles={() => router.push('/edit-vehicle')}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -377,6 +384,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#F1F5F9',
   },
+  modeTabsShellCompact: {
+    flexDirection: 'column',
+  },
   modeTab: {
     flex: 1,
     minHeight: 44,
@@ -385,6 +395,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  modeTabCompact: {
+    width: '100%',
   },
   modeTabActive: {
     backgroundColor: '#FFFFFF',
@@ -400,14 +413,22 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontFamily: 'Poppins_400Regular',
   },
+  modeTabTextCompact: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
   modeTabTextActive: {
     color: '#0F766E',
     fontFamily: 'Poppins_600SemiBold',
   },
   scrollContent: {
-    paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 32,
+    gap: 22,
+  },
+  contentFrame: {
+    width: '100%',
+    alignSelf: 'center',
     gap: 22,
   },
   heroCard: {

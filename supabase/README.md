@@ -56,6 +56,15 @@ Gate entry confirmation:
 - `start_parking_session` and `start_walk_in_session` are retained only for compatibility and are no longer executable by `anon` or `authenticated` roles.
 - Verify valid, duplicate-active, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans against a non-production database before promotion.
 
+PayMongo checkout:
+
+- Deploy the `supabase/functions/paymongo-checkout` Edge Function before enabling the mobile PayMongo flow.
+- Set the `PAYMONGO_SECRET_KEY` secret for the function environment. Use a test key in staging and only switch to live after end-to-end verification.
+- Ensure the function can read `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in its environment so it can verify the customer JWT and update `payments` securely.
+- Run the updated `end_parking_session.sql` so completed sessions can create `pending` PayMongo payment rows instead of auto-marking them paid.
+- The mobile app deep-links back through the existing Expo scheme `parkeasymobile://payment`, so keep that scheme unchanged unless you also update the function request payloads and app routing.
+- This implementation verifies payment on the mobile return path and does not yet add webhook settlement or refunds.
+
 Development multi-lot seed data:
 
 - `seed.sql` now creates three non-production locations: `BGC Pilot Site`, `Makati Business Hub`, and `Ortigas Center Deck`.

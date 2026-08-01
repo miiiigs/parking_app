@@ -226,7 +226,7 @@ export function LocationManagementPanel() {
       ) : null}
 
       {isAdmin ? (
-        <div className="grid gap-4 xl:grid-cols-[0.95fr_0.95fr_1.1fr]">
+        <div className="grid gap-4 2xl:grid-cols-[0.95fr_0.95fr_1.1fr]">
           <Card className="border-border bg-card">
             <CardHeader className="space-y-3">
               <div className="flex items-start justify-between gap-3">

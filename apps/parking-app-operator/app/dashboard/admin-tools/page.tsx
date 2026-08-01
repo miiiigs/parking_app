@@ -44,6 +44,7 @@ export default function AdminToolsPage() {
   const metrics = data?.metrics ?? null;
   const canRunReconciliation = hasOperatorCapability(user?.role, 'run-reconciliation');
   const canResetSlots = hasOperatorCapability(user?.role, 'reset-slot-statuses');
+  const canManagePricing = hasOperatorCapability(user?.role, 'manage-pricing');
 
   const latestRun = reconciliationRuns[0] ?? null;
 
@@ -136,9 +137,9 @@ export default function AdminToolsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Admin Tools</h1>
+          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Operator Tools</h1>
           <p className="text-muted-foreground">
-            Operational controls ported from the hardened admin workflow.
+            Location-scoped operational controls for reconciliation and guarded corrective actions.
           </p>
         </div>
 
@@ -189,7 +190,7 @@ export default function AdminToolsPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">Open Mismatches</CardTitle>
@@ -224,18 +225,22 @@ export default function AdminToolsPage() {
 
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-foreground">Parking Setup Moved</CardTitle>
+            <CardTitle className="text-lg font-semibold text-foreground">Parking Setup</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <p className="text-sm text-foreground">Pricing, rates, and grace periods now live on their own page.</p>
+              <p className="text-sm text-foreground">Pricing, rates, and grace periods stay on their own lot-scoped page.</p>
               <p className="text-sm text-muted-foreground">
-                Use Parking Setup to manage billing rules without mixing them into reconciliation and reset actions.
+                {canManagePricing
+                  ? 'Use Parking Setup to manage billing rules without mixing them into reconciliation and reset actions.'
+                  : 'Pricing changes stay in the admin-only Parking Setup page and are intentionally separate from operator reconciliation work.'}
               </p>
             </div>
-            <Button asChild variant="outline" className="min-w-[180px]">
-              <Link href="/dashboard/parking-setup">Open Parking Setup</Link>
-            </Button>
+            {canManagePricing ? (
+              <Button asChild variant="outline" className="min-w-[180px]">
+                <Link href="/dashboard/parking-setup">Open Parking Setup</Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -247,7 +252,7 @@ export default function AdminToolsPage() {
 
               return (
                 <Card key={tool.id} className="border-border bg-card">
-                  <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
+                  <CardContent className="flex flex-col gap-4 p-4 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-secondary p-2 text-primary">
@@ -261,7 +266,7 @@ export default function AdminToolsPage() {
                       variant={tool.tone}
                       disabled={tool.disabled || isRunning || loadingPreview === tool.id}
                       onClick={() => void fetchActionPreview(tool.id)}
-                      className="min-w-[160px]"
+                      className="w-full sm:w-auto sm:min-w-[160px]"
                     >
                       {isRunning || loadingPreview === tool.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {tool.buttonLabel}
@@ -288,7 +293,7 @@ export default function AdminToolsPage() {
 
               {latestRun ? (
                 <div className="rounded-lg border border-border bg-secondary/40 p-4">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-sm font-semibold uppercase tracking-[0.12em] text-foreground">{latestRun.runStatus}</div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(latestRun.startedAt).toLocaleString()}
@@ -317,7 +322,7 @@ export default function AdminToolsPage() {
               <div className="space-y-3">
                 {reconciliationRuns.slice(0, 5).map((run: ReconciliationRun) => (
                   <div key={run.id} className="rounded-lg border border-border p-4">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="text-sm font-medium capitalize text-foreground">{run.runStatus}</div>
                       <div className="text-xs text-muted-foreground">{new Date(run.startedAt).toLocaleString()}</div>
                     </div>

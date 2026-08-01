@@ -35,7 +35,7 @@ function formatCurrency(amount: number) {
 
 export default function SessionScreen() {
   const router = useRouter();
-  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const { lots, isRefreshing, status, error: dataError, lastSyncedAt, refresh } = useMobileParkingData();
   const { selectedVehicle: savedVehicle } = useMobileVehicles();
   const session = useParkingFlowStore((state) => state.session);
@@ -192,14 +192,14 @@ export default function SessionScreen() {
                   },
                 ]}
               >
-                <View style={styles.headerRow}>
+                <View style={[styles.headerRow, isCompact ? styles.headerRowCompact : null]}>
                   <AuthLogo height={28} />
                   <View style={styles.headerTitleWrap}>
                     <View style={styles.activeBadgeRow}>
                       <View style={styles.activeDot} />
                       <Text numberOfLines={1} style={styles.activeBadgeText}>ACTIVE SESSION</Text>
                     </View>
-                    <Text numberOfLines={1} style={styles.headerTitle}>Active Parking Session</Text>
+                    <Text numberOfLines={1} style={[styles.headerTitle, isCompact ? styles.headerTitleCompact : null]}>Active Parking Session</Text>
                   </View>
                 </View>
               </View>
@@ -215,7 +215,7 @@ export default function SessionScreen() {
 
                 <View style={styles.timerCard}>
                   <Text style={styles.timerEyebrow}>{inEntryGracePeriod ? 'ENTRY GRACE PERIOD' : 'PARKING DURATION'}</Text>
-                  <Text style={styles.timerValue}>{formatTimer(inEntryGracePeriod ? graceRemainingSeconds : activeElapsedSeconds)}</Text>
+                  <Text style={[styles.timerValue, isCompact ? styles.timerValueCompact : null]}>{formatTimer(inEntryGracePeriod ? graceRemainingSeconds : activeElapsedSeconds)}</Text>
                   <View style={styles.timerMetaRow}>
                     <Clock3 color="rgba(255,255,255,0.7)" size={13} strokeWidth={2.2} />
                     <Text style={styles.timerMetaText}>
@@ -240,7 +240,7 @@ export default function SessionScreen() {
                     <Text style={styles.infoHeaderTitle}>Location</Text>
                   </View>
                   <Text style={styles.infoPrimaryText}>{session.lotName}</Text>
-                  <Text style={styles.infoSecondaryText}>{session.address} · Slot {session.slot.number}</Text>
+                  <Text style={styles.infoSecondaryText}>{session.address} - Slot {session.slot.number}</Text>
                 </View>
 
                 <View style={styles.infoCard}>
@@ -355,6 +355,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  headerRowCompact: {
+    alignItems: 'flex-start',
+  },
   headerTitleWrap: {
     flex: 1,
     minWidth: 0,
@@ -384,6 +387,10 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     fontFamily: 'Poppins_600SemiBold',
     textAlign: 'right',
+  },
+  headerTitleCompact: {
+    fontSize: 20,
+    lineHeight: 26,
   },
   emptyHeaderTitle: {
     color: '#1E293B',
@@ -424,9 +431,15 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginTop: 8,
   },
+  timerValueCompact: {
+    fontSize: 34,
+    lineHeight: 40,
+  },
   timerMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 4,
   },
@@ -435,6 +448,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   timerHintText: {
     marginTop: 12,

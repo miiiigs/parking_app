@@ -21,22 +21,29 @@ Use this file after the developer finishes a cycle and before the planner advanc
 
 ## Current Review
 
-### 2026-06-25 - Dashboard Auth-User Onboarding Review
+### 2026-06-27 - Track L UI Hardening Pass 2 Review
 
 - `Current move/task`:
-  Review the Track K slice that lets admins onboard a dashboard user from `Access Control` by inviting a new Supabase Auth user when needed while preserving the existing role-provisioning path for already-existing Auth users.
+  Review the second Track L UI/UX hardening slice across payment, exit, receipt, account/payment-method, and dense operator/admin surfaces.
 
 - `Scope reviewed`:
-  `apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts`
-  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
-  `apps/parking-app-operator/lib/operatorAdminAccess.ts`
-  `apps/parking-app-operator/lib/operatorRouteSchemas.ts`
-  `apps/parking-app-operator/tests/locationContext.test.mjs`
-  `apps/parking-app-operator/tests/routeContractCoverage.test.js`
-  `apps/parking-app-operator/README.md`
+  `apps/mobile/src/features/parking/screens/PaymentScreen.tsx`
+  `apps/mobile/src/features/parking/screens/ExitScreen.tsx`
+  `apps/mobile/src/features/parking/screens/ReceiptScreen.tsx`
+  `apps/mobile/src/features/menu/screens/PaymentMethodsScreen.tsx`
+  `apps/mobile/src/features/menu/screens/MenuScreen.tsx`
+  `apps/mobile/src/features/menu/screens/EditProfileScreen.tsx`
+  `apps/parking-app-operator/app/dashboard/reservations/page.tsx`
+  `apps/parking-app-operator/app/dashboard/audit/page.tsx`
+  `apps/parking-app-operator/app/dashboard/parking-setup/page.tsx`
+  `apps/parking-app-operator/app/dashboard/admin-tools/page.tsx`
+  `apps/parking-app-operator/components/dashboard/pricing-settings-panel.tsx`
+  `apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx`
+  `apps/parking-app-operator/components/dashboard/parking-action-controls.tsx`
+  `apps/mobile/PRODUCTION_READINESS_CHECKLIST.md`
   `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
-  `workflow/temp/SESSION_UPDATE.md`
+  `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md`
 
 - `Inputs reviewed`:
   `workflow/runtime/AI_DEVELOPER_PROMPT_NEXT_MOVE.md`
@@ -45,46 +52,48 @@ Use this file after the developer finishes a cycle and before the planner advanc
   `workflow/planning/PROJECT_DOCUMENT_INDEX.md`
   `workflow/logs/DEBUGGER_OUTPUT_LOG.md`
   `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`
-  current onboarding route, Access Control UI copy, helper-layer invite and lookup logic, focused contract coverage, doc updates, temporary session recap, and developer validation evidence
+  `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md`
+  `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md`
+  developer validation evidence, the changed mobile screen diffs, the changed operator/admin layout diffs, the readiness checklist updates, and the pass-2 Track L temp viewport notes
 
 - `Findings`:
   No material repo-blocking findings remain for this slice.
-  The onboarding route remains admin-only, keeps privileged Auth-user onboarding on the server side through the Supabase Admin API, preserves the existing-user provisioning path, and still uses `admin_user_roles` as the actual dashboard access gate.
-  Residual risk remains external rather than repo-blocking: live invite delivery, first-login completion, non-production Supabase proof, and the broader bootstrap-admin replacement are still manual or future-cycle follow-ups.
+  The mobile changes stay focused on compact wrapping, row shrink behavior, QR sizing, receipt metadata stacking, wallet/card form stacking, and account label overflow protection; they do not implement payment provider work, paid-exit authorization, penalty handling, or backend behavior.
+  The operator/admin changes stay focused on delaying dense tables and multi-column forms until wider breakpoints, making action groups full-width on small screens, and adding safer word wrapping in detail sheets; they do not broaden role visibility, route access, or operator/admin capabilities.
+  The developer documentation truthfully treats this as a second repo-backed hardening slice, not a full Track L signoff, and keeps live device/browser viewport proof plus final coverage open.
 
 - `Validation checked`:
-  Reviewed developer validation evidence: `npm --workspace apps/parking-app-operator run test` passed 41 of 41 tests, `npm --workspace apps/parking-app-operator run build` passed, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
-  Statically reviewed the actual dashboard-account route, the shared admin helper invite and lookup path, the Access Control onboarding copy, the request schema, the helper-level invite assertions, the route contract coverage, and the updated README, checklist, and tracker wording.
+  Reviewed developer validation evidence: `npm.cmd --workspace apps/mobile run test` passed 37 of 37 tests, `npm.cmd --workspace apps/mobile run typecheck` passed, `npm.cmd --workspace apps/parking-app-operator run test` passed 43 of 43 tests, `npm.cmd --workspace apps/parking-app-operator run build` passed, and `git -c safe.directory=C:/dev/parking_app diff --check` passed with line-ending warnings only.
+  Reviewed the code-backed viewport notes and confirmed they are documented as static/code review notes rather than live screenshots, browser captures, or device recordings.
 
 - `Decision`:
   `Approved with follow-ups`
 
 - `Testing expectation snapshot`:
-  `Done`: admins can now use `Access Control` to grant or update a dashboard role for an existing Supabase Auth user or invite a new dashboard user by email while preparing the `admin_user_roles` record server-side.
-  `Partial`: the repo now reflects invitation-based onboarding and the preserved existing-user path truthfully, but that behavior is only code-validated until a non-production Supabase environment proves real invitation delivery, first sign-in completion, and post-invite access behavior end to end.
-  `Missing`: production-safe bootstrap-admin replacement, broader admin customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof for the accepted admin control-plane flows.
+  `Done`: the named mobile payment, exit, receipt, menu, profile, and payment-method screens now have safer compact wrapping and stacking in repo code; the named operator/admin reservations, audit, parking setup, operator-tools, pricing, detail-sheet, and parking-action controls now stay card-first or stacked longer on narrow widths.
+  `Partial`: this was verified through code review, automated tests, typecheck, build, and code-backed viewport reasoning. It is not yet a live rendered device/browser proof pass.
+  `Missing`: full screen-by-screen Track L coverage, live small-phone/tall-phone mobile screenshots or device checks, live narrow-laptop/common-desktop dashboard proof, final visual QA, screenshot regression coverage, and accessibility instrumentation.
 
 - `Manual actions required`:
-  `Backend/DevOps` must deploy and verify the current Supabase SQL and dashboard environment baseline in a non-production project before treating invitation-based onboarding as staging-ready.
-  `Admin/QA` must use real Supabase Auth users to verify `/dashboard/access-control` can both invite a new dashboard user and grant or update a role for an existing one, including the first-login completion path after invitation delivery.
-  `Operator/QA` must confirm that invited or updated dashboard accounts still obey the accepted location-assignment model once they sign in, and that non-admin accounts continue to see only explicitly assigned lots.
-  `Founder/Product` should still define the production-safe replacement for the current `admin@example.com` bootstrap convention before broader rollout.
+  `QA/Release` should capture live small-phone and tall-phone checks for payment, exit, receipt, account/profile, and payment-method screens, including action reachability, QR readability, long labels, and long receipt/payment values.
+  `Admin/QA` should verify Reservations, Audit, Parking Setup, Operator Tools, pricing setup, detail sheets, and action controls at narrow-laptop and common-desktop widths in a browser.
+  `Founder/Product` should decide whether the next Track L cycle runs live viewport proof/final UI sweep or deliberately pivots to another launch blocker such as staging proof, gate/exit contracts, observability, or payment-provider planning.
 
 - `Required rework`:
   None required to accept this cycle.
 
 - `Safe follow-ups`:
-  Planner should choose between the manual non-production proof queue for the accepted admin-control-plane flows and the next repo slice for broader Track K admin customer-oversight or bootstrap hardening.
-  Broader admin customer-oversight tooling, admin analytics, paid-exit authorization, scanner hardware validation, and full staging proof remain later work.
+  Planner should keep Track L open for live viewport proof, final lower-priority UI coverage, and broader visual QA, and should not treat payment implementation, exit authorization, staging Supabase proof, scanner validation, or bootstrap-admin hardening as completed by this UI slice.
+  If the next cycle remains Track L, prioritize live rendered proof and final sweep criteria rather than reopening accepted pass-1 or pass-2 surfaces without new evidence.
 
 - `Temp artifact disposition`:
-  Retain `workflow/temp/SESSION_UPDATE.md` only as a temporary human recap. It trails the current accepted review state and should not be treated as live workflow truth.
+  Retain `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md` and `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md` briefly for the next planner pass because they record reviewed surfaces, code-backed viewport notes, and remaining Track L limits.
 
 - `Debugger log disposition`:
-  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The Metro fix and rerunnable SQL hardening both still have manual external validation steps pending.
+  Retain `workflow/logs/DEBUGGER_OUTPUT_LOG.md`. The SQL hardening rerun and Metro Android launch still need manual external validation and were not resolved by this UI review.
 
 - `Suggestion log disposition`:
-  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The admin/operator separation suggestion is substantially advanced but not fully finished, and the Parking Actions suggestion still has unfinished exit-contract follow-up.
+  Retain `workflow/logs/SUGGESTIONS_AND_IMPROVEMENTS_LOG.md`. The full UI/UX hardening suggestion has been absorbed into Track L and materially advanced across two slices, but it is not complete until broader coverage and live viewport proof are accepted.
 
 - `Next owner`:
   `Planner`

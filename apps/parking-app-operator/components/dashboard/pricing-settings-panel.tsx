@@ -260,7 +260,7 @@ export function PricingSettingsPanel() {
 
       <Card className="border-border bg-card">
         <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-2">
               <CardTitle className="text-lg font-semibold text-foreground">Pricing, Rates, and Grace Periods</CardTitle>
               <p className="max-w-2xl text-sm text-muted-foreground">
@@ -274,7 +274,7 @@ export function PricingSettingsPanel() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 lg:grid-cols-3">
             <div className="rounded-lg border border-border bg-secondary/20 p-4">
               <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Current Mode</div>
               <div className="mt-2 font-semibold text-foreground">{activeMode.label}</div>
@@ -290,7 +290,7 @@ export function PricingSettingsPanel() {
               <div className="mt-2 font-semibold text-foreground">{parsedPricingConfig.exitGraceMinutes} min</div>
               <p className="mt-1 text-sm text-muted-foreground">Time allowed after checkout before penalties apply.</p>
             </div>
-            <div className="rounded-lg border border-border bg-secondary/20 p-4 md:col-span-3">
+            <div className="rounded-lg border border-border bg-secondary/20 p-4 lg:col-span-3">
               <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Reservation Fees</div>
               <div className="mt-2 font-semibold text-foreground">{formatReservationPricingSummary(parsedReservationPricingConfig)}</div>
               <p className="mt-1 text-sm text-muted-foreground">Used for reservation holds on the mobile app before entry.</p>
@@ -305,7 +305,7 @@ export function PricingSettingsPanel() {
           ) : null}
 
           <Tabs defaultValue="rate-model" className="space-y-4">
-            <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 md:grid-cols-3">
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 lg:grid-cols-3">
               <TabsTrigger value="rate-model" className="h-11 border border-border bg-secondary/30 data-[state=active]:border-primary">
                 Rate Model
               </TabsTrigger>
@@ -359,7 +359,7 @@ export function PricingSettingsPanel() {
                 <CardHeader>
                   <CardTitle className="text-base text-foreground">Configure charge amounts and intervals</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <CardContent className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
                   {pricingDraft.mode === 'flat_rate' ? (
                     <div className="space-y-2">
                       <Label htmlFor="flat-rate">Flat rate amount</Label>
@@ -475,7 +475,7 @@ export function PricingSettingsPanel() {
                 <CardHeader>
                   <CardTitle className="text-base text-foreground">Manage entry and exit protection windows</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
+                <CardContent className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="entry-grace">Entry grace (min)</Label>
                     <Input
@@ -502,7 +502,7 @@ export function PricingSettingsPanel() {
                       disabled={!canManagePricing}
                     />
                   </div>
-                  <div className="rounded-lg border border-border bg-card p-4 md:col-span-2">
+                  <div className="rounded-lg border border-border bg-card p-4 lg:col-span-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <TimerReset className="h-4 w-4 text-primary" />
                       Grace period guidance
@@ -520,7 +520,7 @@ export function PricingSettingsPanel() {
             <CardHeader>
               <CardTitle className="text-base text-foreground">Reservation fees by arrival window</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
+            <CardContent className="grid gap-4 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="reservation-fee-30">30-minute window fee</Label>
                 <Input
@@ -563,11 +563,11 @@ export function PricingSettingsPanel() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap justify-end gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="min-w-[150px]"
+              className="w-full sm:w-auto sm:min-w-[150px]"
               disabled={!canManagePricing || loadingPreview || saving}
               onClick={() => {
                 setPricingDraft(buildPricingDraft(data?.locationPricing ?? DEFAULT_PARKING_PRICING));
@@ -578,7 +578,7 @@ export function PricingSettingsPanel() {
             </Button>
             <Button
               type="button"
-              className="min-w-[180px]"
+              className="w-full sm:w-auto sm:min-w-[180px]"
               disabled={!canManagePricing || loadingPreview || saving}
               onClick={() => void fetchPricingPreview()}
             >

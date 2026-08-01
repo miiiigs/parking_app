@@ -86,22 +86,23 @@ export function ReservationParkingActions({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button
           type="button"
           size="sm"
+          className="w-full sm:w-auto"
           onClick={() => void handleVerifyEntry()}
           disabled={!canVerifyEntry || submitting}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Verify Entry QR
         </Button>
-        <Button type="button" size="sm" variant="outline" asChild>
+        <Button type="button" size="sm" variant="outline" asChild className="w-full sm:w-auto">
           <Link href={`/dashboard/parking-actions?entryPass=${encodeURIComponent(entryPass)}`}>
             Open Parking Actions
           </Link>
         </Button>
-        <Button type="button" size="sm" variant="outline" disabled>
+        <Button type="button" size="sm" variant="outline" disabled className="w-full sm:w-auto">
           Verify Exit QR
         </Button>
       </div>
@@ -131,8 +132,8 @@ export function SessionParkingActions({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" asChild disabled={!canOpenParkingActions}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button type="button" size="sm" variant="outline" asChild disabled={!canOpenParkingActions} className="w-full sm:w-auto">
           {canOpenParkingActions ? (
             <Link href={`/dashboard/parking-actions?entryPass=${encodeURIComponent(entryPass!)}`}>
               Open Parking Actions
@@ -141,7 +142,7 @@ export function SessionParkingActions({
             <span>Open Parking Actions</span>
           )}
         </Button>
-        <Button type="button" size="sm" variant="outline" disabled>
+        <Button type="button" size="sm" variant="outline" disabled className="w-full sm:w-auto">
           Verify Exit QR
         </Button>
       </div>

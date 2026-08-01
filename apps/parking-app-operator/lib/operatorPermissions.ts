@@ -31,6 +31,7 @@ const ROLE_CAPABILITIES: Record<OperatorRole, OperatorCapability[]> = {
     'view-audit',
     'view-parking-map',
     'edit-slot-status',
+    'run-reconciliation',
   ],
   support: ['view-dashboard', 'view-reservations', 'view-audit', 'view-parking-map'],
   finance: ['view-dashboard', 'view-reservations', 'view-audit'],

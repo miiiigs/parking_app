@@ -13,6 +13,10 @@ Last reassessed: 2026-06-25
 - [x] Update operator tests to reflect the production-only admin tool set.
 - [x] Replace fixed `limit=200` dashboard reads with paged server-side fetch helpers.
 - [x] Batch `in.(...)` dashboard lookups to reduce URL-size risk for large slot, reservation, and session sets.
+- [x] Finalize operator-versus-admin navigation visibility, non-admin no-switcher behavior, and the `Operator Tools` label while keeping admin-only control-plane surfaces hidden.
+- [x] Add an admin-only customer oversight surface with customer activity summaries and dashboard-account overlap visibility.
+- [x] Harden the dashboard shell, location switcher, and launch-critical admin/operator pages so narrow laptop layouts stack more safely and customer oversight keeps a card-first fallback until wider viewports.
+- [x] Harden dense reservations, audit, parking setup, and operator-tools layouts so tables, filters, pricing forms, detail sheets, and action controls stay card-first or stacked longer on narrow laptop widths.
 
 ## Still Open
 
@@ -30,9 +34,11 @@ Last reassessed: 2026-06-25
 - [x] Add invitation-based dashboard auth-user onboarding from the admin-only Access Control page so provisioning no longer depends on a pre-created Supabase Auth account.
 - [x] Scope non-admin dashboard location context to explicit `operator_location_assignments` rows.
 - [ ] Keep exit scan/confirmation actions blocked until the backend paid-exit authorization contract exists.
+- [ ] Capture live narrow-laptop and common-desktop viewport proof for the refreshed dashboard shell, location switcher, Parking Actions, Access Control, Manage Parking Lots, Customer Oversight, Reservations, Audit, Parking Setup, and Operator Tools layouts.
 - [ ] Prove admin-managed assignment creation/removal against a non-production Supabase project.
 - [ ] Prove admin-managed lot create, update, deactivate, and reactivation flows against a non-production Supabase project.
 - [ ] Prove dashboard-role provisioning and invitation-based onboarding against real Supabase Auth users in a non-production project.
+- [ ] Prove the admin-only customer oversight page against non-production reservation and Supabase Auth data.
 - [ ] Validate at least three active seeded lots across operator and mobile surfaces in staging.
 - [ ] Break the dashboard contract into dedicated paginated endpoints for reservations, payments, audit logs, and reconciliation history instead of one large aggregate payload.
 - [ ] Add structured error logging and request correlation IDs for operator API routes.
@@ -64,7 +70,7 @@ Last reassessed: 2026-06-25
 
 - [ ] Complete the backend paid-exit authorization contract so the now-visible exit scan and manual verification surface can become real.
 - [ ] Full non-production proof for invitation delivery, first sign-in completion, and bootstrap-admin replacement.
-- [ ] Broader admin customer-oversight tooling beyond assignments, lot management, and dashboard roles.
+- [ ] Deeper customer-support workflows beyond the new read-only customer oversight page.
 - [ ] Shift handoff log with unresolved issues and operator notes.
 - [ ] Real audit export with CSV or PDF download history.
 - [ ] Alerting for slot or session mismatches and realtime degradation.

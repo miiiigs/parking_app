@@ -25,6 +25,7 @@ Use this document to decide what we do next, what is blocked, and what can be de
 - Backend-complete reservation lifecycle
 - Backend-complete walk-in lifecycle
 - Gate-entry and exit QR lifecycle
+- Mobile and operator/admin UI/UX responsiveness and readability hardening
 - Real payment integration and settlement
 - Expiry, no-show, and housekeeping automation
 - Observability and analytics baseline
@@ -214,7 +215,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - backend confirmation and the first operator Parking Actions entry client now exist in repo; assignment provisioning, hardware-scanner proof, exit authorization, and staging proof remain open`
+- `In progress - backend confirmation and the first operator Parking Actions entry client now exist in repo; the next active repo slice is the paid-exit authorization contract, while assignment provisioning, hardware-scanner proof, penalty handling, and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
@@ -482,7 +483,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - repo now includes admin/operator identity separation, assignment management, dashboard-role onboarding through existing or invited auth users, dedicated global lot administration, and selected-lot parking setup separation; staging proof, bootstrap-admin hardening, and broader admin-control-plane work remain open`
+- `In progress - repo now includes admin/operator identity separation, assignment management, dashboard-role onboarding through existing or invited auth users, dedicated global lot administration, selected-lot parking setup separation, final operator/admin navigation plus location-control separation, and an initial admin-only customer oversight surface; manual staging proof, bootstrap-admin hardening, and broader support or analytics follow-up remain open`
 
 Owner:
 - `Backend` + `Operator` + `Mobile` + `Security`
@@ -496,7 +497,8 @@ Tasks:
 - [x] Define the shared `admin and operator` app model for `parking-app-operator`, including which screens stay shared and which become admin-only.
 - [ ] Keep `admin@example.com` as the current non-production bootstrap admin and document the production-safe replacement or bootstrap path.
 - [x] Distinguish customer mobile identities from operator/admin dashboard identities and define whether any shared-account overlap is allowed.
-- [~] Give admin full-system visibility and control across all parking lots, operator accounts, operator-to-lot assignments, and customer oversight surfaces that belong in the dashboard. Assignment management, lot management, and dashboard-role provisioning surfaces now exist; broader customer oversight remains future work.
+- [~] Give admin full-system visibility and control across all parking lots, operator accounts, operator-to-lot assignments, and customer oversight surfaces that belong in the dashboard. Assignment management, lot management, dashboard-role provisioning, and an initial read-only customer oversight surface now exist; broader support workflows and analytics remain future work.
+- [x] Add an admin-only customer oversight surface that summarizes customer contact, recent reservation or session activity, payment state, location history, and any dashboard-access overlap without broadening non-admin visibility.
 - [~] Add admin-managed operator assignment and provisioning flows so lot assignment does not require direct SQL for normal operations. Assignment management plus dashboard-role onboarding for existing or newly invited Supabase Auth users now exist; live staging proof and broader bootstrap hardening are still open.
 - [x] Ensure operators can only view or mutate the parking lots they are explicitly assigned to.
 - [x] Add at least two more parking lots in backend-backed development or staging-ready data and make operator plus mobile surfaces reflect the same location inventory.
@@ -507,11 +509,11 @@ Tasks:
 - [x] Move global parking-lot creation and multi-lot administration into a new admin-only `Manage Parking Lots` menu instead of keeping those controls under lot-scoped `Parking Setup`.
 - [x] Keep `Parking Setup` focused on the currently selected parking lot only.
 - [x] Replace create-form reuse for lot editing with a selected-lot dropdown card or dedicated selected-lot editor so editing an existing lot is cleaner and more explicit.
-- [ ] Finalize operator-versus-admin menu visibility so operators only see operational pages and admin-only control surfaces remain hidden from non-admin roles.
-- [ ] Rename the operator-facing `Admin Tools` menu or page label to `Operator Tools` while preserving reconciliation capability for operators.
-- [ ] Remove the location switcher for non-admin users so assigned-lot operators do not appear to choose across locations they should not operate.
-- [ ] Improve the admin lot-switcher dropdown readability and visibility.
-- [ ] Reorder the left navigation to the agreed operational-first sequence, with admin-only entries grouped at the end.
+- [x] Finalize operator-versus-admin menu visibility so operators only see operational pages and admin-only control surfaces remain hidden from non-admin roles.
+- [x] Rename the operator-facing `Admin Tools` menu or page label to `Operator Tools` while preserving reconciliation capability for operators.
+- [x] Remove the location switcher for non-admin users so assigned-lot operators do not appear to choose across locations they should not operate.
+- [x] Improve the admin lot-switcher dropdown readability and visibility.
+- [x] Reorder the left navigation to the agreed operational-first sequence, with admin-only entries grouped at the end.
 
 Success gate:
 - An admin can manage global parking operations, lot assignments, and lot inventory from the dashboard, operators are restricted to their assigned lots, customer and dashboard account boundaries are explicit, and multi-lot data is visible consistently across backend, mobile, and web surfaces without direct database intervention for normal setup.
@@ -531,12 +533,15 @@ Future polish:
 
 Implementation:
 - [apps/parking-app-operator/app/dashboard/access-control/page.tsx](../apps/parking-app-operator/app/dashboard/access-control/page.tsx)
+- [apps/parking-app-operator/app/dashboard/customers/page.tsx](../apps/parking-app-operator/app/dashboard/customers/page.tsx)
 - [apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx](../apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx)
 - [apps/parking-app-operator/app/dashboard/parking-setup/page.tsx](../apps/parking-app-operator/app/dashboard/parking-setup/page.tsx)
+- [apps/parking-app-operator/app/api/operator/customers/route.ts](../apps/parking-app-operator/app/api/operator/customers/route.ts)
 - [apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts](../apps/parking-app-operator/app/api/operator/dashboard-accounts/route.ts)
 - [apps/parking-app-operator/app/api/operator/location-assignments/route.ts](../apps/parking-app-operator/app/api/operator/location-assignments/route.ts)
 - [apps/parking-app-operator/app/api/operator/locations/route.ts](../apps/parking-app-operator/app/api/operator/locations/route.ts)
 - [apps/parking-app-operator/components/dashboard/location-management-panel.tsx](../apps/parking-app-operator/components/dashboard/location-management-panel.tsx)
+- [apps/parking-app-operator/lib/customerOversight.ts](../apps/parking-app-operator/lib/customerOversight.ts)
 - [apps/parking-app-operator/lib/operatorAdminAccess.ts](../apps/parking-app-operator/lib/operatorAdminAccess.ts)
 - [apps/parking-app-operator/lib/operatorLocationServer.ts](../apps/parking-app-operator/lib/operatorLocationServer.ts)
 - [apps/parking-app-operator/lib/operatorLocationAccess.ts](../apps/parking-app-operator/lib/operatorLocationAccess.ts)
@@ -552,33 +557,117 @@ Validation method:
 - `git diff --check`
 - Statically verified admin-only dashboard-role provisioning and parking-lot management route enforcement, service-role containment, non-admin assigned-location filtering, operator-side location refresh after admin lot changes, multi-lot seed data, and documentation of dashboard-versus-customer identity boundaries.
 - Statically verified the dashboard-account route can now invite a new Supabase Auth user through the server-side admin path while preserving the existing-user role-provisioning flow and `admin_user_roles` gate.
+- Statically verified the operator dashboard now uses the agreed sidebar order, keeps admin-only control-plane entries hidden from non-admin roles, exposes an assigned-lot display instead of a non-admin switcher, preserves an improved admin lot switcher, and labels the reconciliation surface as `Operator Tools` while keeping the existing route path stable.
+- Statically verified the new admin-only customer oversight route and page aggregate reservation, session, payment, lot, and dashboard-overlap data into a read-only control-plane surface without broadening non-admin visibility.
 - Mobile automated tests were not rerun in this slice because no mobile source files changed; repo review confirmed the mobile app still reads shared backend `locations` inventory rather than an operator-only source.
 
 Remaining gap before success gate:
 - The Access Control, Manage Parking Lots, and Parking Setup flows still need non-production Supabase proof with real dashboard accounts, role provisioning, operator assignments, and lot create-update-deactivate rehearsal.
 - `admin@example.com` remains the non-production bootstrap convention; production-safe invitation or onboarding is still future work.
 - Invitation-based dashboard onboarding now exists in repo, but live email delivery, first-login completion, and staging proof are still future work.
-- Broader customer oversight and admin analytics are outside this first foundation slice.
+- The first admin-only customer oversight surface now exists in repo, but real-data staging proof plus broader support workflows and admin analytics still remain outside this first foundation slice.
+
+## Track L - UI/UX Responsiveness, Readability, and Layout Hardening
+
+Priority:
+- `P0`
+
+Status:
+- `In progress - the first launch-critical repo slice and pass 2 were accepted by review; payment, exit, receipt, account/payment-method, and dense operator/admin surfaces now have repo-backed hardening, while broader UI hardening and live viewport proof still remain open`
+
+Owner:
+- `Mobile` + `Operator` + `QA/Release`
+
+Why this is next:
+- The product now has enough functional depth that layout breakage, unreadable text, weak spacing, cramped containers, and inconsistent responsive behavior are becoming a bigger near-term trust risk than adding more surface area. A full screen and page hardening pass should happen before this workflow returns to deferred payment implementation.
+
+Tasks:
+- [x] Inventory the launch-critical mobile screens and operator or admin pages that must be reviewed in this pass.
+- [ ] Audit mobile screens for small-phone, normal-phone, and tall-phone responsiveness, including safe areas, keyboard overlap, scroll behavior, sticky actions, and clipped content.
+- [ ] Audit operator and admin pages for narrow desktop and laptop responsiveness, including sidebar behavior, page-header wrapping, cards, tables, forms, drawers, and modal overflow.
+- [ ] Fix unreadable text sizes, low-contrast pairings, weak spacing rhythm, cramped containers, and poor action density where found.
+- [ ] Fix layout overflow, hidden actions, broken wrapping, and non-scroll-safe states across both apps where found.
+- [ ] Ensure critical actions remain discoverable and usable on the affected screens after the layout fixes.
+- [ ] Run the right validation for the touched surfaces, including builds, tests, and practical viewport checks.
+- [ ] Leave real payment implementation out of scope for this track until the separate payment consultation defines direction.
+
+Success gate:
+- Launch-critical mobile screens and operator or admin pages have completed a real responsiveness and readability pass, the highest-severity UI issues have been fixed in repo code, and the remaining UI risks are explicitly documented rather than hidden.
+
+Dependencies:
+- none
+
+Rollback/fallback:
+- if the full pass cannot land at once, prioritize the reservation, arrival, session, walk-in, dashboard, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight surfaces first and defer lower-risk pages explicitly
+
+Future polish:
+- dedicated design tokens
+- stronger accessibility instrumentation
+- screenshot regression checks
+
+Validation method:
+- targeted app builds and existing automated tests for touched files
+- screen and viewport review across the most important mobile and dashboard surfaces
+- manual check for text readability, spacing, and action visibility after implementation
+- `npm.cmd --workspace apps/mobile run test`
+- `npm.cmd --workspace apps/mobile run typecheck`
+- `npm.cmd --workspace apps/parking-app-operator run test`
+- `npm.cmd --workspace apps/parking-app-operator run build`
+- `git -c safe.directory=C:/dev/parking_app diff --check`
+
+Implementation:
+- [apps/mobile/src/features/parking/screens/ReservationScreen.tsx](../apps/mobile/src/features/parking/screens/ReservationScreen.tsx)
+- [apps/mobile/src/features/parking/screens/ArrivalScreen.tsx](../apps/mobile/src/features/parking/screens/ArrivalScreen.tsx)
+- [apps/mobile/src/features/parking/screens/SessionScreen.tsx](../apps/mobile/src/features/parking/screens/SessionScreen.tsx)
+- [apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx](../apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx)
+- [apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx](../apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx)
+- [apps/parking-app-operator/components/layout/dashboard-layout.tsx](../apps/parking-app-operator/components/layout/dashboard-layout.tsx)
+- [apps/parking-app-operator/components/layout/location-switcher.tsx](../apps/parking-app-operator/components/layout/location-switcher.tsx)
+- [apps/parking-app-operator/app/dashboard/parking-actions/page.tsx](../apps/parking-app-operator/app/dashboard/parking-actions/page.tsx)
+- [apps/parking-app-operator/app/dashboard/access-control/page.tsx](../apps/parking-app-operator/app/dashboard/access-control/page.tsx)
+- [apps/parking-app-operator/app/dashboard/customers/page.tsx](../apps/parking-app-operator/app/dashboard/customers/page.tsx)
+- [apps/parking-app-operator/components/dashboard/location-management-panel.tsx](../apps/parking-app-operator/components/dashboard/location-management-panel.tsx)
+- [workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md](../temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md)
+- [apps/mobile/src/features/parking/screens/PaymentScreen.tsx](../apps/mobile/src/features/parking/screens/PaymentScreen.tsx)
+- [apps/mobile/src/features/parking/screens/ExitScreen.tsx](../apps/mobile/src/features/parking/screens/ExitScreen.tsx)
+- [apps/mobile/src/features/parking/screens/ReceiptScreen.tsx](../apps/mobile/src/features/parking/screens/ReceiptScreen.tsx)
+- [apps/mobile/src/features/menu/screens/PaymentMethodsScreen.tsx](../apps/mobile/src/features/menu/screens/PaymentMethodsScreen.tsx)
+- [apps/mobile/src/features/menu/screens/MenuScreen.tsx](../apps/mobile/src/features/menu/screens/MenuScreen.tsx)
+- [apps/mobile/src/features/menu/screens/EditProfileScreen.tsx](../apps/mobile/src/features/menu/screens/EditProfileScreen.tsx)
+- [apps/parking-app-operator/app/dashboard/reservations/page.tsx](../apps/parking-app-operator/app/dashboard/reservations/page.tsx)
+- [apps/parking-app-operator/app/dashboard/audit/page.tsx](../apps/parking-app-operator/app/dashboard/audit/page.tsx)
+- [apps/parking-app-operator/app/dashboard/parking-setup/page.tsx](../apps/parking-app-operator/app/dashboard/parking-setup/page.tsx)
+- [apps/parking-app-operator/app/dashboard/admin-tools/page.tsx](../apps/parking-app-operator/app/dashboard/admin-tools/page.tsx)
+- [apps/parking-app-operator/components/dashboard/pricing-settings-panel.tsx](../apps/parking-app-operator/components/dashboard/pricing-settings-panel.tsx)
+- [apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx](../apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx)
+- [apps/parking-app-operator/components/dashboard/parking-action-controls.tsx](../apps/parking-app-operator/components/dashboard/parking-action-controls.tsx)
+- [workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md](../temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md)
+
+Remaining gap before success gate:
+- Two repo-backed hardening slices now exist, but the full screen-by-screen UI pass is still incomplete.
+- Live rendered viewport proof on real small phones, tall phones, and narrow laptop browsers still remains open; these cycles relied on code-backed layout review plus automated validation rather than screenshots or device capture.
+- Lower-priority surfaces outside these passes, plus final visual QA, still need later Track L review.
+- Payment-related screens may still receive layout cleanup, but payment feature implementation itself remains intentionally deferred from this workflow.
 
 ## Do Next Queue
 
 These are the next tasks we should actively execute in order.
 
-1. `Track K` repo follow-up: finalize operator-versus-admin navigation and visibility, remove the non-admin location switcher, rename `Admin Tools` to `Operator Tools` for operator use, improve the admin lot-switcher UI, and enforce the agreed left-menu order.
-2. `Track K` staging and repo follow-up: prove admin lot management and invitation-based dashboard onboarding against Supabase, then decide whether broader admin customer-oversight tooling is the next repo slice.
-3. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
-4. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
-5. `Track D` plus `Track H` repo follow-up: define the backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real.
+1. `Track D` plus `Track H` repo follow-up: define and implement the first backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real without adding payment-provider settlement yet.
+2. `Track L` manual/UI follow-up: run live viewport proof and final UI sweep, or deliberately defer it after the paid-exit contract if planner judges backend flow risk higher.
+3. `Track K` staging follow-up: prove admin lot management, invitation-based dashboard onboarding, and the new customer oversight surface against Supabase in non-production.
+4. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
+5. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
 6. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
-7. `Track E`: payment provider decision and backend settlement design.
-8. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
+7. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
+8. `Track E`: payment provider decision and backend settlement design after the separate payment consultation defines the intended direction.
 
 ## Recommended Parallel Work Split
 
 If multiple builders are available, this is the safest split:
 
 - Builder 1: Track A staging bootstrap and rollback rehearsal against the rebuilt baseline when credentials and a target are available.
-- Builder 2: Track K admin-versus-operator identity, assignment, and multi-lot implementation review or staging proof.
+- Builder 2: Track K admin customer-oversight implementation review or staging proof for the already-built control-plane foundations.
 - Builder 3: Track D plus Track H staging proof and paid-exit contract design for the new Parking Actions surface.
 - Builder 4: Track C cleanup deployment, scheduler activation, and operator acceptance in staging.
 - Builder 5: Track G analytics event taxonomy and logging plan.

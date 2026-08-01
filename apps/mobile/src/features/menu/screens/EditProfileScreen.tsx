@@ -11,7 +11,7 @@ import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
 export default function EditProfileScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
-  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const initialName = useMemo(() => {
     const metadataName = auth.user?.user_metadata?.display_name ?? auth.user?.user_metadata?.full_name;
     if (typeof metadataName === 'string' && metadataName.trim()) {
@@ -70,7 +70,7 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.content}>
-              <View style={styles.avatarBlock}>
+              <View style={[styles.avatarBlock, isCompact ? styles.avatarBlockCompact : null]}>
                 <View style={styles.avatarBubble}>
                   <User color="#FFFFFF" size={36} strokeWidth={2.1} />
                 </View>
@@ -151,6 +151,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  avatarBlockCompact: {
+    gap: 10,
+  },
   avatarBubble: {
     width: 76,
     height: 76,
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_500Medium',
   },
   inputShell: {
-    height: 52,
+    minHeight: 52,
     borderRadius: 14,
     borderWidth: 2,
     borderColor: '#E2E8F0',
@@ -191,7 +194,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   inputShellMuted: {
-    height: 52,
+    minHeight: 52,
     borderRadius: 14,
     borderWidth: 2,
     borderColor: '#E2E8F0',
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     color: '#1E293B',
     fontSize: 17,
     fontFamily: 'Poppins_500Medium',
@@ -210,6 +214,7 @@ const styles = StyleSheet.create({
   },
   inputMuted: {
     flex: 1,
+    minWidth: 0,
     color: '#94A3B8',
     fontSize: 17,
     fontFamily: 'Poppins_500Medium',

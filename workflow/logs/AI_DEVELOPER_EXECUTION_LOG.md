@@ -623,3 +623,137 @@ Do not use this file as the strategic roadmap or the active priority board.
 
 - `Recommended next move`:
   Reviewer should verify that the new onboarding route and UI stay admin-only, preserve the existing-user provisioning path, keep `admin_user_roles` as the actual dashboard access gate, and update the tracker and docs truthfully without implying live invitation proof or bootstrap-admin completion.
+
+### 2026-06-25 - Finalize Operator/Admin Navigation And Location Visibility
+
+- `Current move/task`:
+  Implement the next Track K repo slice so the operator dashboard navigation, location control, and operational-tools labeling match the accepted admin-versus-operator direction without reopening the accepted admin-only control-plane foundations.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K foundations in place: admin-only `Access Control`, admin-only `Manage Parking Lots`, selected-lot `Parking Setup`, invitation-based dashboard onboarding, durable operator-to-lot assignment enforcement, and non-admin location scoping in backend or dashboard data reads.
+  The tracker and planner brief already identified the remaining gap precisely: the live repo still used the old sidebar order, still labeled the reconciliation surface `Admin Tools`, and still rendered a selectable location switcher for non-admin roles.
+
+- `What I completed now`:
+  Reordered `apps/parking-app-operator/components/layout/dashboard-layout.tsx` to the agreed operational-first sequence and kept admin-only control-plane entries grouped at the end.
+  Renamed the operator-facing reconciliation surface to `Operator Tools` in the live menu and page copy while intentionally keeping the route path at `/dashboard/admin-tools` for minimal routing risk.
+  Reworked `apps/parking-app-operator/components/layout/location-switcher.tsx` so admins keep a clearer, more readable active-lot selector, while non-admin roles now see an assigned-lot summary instead of a selectable switcher.
+  Simplified the top-bar location area so the location control itself carries the lot context and the duplicate lot-name readout is removed.
+  Narrowly restored `run-reconciliation` to the `operator` role in `apps/parking-app-operator/lib/operatorPermissions.ts` so non-admin operators can reach the renamed `Operator Tools` surface without regaining pricing, assignment, map-layout, or other admin-only powers.
+  Updated `apps/parking-app-operator/app/dashboard/admin-tools/page.tsx` copy to match the new `Operator Tools` label and hid the `Parking Setup` shortcut from non-admin users while keeping the pricing explanation truthful.
+  Updated focused contract coverage and capability tests so the new order, labeling, non-admin no-switcher behavior, and narrow reconciliation reachability are checked in repo tests.
+  Updated the operator README, readiness checklist, and active execution tracker so the durable docs now reflect the final navigation and location-control behavior truthfully.
+  A production build refreshed `apps/parking-app-operator/next-env.d.ts` from the development routes reference to the current `.next/types/routes.d.ts` reference during Next.js route typing.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 42 of 42 tests, including the updated navigation, location-control, and capability assertions.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/dashboard/admin-tools`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Mobile automated tests were not rerun in this slice because the work stayed inside the operator dashboard, its docs, and workflow artifacts.
+
+- `Still open`:
+  The route path still remains `/dashboard/admin-tools` for continuity even though the UI label is now `Operator Tools`; reviewer should confirm that this minimal-risk choice is acceptable for the current slice.
+  Live Supabase proof for invitation onboarding, lot-management flows, role-assignment staging rehearsal, bootstrap-admin replacement, scanner hardware validation, and exit-contract work all remain external or future-cycle follow-ups.
+  Broader customer-oversight tooling and admin analytics remain outside this repo slice.
+
+- `Recommended next move`:
+  Reviewer should verify the final sidebar order, non-admin no-switcher behavior, improved admin switcher readability, narrow operator reconciliation capability, stable `/dashboard/admin-tools` route choice, and truthful docs or tracker wording.
+
+### 2026-06-25 - Add Admin Customer Oversight Surface
+
+- `Current move/task`:
+  Implement the next Track K repo slice by adding an admin-only customer oversight surface in `parking-app-operator` so admins can review customer contact, activity, lot history, payment state, and dashboard-account overlap without direct SQL.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K control-plane foundations in place: admin-only `Access Control`, invitation-backed dashboard onboarding, durable operator-to-lot assignment enforcement, dedicated `Manage Parking Lots`, selected-lot `Parking Setup`, final operator-admin navigation separation, and shared reservation, session, payment, location, and dashboard-role data sources.
+  The planner brief was also correct that `reservations.user_id` and the existing Supabase auth-admin helpers already gave the repo enough foundation for a first read-only customer oversight slice.
+
+- `What I completed now`:
+  Added `apps/parking-app-operator/app/api/operator/customers/route.ts` as an admin-only service-role-backed route that reads reservations, sessions, payments, slot-to-location mappings, dashboard-role overlap, and Supabase Auth user metadata into a paginated customer oversight response.
+  Added `apps/parking-app-operator/lib/customerOversight.ts` so customer aggregation, activity rollups, payment summarization, plate history, and visited-location shaping stay testable outside the route.
+  Extended `apps/parking-app-operator/lib/operatorAdminAccess.ts` with `listAuthUsersByIds` so the new oversight route can safely look up customer email, phone, and display-name metadata through the Supabase Admin API.
+  Added `apps/parking-app-operator/app/dashboard/customers/page.tsx` as an admin-only read-only control-plane surface with search, overlap filtering, pagination, summary cards, explicit data-limit notices, and responsive customer activity views.
+  Updated `apps/parking-app-operator/components/layout/dashboard-layout.tsx` so `Customer Oversight` is grouped with the admin-only control plane in navigation without changing non-admin visibility.
+  Added `apps/parking-app-operator/tests/customerOversight.test.mjs`, expanded `apps/parking-app-operator/tests/routeContractCoverage.test.js`, and updated `apps/parking-app-operator/package.json` so the new aggregation and route-contract coverage are actually included in the operator test suite.
+  Updated `apps/parking-app-operator/README.md`, `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`, `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`, and `workflow/temp/TRACK_K_CUSTOMER_OVERSIGHT_IMPLEMENTATION_NOTES.md` so the repo and workflow docs now describe the new surface, its data sources, and its intentional limits truthfully.
+
+- `Validation`:
+  `npm --workspace apps/parking-app-operator run test`: passed 43 of 43 tests after adding the new customer oversight aggregation test and route-contract coverage.
+  `npm --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript checking, static page generation, and route discovery including `/api/operator/customers` and `/dashboard/customers`.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Statically verified the new route stays admin-only, the page stays read-only, navigation keeps the surface grouped with admin-only entries, and the UI explicitly communicates current data boundaries instead of implying deeper support tooling already exists.
+
+- `Still open`:
+  The new page still needs non-production Supabase proof against real customer, reservation, and auth data.
+  Customer display names remain limited to whatever Supabase Auth metadata or dashboard-role records already provide; this slice does not invent a richer customer profile system.
+  Broader customer-support workflows, admin analytics, bootstrap-admin replacement, and the Track D paid-exit contract remain outside this repo slice.
+
+- `Recommended next move`:
+  Reviewer should verify the new customer oversight route and page are truly admin-only and read-only, confirm the customer-versus-dashboard overlap behavior is accurate and not overstated, and make sure the tracker or checklist now point next to staging proof rather than another repo customer-oversight slice.
+
+### 2026-06-25 - Track L UI/UX Hardening Pass 1 For Launch-Critical Surfaces
+
+- `Current move/task`:
+  Implement the first Track L repo slice by auditing and hardening the highest-risk launch-critical mobile and operator/admin surfaces for responsiveness, readability, spacing, and layout safety, while keeping payment implementation and staging-only proof out of scope.
+
+- `Already finished before my work`:
+  The repo already had the accepted Track K control-plane foundations, the session screen already used the shared mobile responsive metrics hook, and the operator dashboard already had mobile/table/card fallbacks on some pages such as reservations and audit.
+  The current repo still left several concrete layout risks in the named launch-critical surfaces: fixed-width location switching in the dashboard shell, dense multi-column operator/admin layouts switching too early on narrower laptop widths, customer oversight forcing its large table at `lg`, and several mobile launch screens still using fixed paddings and compact-unfriendly tab or header layouts.
+
+- `What I completed now`:
+  Updated the operator dashboard shell and location switcher so the top bar can stack more safely on tighter widths, the collapsed sidebar centers icon-only navigation more cleanly, and the active-lot control no longer forces an overly rigid width.
+  Shifted early two-column or multi-column layouts later on the launch-critical operator/admin surfaces by updating `Parking Actions`, `Access Control`, `Manage Parking Lots`, and the customer-oversight responsive breakpoints.
+  Updated `Customer Oversight` so the card-first fallback stays active until `xl` widths and the compact card details drop to one column sooner, reducing cramped narrow-laptop and small-width presentation.
+  Hardened the launch-critical mobile reservation and walk-in-confirm flows with responsive paddings, bounded content width, and compact stacked tabs instead of always forcing a dense two-tab row.
+  Hardened the arrival and walk-in QR screens with responsive paddings and more compact QR sizing for smaller phones.
+  Hardened the active session screen by reducing compact header/timer footprint, allowing timer metadata to wrap, and replacing the broken location separator text with a safe ASCII `-`.
+  Added `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md` to capture the reviewed surfaces, concrete issues fixed, code-backed viewport notes, and the remaining UI risks for reviewer context.
+  Updated the Track L tracker entry plus the mobile and operator readiness checklists so the repo now truthfully records this first UI hardening slice and its remaining live-viewport gaps.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `npm.cmd --workspace apps/parking-app-operator run test`: passed 43 of 43 tests.
+  `npm.cmd --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript, static page generation, and route discovery including the touched dashboard routes.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Manual viewport-check notes for small-phone and narrow-laptop behavior were recorded in `workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md`, but they are code-backed review notes rather than live device/browser screenshots.
+
+- `Still open`:
+  This first Track L slice does not complete the full screen-by-screen UI pass; payment, exit, and lower-priority dashboard surfaces still need later review.
+  Real-device and real-browser viewport proof for small phones, tall phones, narrow laptops, and common desktop widths still remains open.
+  The cycle intentionally did not touch payment implementation, staging-only Supabase proof, role-model changes, or new backend business logic.
+
+- `Recommended next move`:
+  Reviewer should verify that the responsive shell and breakpoint changes really improve the named launch-critical surfaces without regressing role gating or user flows, confirm that the validation evidence and viewport notes are described truthfully, and decide whether this first Track L slice is acceptable before planner scopes the next UI hardening pass.
+
+### 2026-06-27 - Track L UI/UX Hardening Pass 2 For Payment, Exit, And Dense Operator Surfaces
+
+- `Current move/task`:
+  Implement the second Track L repo slice by auditing and hardening the remaining payment, exit, receipt, account/payment-method, and dense operator/admin surfaces for responsiveness, readability, spacing, overflow safety, and action reachability while keeping payment provider work and paid-exit backend work out of scope.
+
+- `Already finished before my work`:
+  Track L pass 1 had already been accepted by review and covered the mobile reservation, arrival, session, walk-in confirm, and walk-in QR screens plus the dashboard shell, location switcher, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight.
+  The repo already had responsive metric helpers in mobile and card/table fallbacks on several operator pages, but pass-2 surfaces still had concrete layout risks around rigid fee rows, receipt metadata rows, wallet/card rows, early dense tables, pricing forms, detail-sheet action controls, and operator-tool side-by-side layouts.
+
+- `What I completed now`:
+  Hardened `PaymentScreen`, `ExitScreen`, and `ReceiptScreen` so fee rows, total banners, QR presentation, ticket rows, receipt metadata, amount rows, and payment method values shrink, wrap, or stack more safely on compact phones.
+  Hardened `PaymentMethodsScreen`, `MenuScreen`, and `EditProfileScreen` so wallet rows, split card inputs, profile/contact labels, menu labels, toggle labels, and profile form fields have safer compact-screen behavior.
+  Updated dense operator/admin surfaces so `Live Reservations` and `Audit Trail` keep card-first layouts until `xl`, narrow cards use single-column details before `sm`, and dense filters avoid crowding narrower widths.
+  Updated `Parking Setup`, `PricingSettingsPanel`, `Operator Tools`, `operation-detail-sheet`, and `parking-action-controls` so dense forms, summary grids, action cards, reconciliation history, linked-session panels, and operator action buttons stack or delay multi-column behavior on tighter widths.
+  Added `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md` with reviewed surfaces, concrete fixes, code-backed viewport notes, and remaining risks.
+  Updated mobile/operator readiness checklists and the Track L tracker entry to reflect the accepted pass-1 baseline plus the new pass-2 repo hardening while keeping live viewport proof and broader final UI coverage open.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `npm.cmd --workspace apps/parking-app-operator run test`: passed 43 of 43 tests.
+  `npm.cmd --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript, static page generation, and route discovery including the touched dashboard routes.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Viewport notes were recorded in `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md`, but they are code-backed review notes rather than live screenshots or device/browser captures.
+
+- `Still open`:
+  Track L still needs live rendered viewport proof across representative small phones, tall phones, narrow laptops, and common desktop widths before claiming the broader success gate.
+  Lower-priority screens outside pass 1 and pass 2 may still need a final polish sweep.
+  Payment provider implementation, paid-exit backend authorization, penalty handling, staging proof, SQL rollout, scanner hardware proof, and role-model changes remain intentionally out of scope and still open.
+
+- `Recommended next move`:
+  Reviewer should verify that pass-2 layout changes preserve payment/exit placeholders, role gates, and existing operator behavior while materially improving compact phone and narrow laptop usability, confirm that validation and viewport notes are truthful, and decide whether the workflow can return to Planner for live viewport proof/final UI sweep or another launch blocker.
