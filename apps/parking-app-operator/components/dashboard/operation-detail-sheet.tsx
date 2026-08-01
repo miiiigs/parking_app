@@ -86,7 +86,7 @@ function DetailBlock({
   return (
     <div className="rounded-lg border border-border bg-secondary/30 p-3">
       <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium text-foreground">{value}</div>
+      <div className="mt-1 break-words text-sm font-medium text-foreground">{value}</div>
     </div>
   );
 }
@@ -100,12 +100,12 @@ function AuditTimeline({ logs }: { logs: AuditLog[] }) {
     <div className="space-y-3">
       {logs.slice(0, 12).map((log) => (
         <div key={log.id} className="rounded-lg border border-border bg-secondary/20 p-3">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="font-mono text-xs text-foreground">{log.action}</div>
               <div className="mt-1 text-xs text-muted-foreground">{log.operator}</div>
             </div>
-            <div className="shrink-0 text-xs text-muted-foreground">{formatDateTime(log.timestamp)}</div>
+            <div className="text-xs text-muted-foreground sm:shrink-0">{formatDateTime(log.timestamp)}</div>
           </div>
           <div className="mt-2 text-sm text-muted-foreground">{log.details}</div>
         </div>
@@ -123,7 +123,7 @@ function PaymentHistory({ payments }: { payments: PaymentRecord[] }) {
     <div className="space-y-3">
       {payments.map((payment) => (
         <div key={payment.id} className="rounded-lg border border-border bg-secondary/20 p-3">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="font-mono text-xs text-foreground">{payment.paymentId}</div>
               <div className="mt-1 text-sm font-medium text-foreground">{formatCurrency(payment.amount)}</div>
@@ -228,14 +228,14 @@ export function ReservationDetailSheet({
                 <div className="text-sm font-semibold text-foreground">Linked Session</div>
                 {linkedSession ? (
                   <div className="rounded-lg border border-border bg-secondary/20 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                       <div>
                         <div className="font-mono text-xs text-foreground">{linkedSession.sessionId}</div>
                         <div className="mt-1 text-sm text-muted-foreground">
                           Started {formatDateTime(linkedSession.startedAt)}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge className={`${sessionTone(linkedSession.status)} border text-xs font-medium`}>
                           {linkedSession.status}
                         </Badge>

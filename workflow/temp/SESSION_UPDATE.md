@@ -4,12 +4,13 @@ Use this file as the quick human-readable reset note for the current working ses
 
 ## Current Snapshot
 
-- `Session date`: `2026-06-25`
+- `Session date`: `2026-06-27`
 - `Workflow state`: `active, automation-aligned, and planner-ready`
 - `Current baton owner`: `Planner`
 - `Current cycle`: `2026-06-25-cycle-010-track-l-ui-hardening-pass-1`
 - `Primary live objective`: `choose whether the next automation continues broader Track L UI hardening or switches to the next launch blocker`
-- `Automation cadence`: `Heartbeat dispatcher configured for every 5 minutes`
+- `Automation name`: `Parking App Workflow Dispatcher`
+- `Automation cadence`: `Heartbeat dispatcher configured for every 2 minutes`
 - `Automation status`: `SAFE TO RUN`
 - `Immediate product priority`: `UI/UX responsiveness and readability hardening remains ahead of payment implementation in this workflow`
 
@@ -28,7 +29,7 @@ Use this file as the quick human-readable reset note for the current working ses
 - Kept the planner, developer, and reviewer baton flow intact while making the workflow easier to reuse in other projects.
 - Added manual-support paths for debugger work, suggestions intake, temp session notes, and temp implementation notes.
 - Updated the reviewer contract so accepted cycles now leave a clearer testing expectation snapshot with `Done`, `Partial`, and `Missing`.
-- Kept the automation dispatcher aligned to a fixed-cadence heartbeat model with a `5 minute` schedule.
+- Kept the automation dispatcher aligned to a fixed-cadence heartbeat model with a `2 minute` schedule.
 
 ### Product and platform progress accepted by reviewer
 

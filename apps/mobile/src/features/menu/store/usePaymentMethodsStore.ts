@@ -27,13 +27,16 @@ type PaymentMethodsState = {
   removeCard: (id: string) => void;
 };
 
+const GCASH_DEFAULT_DETAIL = 'Approval still happens in the GCash app';
+const MAYA_DEFAULT_DETAIL = 'Approval still happens in the Maya app';
+
 const INITIAL_WALLETS: LinkedWallet[] = [
-  { id: 'gcash', name: 'GCash', detail: 'Not linked', linked: false, color: '#0070E0' },
-  { id: 'maya', name: 'Maya', detail: 'Not linked', linked: false, color: '#18C16E' },
+  { id: 'gcash', name: 'GCash', detail: GCASH_DEFAULT_DETAIL, linked: false, color: '#0070E0' },
+  { id: 'maya', name: 'Maya', detail: MAYA_DEFAULT_DETAIL, linked: false, color: '#18C16E' },
 ];
 
 const INITIAL_CARDS: SavedCard[] = [
-  { id: '1', label: 'Visa •••• 4242', type: 'Visa', last4: '4242' },
+  { id: '1', label: 'Visa **** 4242', type: 'Visa', last4: '4242' },
 ];
 
 export const usePaymentMethodsStore = create<PaymentMethodsState>()(
@@ -60,7 +63,7 @@ export const usePaymentMethodsStore = create<PaymentMethodsState>()(
               ? {
                   ...wallet,
                   linked: false,
-                  detail: 'Not linked',
+                  detail: wallet.id === 'maya' ? MAYA_DEFAULT_DETAIL : GCASH_DEFAULT_DETAIL,
                 }
               : wallet,
           ),

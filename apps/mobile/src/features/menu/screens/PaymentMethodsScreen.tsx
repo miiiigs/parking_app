@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
-import { Check, CreditCard, Plus, Trash2 } from 'lucide-react-native';
+import { Check, Plus, Trash2 } from 'lucide-react-native';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
@@ -10,7 +10,7 @@ import { usePaymentMethodsStore } from '../store/usePaymentMethodsStore';
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const wallets = usePaymentMethodsStore((state) => state.wallets);
   const cards = usePaymentMethodsStore((state) => state.cards);
   const linkWallet = usePaymentMethodsStore((state) => state.linkWallet);
@@ -35,7 +35,7 @@ export default function PaymentMethodsScreen() {
     && expiryDigits.length === 4
     && cvv.replace(/\D/g, '').length >= 3;
 
-  const nextWalletDetail = useMemo(() => '+63 912 345 6789', []);
+  const nextWalletDetail = useMemo(() => 'Marked as preferred for faster checkout selection', []);
 
   function getCardType(value: string) {
     if (value.startsWith('4')) {
@@ -69,7 +69,7 @@ export default function PaymentMethodsScreen() {
 
     const last4 = normalizedCardNumber.slice(-4);
     const type = getCardType(normalizedCardNumber);
-    const label = `${type} •••• ${last4}`;
+    const label = `${type} **** ${last4}`;
 
     addCard({
       id: Date.now().toString(),
@@ -93,32 +93,44 @@ export default function PaymentMethodsScreen() {
             <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
               <View
                 style={[
-                styles.header,
-                {
-                  marginHorizontal: -horizontalPadding,
-                },
-              ]}
-            >
+                  styles.header,
+                  {
+                    marginHorizontal: -horizontalPadding,
+                  },
+                ]}
+              >
                 <AppScreenHeader title="Payment Methods" onBack={() => router.back()} />
               </View>
 
               <View style={styles.content}>
                 <View>
                   <Text style={styles.sectionEyebrow}>E-WALLETS</Text>
+                  <Text style={styles.sectionNote}>
+                    Marking a wallet here only saves your preferred choice in the app. PayMongo still sends GCash and Maya to their approval flow during payment.
+                  </Text>
                   <View style={styles.stack}>
                     {wallets.map((wallet) => {
                       const active = selectedPaymentMethod === wallet.name;
 
                       return (
-                        <View key={wallet.id} style={[styles.walletCard, wallet.linked ? styles.walletCardLinked : null, active ? styles.walletCardSelected : null]}>
-                          <View style={styles.walletRow}>
+                        <View
+                          key={wallet.id}
+                          style={[
+                            styles.walletCard,
+                            wallet.linked ? styles.walletCardLinked : null,
+                            active ? styles.walletCardSelected : null,
+                          ]}
+                        >
+                          <View style={[styles.walletRow, isCompact ? styles.walletRowCompact : null]}>
                             <View style={styles.walletLeft}>
                               <View style={[styles.walletIcon, { backgroundColor: wallet.color }]}>
                                 <Text style={styles.walletIconText}>{wallet.name}</Text>
                               </View>
                               <View>
                                 <Text style={styles.walletName}>{wallet.name}</Text>
-                                <Text style={[styles.walletDetail, wallet.linked ? styles.walletDetailLinked : null]}>{wallet.detail}</Text>
+                                <Text style={[styles.walletDetail, wallet.linked ? styles.walletDetailLinked : null]}>
+                                  {wallet.detail}
+                                </Text>
                               </View>
                             </View>
                             <Pressable
@@ -126,7 +138,7 @@ export default function PaymentMethodsScreen() {
                               style={[styles.walletAction, wallet.linked ? styles.walletActionDanger : styles.walletActionPrimary]}
                             >
                               <Text style={[styles.walletActionText, wallet.linked ? styles.walletActionTextDanger : styles.walletActionTextPrimary]}>
-                                {wallet.linked ? 'Unlink' : 'Link'}
+                                {wallet.linked ? 'Clear' : 'Prefer'}
                               </Text>
                             </Pressable>
                           </View>
@@ -135,7 +147,7 @@ export default function PaymentMethodsScreen() {
                             <Pressable onPress={() => setPaymentMethod(wallet.name)} style={styles.walletFooter}>
                               <Check color="#16A34A" size={12} strokeWidth={2.4} />
                               <Text style={styles.walletFooterText}>
-                                {active ? 'Default payment method for walk-in parking' : 'Account linked and ready for payments'}
+                                {active ? 'Preferred payment method for walk-in parking' : 'Saved as your preferred wallet'}
                               </Text>
                             </Pressable>
                           ) : null}
@@ -147,12 +159,19 @@ export default function PaymentMethodsScreen() {
 
                 <View>
                   <Text style={styles.sectionEyebrow}>CREDIT / DEBIT CARDS</Text>
+                  <Text style={styles.sectionNote}>
+                    Cards entered here are only stored as app preferences for testing. The actual PayMongo card entry still happens on the payment screen.
+                  </Text>
                   <View style={styles.stack}>
                     {cards.map((card) => {
                       const active = selectedPaymentMethod === card.label;
 
                       return (
-                        <Pressable key={card.id} onPress={() => setPaymentMethod(card.label)} style={[styles.cardRow, active ? styles.cardRowSelected : null]}>
+                        <Pressable
+                          key={card.id}
+                          onPress={() => setPaymentMethod(card.label)}
+                          style={[styles.cardRow, active ? styles.cardRowSelected : null]}
+                        >
                           <View style={styles.cardLeft}>
                             <View style={styles.cardTypeBadge}>
                               <Text style={styles.cardTypeText}>{card.type}</Text>
@@ -203,7 +222,7 @@ export default function PaymentMethodsScreen() {
                           />
                         </Field>
 
-                        <View style={styles.splitRow}>
+                        <View style={[styles.splitRow, isCompact ? styles.splitRowCompact : null]}>
                           <Field label="Expiry" style={styles.splitField}>
                             <TextInput
                               value={formattedExpiry}
@@ -219,14 +238,18 @@ export default function PaymentMethodsScreen() {
                               value={cvv.replace(/\D/g, '').slice(0, 4)}
                               onChangeText={setCvv}
                               keyboardType="number-pad"
-                              placeholder="•••"
+                              placeholder="***"
                               placeholderTextColor="#94A3B8"
                               style={styles.textField}
                             />
                           </Field>
                         </View>
 
-                        <Pressable onPress={handleSaveCard} disabled={!isCardValid} style={[styles.saveCardButton, !isCardValid ? styles.saveCardButtonDisabled : null]}>
+                        <Pressable
+                          onPress={handleSaveCard}
+                          disabled={!isCardValid}
+                          style={[styles.saveCardButton, !isCardValid ? styles.saveCardButtonDisabled : null]}
+                        >
                           <Text style={[styles.saveCardText, !isCardValid ? styles.saveCardTextDisabled : null]}>Save Card</Text>
                         </Pressable>
                       </View>
@@ -247,7 +270,7 @@ function Field({
   label,
   style,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   label: string;
   style?: object;
 }) {
@@ -290,6 +313,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 10,
   },
+  sectionNote: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+    marginBottom: 10,
+  },
   stack: {
     gap: 12,
   },
@@ -316,11 +346,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  walletRowCompact: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+  },
   walletLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0,
   },
   walletIcon: {
     width: 42,
@@ -340,12 +375,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
     fontFamily: 'Poppins_600SemiBold',
+    flexShrink: 1,
   },
   walletDetail: {
     color: '#94A3B8',
     fontSize: 14,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
+    flexShrink: 1,
   },
   walletDetailLinked: {
     color: '#16A34A',
@@ -414,6 +451,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0,
   },
   cardTypeBadge: {
     width: 42,
@@ -487,6 +525,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  splitRowCompact: {
+    flexDirection: 'column',
+  },
   splitField: {
     flex: 1,
   },
@@ -510,5 +551,3 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
 });
-
-

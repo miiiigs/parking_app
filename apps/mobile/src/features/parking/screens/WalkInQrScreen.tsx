@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, Car, Clock, Zap } from 'lucide-react-native';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -35,6 +35,7 @@ export default function WalkInQrScreen() {
   const [isStarting, setIsStarting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [issueAttempt, setIssueAttempt] = useState(0);
+  const isPollingRef = useRef(false);
 
   useEffect(() => {
     if ((!lotId || !slotId) || !vehicle) {
@@ -98,6 +99,45 @@ export default function WalkInQrScreen() {
 
     return () => clearInterval(intervalId);
   }, [activeWalkInBooking?.expiresAt]);
+
+  useEffect(() => {
+    if (!activeWalkInBooking?.reservationId || isExpiredState(activeWalkInBooking?.expiresAt)) {
+      return;
+    }
+
+    let active = true;
+
+    const pollForConfirmation = async () => {
+      if (!active || isPollingRef.current) {
+        return;
+      }
+
+      try {
+        isPollingRef.current = true;
+        const confirmedSession = await refreshSession();
+        if (active && confirmedSession) {
+          router.replace('/session');
+        }
+      } catch {
+        // Keep silent background polling non-disruptive; manual checks surface errors.
+      } finally {
+        isPollingRef.current = false;
+      }
+    };
+
+    const initialTimer = setTimeout(() => {
+      void pollForConfirmation();
+    }, 1200);
+    const intervalId = setInterval(() => {
+      void pollForConfirmation();
+    }, 5000);
+
+    return () => {
+      active = false;
+      clearTimeout(initialTimer);
+      clearInterval(intervalId);
+    };
+  }, [activeWalkInBooking?.expiresAt, activeWalkInBooking?.reservationId, refreshSession, router]);
 
   if ((!lot || !slot) && isLoading) {
     return (
@@ -240,6 +280,7 @@ export default function WalkInQrScreen() {
         ) : null}
 
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        <Text style={styles.syncHint}>This screen checks for operator or gate confirmation automatically every few seconds.</Text>
         </View>
       </ScrollView>
 
@@ -296,6 +337,15 @@ function TicketRow({ label, value }: { label: string; value: string }) {
       <Text style={styles.ticketValue}>{value}</Text>
     </View>
   );
+}
+
+function isExpiredState(expiresAt: string | null | undefined) {
+  if (!expiresAt) {
+    return false;
+  }
+
+  const expiresAtMs = new Date(expiresAt).getTime();
+  return Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now();
 }
 
 const styles = StyleSheet.create({
@@ -571,6 +621,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+  },
+  syncHint: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   footer: {
     backgroundColor: '#FAFAF9',

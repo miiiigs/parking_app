@@ -1,4 +1,4 @@
-'use client';
+y'use client';
 
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';

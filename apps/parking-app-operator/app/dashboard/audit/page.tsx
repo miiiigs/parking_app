@@ -186,7 +186,7 @@ export default function AuditPage() {
         <Card className="border-border bg-card">
           <CardHeader>
             <div className="space-y-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -202,7 +202,7 @@ export default function AuditPage() {
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-4 md:flex-row">
+              <div className="flex flex-col gap-4 xl:flex-row">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">Status</label>
                   <div className="flex flex-wrap gap-2">
@@ -229,7 +229,7 @@ export default function AuditPage() {
                   <select
                     value={actionFilter || ''}
                     onChange={(event) => setActionFilter(event.target.value || null)}
-                    className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground md:min-w-56"
+                    className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground xl:min-w-56"
                   >
                     <option value="">All Actions</option>
                     {filteredActions.map((action) => (
@@ -245,7 +245,7 @@ export default function AuditPage() {
                   <select
                     value={pageSize}
                     onChange={(event) => setPageSize(Number(event.target.value))}
-                    className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground md:min-w-28"
+                    className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground xl:min-w-28"
                   >
                     {[10, 20, 40].map((size) => (
                       <option key={size} value={size}>
@@ -269,7 +269,7 @@ export default function AuditPage() {
               </div>
             ) : null}
 
-            <div className="grid gap-3 lg:hidden">
+            <div className="grid gap-3 xl:hidden">
               {logs.map((log: AuditLog) => (
                 <Card key={log.id} className="border-border bg-secondary/20">
                   <CardContent className="space-y-3 p-4">
@@ -282,7 +282,7 @@ export default function AuditPage() {
                         {log.status}
                       </Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                       <div>
                         <div className="text-xs text-muted-foreground">Operator</div>
                         <div className="text-foreground">{log.operator}</div>
@@ -301,7 +301,7 @@ export default function AuditPage() {
               ))}
             </div>
 
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b border-border">

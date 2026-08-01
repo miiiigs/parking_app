@@ -34,10 +34,10 @@ The workflow also expects personas to respect the `workflow/temp/` contract:
 ## Current Automation Configuration
 
 - `Automation name`:
-  `Three Persona Workflow Dispatcher`
+  `Parking App Workflow Dispatcher`
 
 - `Automation id`:
-  `planner-persona-cycle`
+  `planner-persona-cycle` (legacy id retained from the first setup)
 
 - `Kind`:
   `heartbeat`
@@ -46,7 +46,7 @@ The workflow also expects personas to respect the `workflow/temp/` contract:
   `thread`
 
 - `Schedule`:
-  `FREQ=MINUTELY;INTERVAL=5`
+  `FREQ=MINUTELY;INTERVAL=2`
 
 - `Status when configured`:
   `PAUSED`
@@ -57,13 +57,13 @@ The heartbeat interval controls automatic wake-ups on a fixed schedule.
 
 In this workflow, the current schedule is:
 
-- `FREQ=MINUTELY;INTERVAL=5`
+- `FREQ=MINUTELY;INTERVAL=2`
 
 That means the dispatcher is eligible to wake up automatically on the clock pattern implied by the schedule.
 
 Example:
 
-- `10:00 -> 10:05 -> 10:10 -> 10:15`
+- `10:00 -> 10:02 -> 10:04 -> 10:06`
 
 not:
 

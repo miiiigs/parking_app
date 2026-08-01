@@ -4,7 +4,9 @@ create or replace function end_parking_session(
   p_reservation_id uuid,
   p_billed_minutes integer default null,
   p_billed_amount numeric default null,
-  p_payment_reference text default 'mobile_mark_paid'
+  p_payment_reference text default 'mobile_mark_paid',
+  p_payment_provider text default 'manual',
+  p_payment_status text default 'paid'
 )
 returns table (
   session_id uuid,
@@ -36,10 +38,19 @@ declare
   v_elapsed_minutes integer;
   v_billed_minutes integer;
   v_billed_amount numeric(10,2);
+  v_total_amount numeric(10,2);
   v_pricing_config jsonb;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
+  end if;
+
+  if p_payment_provider not in ('gcash', 'maya', 'manual', 'paymongo') then
+    raise exception 'Unsupported payment provider';
+  end if;
+
+  if p_payment_status not in ('pending', 'paid', 'failed', 'refunded') then
+    raise exception 'Unsupported payment status';
   end if;
 
   select *
@@ -125,6 +136,7 @@ begin
     p_billed_amount,
     calculate_parking_fee_from_config(v_elapsed_minutes, v_pricing_config)
   );
+  v_total_amount := round(v_billed_amount + coalesce(v_reservation.reservation_fee, 0), 2);
 
   update parking_sessions
     set status = 'completed',
@@ -152,11 +164,11 @@ begin
   ) values (
     v_session.id,
     p_reservation_id,
-    'manual',
-    'paid',
+    p_payment_provider,
+    p_payment_status,
     p_payment_reference,
-    v_billed_amount,
-    v_ended_at
+    v_total_amount,
+    case when p_payment_status = 'paid' then v_ended_at else null end
   );
 
   insert into operator_events (
@@ -173,7 +185,9 @@ begin
     jsonb_build_object(
       'billed_minutes', coalesce(p_billed_minutes, v_billed_minutes),
       'billed_amount', v_billed_amount,
-      'payment_status', 'paid',
+      'total_amount', v_total_amount,
+      'payment_provider', p_payment_provider,
+      'payment_status', p_payment_status,
       'payment_reference', p_payment_reference,
       'pricing_config', v_pricing_config
     )
@@ -195,9 +209,9 @@ begin
       v_reservation.reservation_fee,
       coalesce(p_billed_minutes, v_billed_minutes),
       v_billed_amount,
-      'paid',
+      p_payment_status,
       v_pricing_config;
 end;
 $$;
 
-grant execute on function end_parking_session(uuid, integer, numeric, text) to anon, authenticated;
+grant execute on function end_parking_session(uuid, integer, numeric, text, text, text) to anon, authenticated;

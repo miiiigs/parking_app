@@ -190,7 +190,7 @@ export default function AdminToolsPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">Open Mismatches</CardTitle>
@@ -252,7 +252,7 @@ export default function AdminToolsPage() {
 
               return (
                 <Card key={tool.id} className="border-border bg-card">
-                  <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
+                  <CardContent className="flex flex-col gap-4 p-4 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-secondary p-2 text-primary">
@@ -266,7 +266,7 @@ export default function AdminToolsPage() {
                       variant={tool.tone}
                       disabled={tool.disabled || isRunning || loadingPreview === tool.id}
                       onClick={() => void fetchActionPreview(tool.id)}
-                      className="min-w-[160px]"
+                      className="w-full sm:w-auto sm:min-w-[160px]"
                     >
                       {isRunning || loadingPreview === tool.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {tool.buttonLabel}
@@ -293,7 +293,7 @@ export default function AdminToolsPage() {
 
               {latestRun ? (
                 <div className="rounded-lg border border-border bg-secondary/40 p-4">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-sm font-semibold uppercase tracking-[0.12em] text-foreground">{latestRun.runStatus}</div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(latestRun.startedAt).toLocaleString()}
@@ -322,7 +322,7 @@ export default function AdminToolsPage() {
               <div className="space-y-3">
                 {reconciliationRuns.slice(0, 5).map((run: ReconciliationRun) => (
                   <div key={run.id} className="rounded-lg border border-border p-4">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="text-sm font-medium capitalize text-foreground">{run.runStatus}</div>
                       <div className="text-xs text-muted-foreground">{new Date(run.startedAt).toLocaleString()}</div>
                     </div>

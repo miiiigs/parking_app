@@ -215,7 +215,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - backend confirmation and the first operator Parking Actions entry client now exist in repo; assignment provisioning, hardware-scanner proof, exit authorization, and staging proof remain open`
+- `In progress - backend confirmation and the first operator Parking Actions entry client now exist in repo; the next active repo slice is the paid-exit authorization contract, while assignment provisioning, hardware-scanner proof, penalty handling, and staging proof remain open`
 
 Owner:
 - `Mobile` + `Backend`
@@ -573,7 +573,7 @@ Priority:
 - `P0`
 
 Status:
-- `In progress - the first launch-critical repo slice was accepted by review and now hardens the mobile reservation, arrival, session, and walk-in surfaces plus the operator/admin dashboard shell, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight for better responsiveness and action visibility; broader UI hardening and live viewport proof still remain open`
+- `In progress - the first launch-critical repo slice and pass 2 were accepted by review; payment, exit, receipt, account/payment-method, and dense operator/admin surfaces now have repo-backed hardening, while broader UI hardening and live viewport proof still remain open`
 
 Owner:
 - `Mobile` + `Operator` + `QA/Release`
@@ -628,22 +628,36 @@ Implementation:
 - [apps/parking-app-operator/app/dashboard/customers/page.tsx](../apps/parking-app-operator/app/dashboard/customers/page.tsx)
 - [apps/parking-app-operator/components/dashboard/location-management-panel.tsx](../apps/parking-app-operator/components/dashboard/location-management-panel.tsx)
 - [workflow/temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md](../temp/TRACK_L_UI_HARDENING_PASS_1_NOTES.md)
+- [apps/mobile/src/features/parking/screens/PaymentScreen.tsx](../apps/mobile/src/features/parking/screens/PaymentScreen.tsx)
+- [apps/mobile/src/features/parking/screens/ExitScreen.tsx](../apps/mobile/src/features/parking/screens/ExitScreen.tsx)
+- [apps/mobile/src/features/parking/screens/ReceiptScreen.tsx](../apps/mobile/src/features/parking/screens/ReceiptScreen.tsx)
+- [apps/mobile/src/features/menu/screens/PaymentMethodsScreen.tsx](../apps/mobile/src/features/menu/screens/PaymentMethodsScreen.tsx)
+- [apps/mobile/src/features/menu/screens/MenuScreen.tsx](../apps/mobile/src/features/menu/screens/MenuScreen.tsx)
+- [apps/mobile/src/features/menu/screens/EditProfileScreen.tsx](../apps/mobile/src/features/menu/screens/EditProfileScreen.tsx)
+- [apps/parking-app-operator/app/dashboard/reservations/page.tsx](../apps/parking-app-operator/app/dashboard/reservations/page.tsx)
+- [apps/parking-app-operator/app/dashboard/audit/page.tsx](../apps/parking-app-operator/app/dashboard/audit/page.tsx)
+- [apps/parking-app-operator/app/dashboard/parking-setup/page.tsx](../apps/parking-app-operator/app/dashboard/parking-setup/page.tsx)
+- [apps/parking-app-operator/app/dashboard/admin-tools/page.tsx](../apps/parking-app-operator/app/dashboard/admin-tools/page.tsx)
+- [apps/parking-app-operator/components/dashboard/pricing-settings-panel.tsx](../apps/parking-app-operator/components/dashboard/pricing-settings-panel.tsx)
+- [apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx](../apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx)
+- [apps/parking-app-operator/components/dashboard/parking-action-controls.tsx](../apps/parking-app-operator/components/dashboard/parking-action-controls.tsx)
+- [workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md](../temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md)
 
 Remaining gap before success gate:
-- A first repo-backed hardening slice now exists, but the full screen-by-screen UI pass is still incomplete.
-- Live rendered viewport proof on real small phones, tall phones, and narrow laptop browsers still remains open; this cycle relied on code-backed layout review plus automated validation rather than screenshots or device capture.
-- Lower-priority surfaces outside this pass, including payment and other dashboard pages, still need later Track L review.
+- Two repo-backed hardening slices now exist, but the full screen-by-screen UI pass is still incomplete.
+- Live rendered viewport proof on real small phones, tall phones, and narrow laptop browsers still remains open; these cycles relied on code-backed layout review plus automated validation rather than screenshots or device capture.
+- Lower-priority surfaces outside these passes, plus final visual QA, still need later Track L review.
 - Payment-related screens may still receive layout cleanup, but payment feature implementation itself remains intentionally deferred from this workflow.
 
 ## Do Next Queue
 
 These are the next tasks we should actively execute in order.
 
-1. `Track L` next decision: either continue broader screen-by-screen UI hardening and live viewport proof, or deliberately switch to the next launch blocker if planner judges staging proof or backend contract work higher value.
-2. `Track K` staging follow-up: prove admin lot management, invitation-based dashboard onboarding, and the new customer oversight surface against Supabase in non-production.
-3. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
-4. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
-5. `Track D` plus `Track H` repo follow-up: define the backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real.
+1. `Track D` plus `Track H` repo follow-up: define and implement the first backend paid-exit authorization contract so the now-visible exit scan/manual verification surface can become real without adding payment-provider settlement yet.
+2. `Track L` manual/UI follow-up: run live viewport proof and final UI sweep, or deliberately defer it after the paid-exit contract if planner judges backend flow risk higher.
+3. `Track K` staging follow-up: prove admin lot management, invitation-based dashboard onboarding, and the new customer oversight surface against Supabase in non-production.
+4. `Track D` plus `Track H` staging follow-up: provision operator-location assignments and prove valid, duplicate, expired, cancelled, completed, wrong-location, unauthorized-location, and concurrent scans in staging.
+5. `Track A` manual follow-up: rehearse one fresh `staging` bootstrap and one rollback drill against a non-production Supabase project using the rebuilt baseline.
 6. `Track C` manual follow-up: deploy the cleanup function, enable the scheduler, and observe expiry, slot release, and audit events in staging.
 7. `Track G`: establish the first observability and analytics baseline around the launch-critical flows.
 8. `Track E`: payment provider decision and backend settlement design after the separate payment consultation defines the intended direction.

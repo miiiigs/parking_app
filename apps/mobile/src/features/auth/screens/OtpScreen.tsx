@@ -157,10 +157,6 @@ export default function OtpScreen() {
           ))}
         </View>
 
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${(filledCount / 6) * 100}%` }]} />
-        </View>
-
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
         <AuthActionButton
@@ -255,18 +251,6 @@ const styles = StyleSheet.create({
   codeInputFilled: {
     borderColor: '#0F766E',
     backgroundColor: '#F0FDFA',
-  },
-  progressTrack: {
-    width: '100%',
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: '#0F766E',
   },
   errorText: {
     alignSelf: 'stretch',

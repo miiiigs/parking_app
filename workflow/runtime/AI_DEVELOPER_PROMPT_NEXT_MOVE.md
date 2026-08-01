@@ -18,87 +18,96 @@ Before acting on any prompt written here, read:
 
 ## Current Prompt
 
-### 2026-06-25 - Track L UI/UX Hardening Pass 1 For Launch-Critical Surfaces
+### 2026-06-27 - Track D/H Paid-Exit Authorization Contract Slice
 
 - `Objective`:
-  Implement the first Track L repo slice by auditing and hardening the highest-risk launch-critical mobile and operator or admin surfaces for responsiveness, readability, spacing, and layout safety.
+  Implement the first repo-backed paid-exit authorization contract so the mobile app and operator dashboard have a backend-owned source of truth for post-payment exit QR eligibility, exit grace expiry, and operator exit verification, without implementing a real payment provider or penalty engine in this cycle.
 
 - `Why now`:
-  Founder priority shifted after the accepted Track K customer-oversight review. The repo now has enough functional depth that cramped layouts, clipped actions, weak spacing, and unreadable text are a bigger near-term trust risk than adding more surface area. Track L is now the top queue item, while payment implementation is intentionally deferred until a separate consultation defines direction.
+  Track L pass 1 and pass 2 were accepted with follow-ups, so the next highest repo-executable blocker is the currently documented Track D/H gap: exit verification remains visible but intentionally blocked because the backend paid-exit authorization contract does not exist yet. The top Track K, Track D/H staging, and Track A items need external Supabase or environment proof, while this contract can be advanced safely in repo code and will unblock later scanner, staging, and payment-provider work.
 
 - `In scope`:
-  Compare this brief against the real repo state first and inventory the concrete issues that still exist on the named surfaces before editing.
-  Audit and fix the highest-severity mobile UI issues on `ReservationScreen`, `ArrivalScreen`, `SessionScreen`, `WalkInConfirmScreen`, and `WalkInQrScreen`, plus their route wrappers in `apps/mobile/app/` when those wrappers contribute to layout or safe-area problems.
-  Audit and fix the highest-severity operator or admin UI issues on `/dashboard`, `/dashboard/parking-actions`, `/dashboard/access-control`, `/dashboard/manage-parking-lots`, and `/dashboard/customers`.
-  Make only the supporting shared-layout changes that are directly needed for those surfaces, such as `dashboard-layout.tsx`, `location-switcher.tsx`, `parking-action-controls.tsx`, `location-management-panel.tsx`, `operation-detail-sheet.tsx`, or closely related shared UI wrappers.
-  Fix the real issues found around small-phone, normal-phone, tall-phone, narrow-laptop, and common desktop usage, including safe areas, keyboard overlap, scroll behavior, sticky action reachability, clipped content, unreadable text, cramped cards or forms, poor wrapping, and hidden primary actions.
-  Record any notable remaining UI risks that are intentionally left for a later Track L pass instead of silently implying the whole app was fully hardened.
+  Compare this brief against the real repo state before editing, especially `supabase/end_parking_session.sql`, `apps/mobile/src/lib/reservations.ts`, `apps/mobile/src/features/parking/store/useParkingFlowStore.ts`, `apps/mobile/src/features/parking/screens/PaymentScreen.tsx`, `apps/mobile/src/features/parking/screens/ExitScreen.tsx`, `apps/parking-app-operator/app/api/operator/gate-entry/route.ts`, `apps/parking-app-operator/components/dashboard/parking-action-controls.tsx`, and the operator route schema or contract tests.
+  Define and implement a backend-owned exit authorization model for the current manual-paid path. It should only authorize exit after the session is completed or paid according to existing repo semantics, return a durable exit code or token, return an exit-grace deadline derived from the lot or reservation pricing config, and be safe to replay idempotently.
+  Add or update Supabase SQL artifacts for the paid-exit authorization and/or verification contract. Prefer a small additive artifact if that is safer than rewriting the existing `end_parking_session` contract; if the existing function must change, preserve backward compatibility for current mobile callers where practical.
+  Add an operator API route for exit verification that mirrors the safety posture of `/api/operator/gate-entry`: authenticated operator, capability check, active-location resolution, exact location assignment enforcement, service-role RPC call, structured errors, and route logging.
+  Update the operator Parking Actions/detail controls so exit verification is no longer merely a disabled placeholder when an eligible paid/completed session has a backend exit token, while still clearly blocking ineligible sessions.
+  Update the mobile session/payment/exit data mapping only as needed so the exit screen uses backend-provided exit authorization fields when available and falls back safely for local/guest/demo flows without overstating production payment support.
+  Add focused tests or contract coverage for the new SQL artifact names, route schema, permission/location enforcement expectations, eligible/ineligible exit states, and mobile mapping of backend exit authorization fields.
+  Update durable docs and tracker notes only where the project state changes, and keep staging proof, real payment-provider settlement, scanner hardware proof, penalties, and compensation explicitly open.
 
 - `Out of scope`:
-  Do not implement payment provider work, payment settlement, or the Track D paid-exit backend contract in this cycle.
-  Do not do staging-only Supabase proof, SQL migration work, role-model changes, or new backend business logic unless a tiny bug fix is strictly required to support a layout-safe screen.
-  Do not turn this into a broad redesign, design-token overhaul, or a whole-app visual refresh.
-  Do not spend cycle scope on lower-risk pages outside the named launch-critical surfaces unless a narrow shared fix unavoidably affects them.
+  Do not integrate Stripe, PayMongo, GCash, Maya, Apple Pay, Google Pay, or any real payment provider.
+  Do not implement webhook settlement, refunds, reversals, finance exports, or real-money reconciliation.
+  Do not implement penalty charging, compensation credits, wrong-slot dispute handling, or automatic overstay enforcement beyond recording/returning the exit grace boundary needed by this contract.
+  Do not claim live Supabase staging proof, scanner hardware proof, or full Track D/H success-gate completion.
+  Do not reopen Track L layout work unless a tiny copy or state-display adjustment is directly required to represent the new exit authorization contract.
+  Do not change admin/operator role policy beyond the narrow capability and location checks needed for exit verification.
 
 - `Dependencies to respect`:
-  `ACTIVE_EXECUTION_TRACKER.md` now places Track L ahead of Track K staging proof, Track D staging proof, and the deferred payment work.
-  The accepted Track K customer-oversight page already exists and may receive UI hardening in this cycle, but its staging proof remains a separate manual follow-up.
-  The debugger notes about rerunnable `admin_hardening.sql` and the Metro Android launch remain manual follow-ups and should not redirect this slice.
+  Existing entry confirmation, parking grace, manual-paid `end_parking_session`, operator location assignment, and Track K role boundaries are accepted baselines.
+  Track A staging bootstrap, Track K staging proof, Track D/H scanner proof, debugger SQL rerun, and Android launch validation remain manual/external follow-ups and should not be represented as solved.
+  Payment implementation remains deferred until the separate React Native/payment consultation changes direction; this cycle is a backend exit authorization bridge over the current manual-paid path.
+  Track L live viewport proof remains open and should not be marked complete by this backend/operator slice.
 
 - `Constraints`:
-  Implement only the missing UI hardening that is actually still absent in repo state.
-  Prefer surgical layout, spacing, typography, overflow, and discoverability fixes over rewriting flows or introducing new product behavior.
-  Preserve existing role gating, backend contracts, and accepted Track K behavior while improving the UI.
-  Keep the slice reviewable in one cycle; if not every issue can land, prioritize hidden actions, broken overflow, unreadable text, and unsafe scroll states first.
-  Payment-related screens may receive layout cleanup only if they are directly touched by shared fixes; payment feature implementation itself stays out of scope.
+  Keep the contract small, replay-safe, and auditable.
+  Preserve current mobile guest/local demo behavior; local flows may continue generating local exit codes as long as live/backend flows prefer backend authorization.
+  Preserve current operator access boundaries: non-admin operators can only verify exit for their assigned active location, and admin/global visibility must not bypass location safety for mutation unless existing route patterns already allow it explicitly.
+  Prefer clear names that distinguish `payment completed`, `exit authorized`, and `exit verified` states instead of overloading one status ambiguously.
+  If schema additions are needed, make SQL rerunnable where possible and update `supabase/README.md` with the deployment order or manual action.
 
 - `Required validation`:
-  If mobile files change, run `npm --workspace apps/mobile run test` and `npm --workspace apps/mobile run typecheck`.
-  If operator files change, run `npm --workspace apps/parking-app-operator run test` and `npm --workspace apps/parking-app-operator run build`.
-  Run `git diff --check`.
-  Include truthful manual viewport-check notes for the changed surfaces across at least one small-phone or tall-phone case and one narrow-laptop or common-desktop dashboard case.
-  Call out any remaining layout or readability risks instead of implying the full Track L pass is complete.
+  If mobile files change, run `npm.cmd --workspace apps/mobile run test` and `npm.cmd --workspace apps/mobile run typecheck`.
+  If operator files change, run `npm.cmd --workspace apps/parking-app-operator run test` and `npm.cmd --workspace apps/parking-app-operator run build`.
+  Run `git -c safe.directory=C:/dev/parking_app diff --check`.
+  Statically review the SQL artifacts for idempotency, auth assumptions, location scoping, replay behavior, and payment/exit state boundaries.
+  If any validation cannot be run, record the exact reason and do not imply the contract is production-proven.
 
 - `Success criteria`:
-  The named launch-critical surfaces no longer have obvious clipped or hidden primary actions, broken wrapping, unreadable text sizing, or non-scroll-safe states in the real repo UI.
-  Shared layout fixes remain compatible with the accepted operator or admin role boundaries and Track K customer-oversight behavior.
-  Validation and notes truthfully distinguish what was fixed now versus what remains for later UI hardening.
+  The repo contains a clear backend-owned paid-exit authorization and operator verification contract for the current manual-paid path.
+  Eligible paid/completed sessions can receive a backend exit token/code plus exit-grace deadline, and ineligible sessions remain blocked with clear errors.
+  Operator exit verification uses the same authentication, capability, active-location, assignment, logging, and service-role safety patterns as accepted gate-entry verification.
+  Mobile exit presentation can prefer backend exit authorization data when available without pretending real payment settlement exists.
+  Tests and docs distinguish implemented repo contract from missing staging proof, scanner hardware proof, payment provider work, penalties, compensation, and full Track D/H completion.
 
 - `Expected deliverable`:
-  A focused Track L repo slice that hardens the highest-risk launch-critical mobile and operator or admin surfaces, updates any truthful readiness or tracker notes needed by the changed UI, appends the execution log, and hands the baton to Reviewer.
+  A focused Track D/H paid-exit authorization repo slice with SQL/API/mobile/operator/test/doc updates as needed, a factual developer execution-log entry, tracker/readiness updates where state changed, and a baton handoff to Reviewer.
 
 - `Files likely involved`:
-  `apps/mobile/src/features/parking/screens/ReservationScreen.tsx`
-  `apps/mobile/src/features/parking/screens/ArrivalScreen.tsx`
-  `apps/mobile/src/features/parking/screens/SessionScreen.tsx`
-  `apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx`
-  `apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx`
-  `apps/mobile/app/reservation/[lotId].tsx`
-  `apps/mobile/app/arrival.tsx`
-  `apps/mobile/app/session.tsx`
-  `apps/mobile/app/walkin-confirm.tsx`
-  `apps/mobile/app/walkin-qr.tsx`
-  `apps/parking-app-operator/app/dashboard/page.tsx`
-  `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx`
-  `apps/parking-app-operator/app/dashboard/access-control/page.tsx`
-  `apps/parking-app-operator/app/dashboard/manage-parking-lots/page.tsx`
-  `apps/parking-app-operator/app/dashboard/customers/page.tsx`
-  `apps/parking-app-operator/components/layout/dashboard-layout.tsx`
-  `apps/parking-app-operator/components/layout/location-switcher.tsx`
+  `supabase/end_parking_session.sql`
+  `supabase/schema.sql`
+  `supabase/README.md`
+  `supabase/paid_exit_authorization.sql` or an equivalently named new artifact if needed
+  `apps/mobile/src/lib/reservations.ts`
+  `apps/mobile/src/features/parking/store/useParkingFlowStore.ts`
+  `apps/mobile/src/features/parking/types.ts`
+  `apps/mobile/src/features/parking/screens/PaymentScreen.tsx`
+  `apps/mobile/src/features/parking/screens/ExitScreen.tsx`
+  `apps/mobile/tests/backendContract.test.mjs`
+  `apps/mobile/tests/reservationContract.test.mjs`
+  `apps/parking-app-operator/app/api/operator/exit-verification/route.ts`
+  `apps/parking-app-operator/app/api/operator/gate-entry/route.ts`
+  `apps/parking-app-operator/lib/operatorRouteSchemas.ts`
+  `apps/parking-app-operator/lib/operatorPermissions.ts`
   `apps/parking-app-operator/components/dashboard/parking-action-controls.tsx`
-  `apps/parking-app-operator/components/dashboard/location-management-panel.tsx`
-  `apps/parking-app-operator/components/dashboard/operation-detail-sheet.tsx`
+  `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx`
+  `apps/parking-app-operator/tests/routeContractCoverage.test.js`
+  `apps/parking-app-operator/tests/routeRequestValidation.test.mjs`
+  `apps/parking-app-operator/tests/operatorPermissions.test.mjs`
   `apps/mobile/PRODUCTION_READINESS_CHECKLIST.md`
   `apps/parking-app-operator/PRODUCTION_READINESS_CHECKLIST.md`
-  `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
   `workflow/planning/ACTIVE_EXECUTION_TRACKER.md`
+  `workflow/logs/AI_DEVELOPER_EXECUTION_LOG.md`
   `workflow/runtime/AI_WORKFLOW_STATE.md`
+  `workflow/temp/TRACK_DH_PAID_EXIT_CONTRACT_NOTES.md`
 
 - `Reviewer focus areas`:
-  Verify the developer fixed real layout and readability issues on the named surfaces rather than doing an unvalidated cosmetic sweep.
-  Verify the changes preserve current functional behavior, role gating, and the accepted Track K customer-oversight behavior.
-  Verify validation coverage matches the touched app surfaces and that any remaining UI risks are documented truthfully.
-  Verify payment or backend scope did not creep back into this UI hardening slice.
+  Verify that exit authorization is backend-owned, replay-safe, and distinct from real payment-provider settlement.
+  Verify operator exit verification cannot mutate sessions outside the operator's assigned active location and does not broaden admin/operator role powers accidentally.
+  Verify mobile live/backend flows prefer backend exit authorization fields while local/demo fallback remains clearly scoped.
+  Verify SQL artifacts are rerunnable or deployment-order-safe and docs do not claim staging proof, scanner proof, penalties, compensation, payment provider support, or full Track D/H completion.
+  Verify the Developer did not use this cycle to reopen unrelated Track L UI polish, Track K control-plane work, or broad payment integration.
 
 - `Next owner after developer closeout`:
   `Reviewer`

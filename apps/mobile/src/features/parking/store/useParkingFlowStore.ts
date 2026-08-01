@@ -55,6 +55,9 @@ interface ParkingFlowState {
   booking: Booking | null;
   session: ParkingSession | null;
   completedSession: CompletedSession | null;
+  pendingPaymentIntentId: string | null;
+  pendingPaymentMethodType: string | null;
+  pendingPaymentQrImageUrl: string | null;
   reservationDraft: ReservationDraft | null;
   validationQrToken: string;
   scheduledNotificationIds: string[];
@@ -67,6 +70,13 @@ interface ParkingFlowState {
   refreshSession: () => Promise<ParkingSession | null>;
   clearExpiredEntryPass: () => Promise<void>;
   finishSession: (durationSeconds: number) => Promise<CompletedSession | null>;
+  setPendingPaymentAttempt: (value: {
+    paymentIntentId: string | null;
+    paymentMethodType?: string | null;
+    qrImageUrl?: string | null;
+  }) => void;
+  clearPendingPaymentAttempt: () => void;
+  markCompletedSessionPaymentStatus: (paymentStatus: string) => void;
   cancelReservation: () => Promise<void>;
   restoreWorkflow: (lots: ParkingLot[]) => Promise<void>;
   setValidationQrToken: (value: string) => void;
@@ -83,6 +93,9 @@ const initialState = {
   booking: null,
   session: null,
   completedSession: null,
+  pendingPaymentIntentId: null,
+  pendingPaymentMethodType: null,
+  pendingPaymentQrImageUrl: null,
   reservationDraft: null,
   validationQrToken: '',
   scheduledNotificationIds: [] as string[],
@@ -134,6 +147,33 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
       setHasHydrated: (value: boolean) => {
         set({ hasHydrated: value });
       },
+      setPendingPaymentAttempt: ({ paymentIntentId, paymentMethodType = null, qrImageUrl = null }) => {
+        set({
+          pendingPaymentIntentId: paymentIntentId,
+          pendingPaymentMethodType: paymentMethodType,
+          pendingPaymentQrImageUrl: qrImageUrl,
+        });
+      },
+      clearPendingPaymentAttempt: () => {
+        set({
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
+        });
+      },
+      markCompletedSessionPaymentStatus: (paymentStatus: string) => {
+        set((state) => ({
+          completedSession: state.completedSession
+            ? {
+                ...state.completedSession,
+                paymentStatus,
+              }
+            : null,
+          pendingPaymentIntentId: paymentStatus === 'paid' ? null : state.pendingPaymentIntentId,
+          pendingPaymentMethodType: paymentStatus === 'paid' ? null : state.pendingPaymentMethodType,
+          pendingPaymentQrImageUrl: paymentStatus === 'paid' ? null : state.pendingPaymentQrImageUrl,
+        }));
+      },
       reserveSlot: async ({ lot, slot, arrivalWindowMinutes, plateNumber }) => {
         const booking = await createParkingReservation({
           lot,
@@ -162,6 +202,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking,
           session: null,
           completedSession: null,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: notificationIds,
@@ -214,6 +257,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking,
           session: null,
           completedSession: null,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: [],
@@ -273,6 +319,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking,
           session,
           completedSession: null,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: [],
@@ -307,6 +356,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking: null,
           session: null,
           completedSession: null,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: [],
@@ -340,6 +392,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
         } else {
           const endRecords = await endParkingSession({
             reservationId: session.reservationId ?? session.reservationCode,
+            paymentProvider: 'paymongo',
+            paymentReference: 'pending_checkout',
+            paymentStatus: 'pending',
           });
 
           if (endRecords && endRecords.length > 0) {
@@ -370,6 +425,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking: null,
           session: null,
           completedSession,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: [],
@@ -402,6 +460,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking: null,
           session: null,
           completedSession: null,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: [],
@@ -447,6 +508,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
                 booking,
                 session,
                 completedSession: null,
+                pendingPaymentIntentId: null,
+                pendingPaymentMethodType: null,
+                pendingPaymentQrImageUrl: null,
                 reservationDraft: null,
                 validationQrToken: storedWorkflow?.validationQrToken ?? '',
                 scheduledNotificationIds: storedWorkflow?.scheduledNotificationIds ?? [],
@@ -500,6 +564,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
                 booking,
                 session,
                 completedSession: null,
+                pendingPaymentIntentId: null,
+                pendingPaymentMethodType: null,
+                pendingPaymentQrImageUrl: null,
                 reservationDraft: null,
                 validationQrToken: storedWorkflow.validationQrToken ?? '',
                 scheduledNotificationIds: storedWorkflow.scheduledNotificationIds ?? [],
@@ -529,6 +596,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           booking: null,
           session: null,
           completedSession: null,
+          pendingPaymentIntentId: null,
+          pendingPaymentMethodType: null,
+          pendingPaymentQrImageUrl: null,
           reservationDraft: null,
           validationQrToken: '',
           scheduledNotificationIds: [],
@@ -552,6 +622,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
         validationQrToken: state.validationQrToken,
         scheduledNotificationIds: state.scheduledNotificationIds,
         isRestoring: state.isRestoring,
+        pendingPaymentIntentId: state.pendingPaymentIntentId,
+        pendingPaymentMethodType: state.pendingPaymentMethodType,
+        pendingPaymentQrImageUrl: state.pendingPaymentQrImageUrl,
       }),
     },
   ),

@@ -630,11 +630,11 @@ The automation was built in Codex in two steps:
 
 The current dispatcher configuration is:
 
-- `Name`: `Three Persona Workflow Dispatcher`
-- `Automation id`: `planner-persona-cycle`
+- `Name`: `Parking App Workflow Dispatcher`
+- `Automation id`: `planner-persona-cycle` (legacy id retained from the first setup)
 - `Kind`: `heartbeat`
 - `Destination`: `thread`
-- `Schedule`: `FREQ=MINUTELY;INTERVAL=20`
+- `Schedule`: `FREQ=MINUTELY;INTERVAL=2`
 - `Status when configured`: `PAUSED`
 
 ### Current Dispatcher Behavior

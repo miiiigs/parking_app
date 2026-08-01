@@ -43,7 +43,7 @@ export default function MenuScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
   const { vehicles, selectedVehicle: vehicle } = useMobileVehicles();
-  const { contentWidth, horizontalPadding } = useResponsiveMetrics();
+  const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const [expanded, setExpanded] = useState<SectionId | null>('profile');
   const [notificationsOn, setNotificationsOn] = useState(true);
   const [locationOn, setLocationOn] = useState(true);
@@ -142,7 +142,7 @@ export default function MenuScreen() {
 
               <View style={styles.content}>
                 <View style={styles.profileCard}>
-                  <View style={styles.profileRow}>
+                  <View style={[styles.profileRow, isCompact ? styles.profileRowCompact : null]}>
                     <View style={styles.profileAvatar}>
                       <User color="#FFFFFF" size={26} strokeWidth={2.1} />
                     </View>
@@ -376,6 +376,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  profileRowCompact: {
+    alignItems: 'flex-start',
+  },
   profileAvatar: {
     width: 52,
     height: 52,
@@ -386,6 +389,7 @@ const styles = StyleSheet.create({
   },
   profileCopy: {
     flex: 1,
+    minWidth: 0,
   },
   profileName: {
     color: '#FFFFFF',
@@ -461,6 +465,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
     fontFamily: 'Poppins_500Medium',
+    flexShrink: 1,
   },
   sectionBody: {
     borderTopWidth: 1,
@@ -479,6 +484,7 @@ const styles = StyleSheet.create({
   },
   navItemCopy: {
     flex: 1,
+    minWidth: 0,
   },
   navItemTitle: {
     color: '#1E293B',
@@ -517,6 +523,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+    flexShrink: 1,
   },
   reportCard: {
     minHeight: 68,

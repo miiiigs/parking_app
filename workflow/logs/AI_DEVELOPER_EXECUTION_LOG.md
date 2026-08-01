@@ -724,3 +724,36 @@ Do not use this file as the strategic roadmap or the active priority board.
 
 - `Recommended next move`:
   Reviewer should verify that the responsive shell and breakpoint changes really improve the named launch-critical surfaces without regressing role gating or user flows, confirm that the validation evidence and viewport notes are described truthfully, and decide whether this first Track L slice is acceptable before planner scopes the next UI hardening pass.
+
+### 2026-06-27 - Track L UI/UX Hardening Pass 2 For Payment, Exit, And Dense Operator Surfaces
+
+- `Current move/task`:
+  Implement the second Track L repo slice by auditing and hardening the remaining payment, exit, receipt, account/payment-method, and dense operator/admin surfaces for responsiveness, readability, spacing, overflow safety, and action reachability while keeping payment provider work and paid-exit backend work out of scope.
+
+- `Already finished before my work`:
+  Track L pass 1 had already been accepted by review and covered the mobile reservation, arrival, session, walk-in confirm, and walk-in QR screens plus the dashboard shell, location switcher, Parking Actions, Access Control, Manage Parking Lots, and Customer Oversight.
+  The repo already had responsive metric helpers in mobile and card/table fallbacks on several operator pages, but pass-2 surfaces still had concrete layout risks around rigid fee rows, receipt metadata rows, wallet/card rows, early dense tables, pricing forms, detail-sheet action controls, and operator-tool side-by-side layouts.
+
+- `What I completed now`:
+  Hardened `PaymentScreen`, `ExitScreen`, and `ReceiptScreen` so fee rows, total banners, QR presentation, ticket rows, receipt metadata, amount rows, and payment method values shrink, wrap, or stack more safely on compact phones.
+  Hardened `PaymentMethodsScreen`, `MenuScreen`, and `EditProfileScreen` so wallet rows, split card inputs, profile/contact labels, menu labels, toggle labels, and profile form fields have safer compact-screen behavior.
+  Updated dense operator/admin surfaces so `Live Reservations` and `Audit Trail` keep card-first layouts until `xl`, narrow cards use single-column details before `sm`, and dense filters avoid crowding narrower widths.
+  Updated `Parking Setup`, `PricingSettingsPanel`, `Operator Tools`, `operation-detail-sheet`, and `parking-action-controls` so dense forms, summary grids, action cards, reconciliation history, linked-session panels, and operator action buttons stack or delay multi-column behavior on tighter widths.
+  Added `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md` with reviewed surfaces, concrete fixes, code-backed viewport notes, and remaining risks.
+  Updated mobile/operator readiness checklists and the Track L tracker entry to reflect the accepted pass-1 baseline plus the new pass-2 repo hardening while keeping live viewport proof and broader final UI coverage open.
+
+- `Validation`:
+  `npm.cmd --workspace apps/mobile run test`: passed 37 of 37 tests.
+  `npm.cmd --workspace apps/mobile run typecheck`: passed.
+  `npm.cmd --workspace apps/parking-app-operator run test`: passed 43 of 43 tests.
+  `npm.cmd --workspace apps/parking-app-operator run build`: passed Next.js compilation, TypeScript, static page generation, and route discovery including the touched dashboard routes.
+  `git -c safe.directory=C:/dev/parking_app diff --check`: passed with line-ending warnings only.
+  Viewport notes were recorded in `workflow/temp/TRACK_L_UI_HARDENING_PASS_2_NOTES.md`, but they are code-backed review notes rather than live screenshots or device/browser captures.
+
+- `Still open`:
+  Track L still needs live rendered viewport proof across representative small phones, tall phones, narrow laptops, and common desktop widths before claiming the broader success gate.
+  Lower-priority screens outside pass 1 and pass 2 may still need a final polish sweep.
+  Payment provider implementation, paid-exit backend authorization, penalty handling, staging proof, SQL rollout, scanner hardware proof, and role-model changes remain intentionally out of scope and still open.
+
+- `Recommended next move`:
+  Reviewer should verify that pass-2 layout changes preserve payment/exit placeholders, role gates, and existing operator behavior while materially improving compact phone and narrow laptop usability, confirm that validation and viewport notes are truthful, and decide whether the workflow can return to Planner for live viewport proof/final UI sweep or another launch blocker.

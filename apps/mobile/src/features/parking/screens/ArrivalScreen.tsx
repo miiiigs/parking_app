@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -28,6 +28,7 @@ export default function ArrivalScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const isPollingRef = useRef(false);
 
   useEffect(() => {
     if (hasHydrated && !booking && !session) {
@@ -40,6 +41,45 @@ export default function ArrivalScreen() {
       router.replace('/session');
     }
   }, [router, session]);
+
+  useEffect(() => {
+    if (!booking?.reservationId || session) {
+      return;
+    }
+
+    let active = true;
+
+    const pollForConfirmation = async () => {
+      if (!active || isPollingRef.current) {
+        return;
+      }
+
+      try {
+        isPollingRef.current = true;
+        const confirmedSession = await refreshSession();
+        if (active && confirmedSession) {
+          router.replace('/session');
+        }
+      } catch {
+        // Keep silent background polling non-disruptive; manual checks surface errors.
+      } finally {
+        isPollingRef.current = false;
+      }
+    };
+
+    const initialTimer = setTimeout(() => {
+      void pollForConfirmation();
+    }, 1200);
+    const intervalId = setInterval(() => {
+      void pollForConfirmation();
+    }, 5000);
+
+    return () => {
+      active = false;
+      clearTimeout(initialTimer);
+      clearInterval(intervalId);
+    };
+  }, [booking?.reservationId, refreshSession, router, session]);
   const reservation = booking ?? session;
 
   const entryQrValue = useMemo(() => {
@@ -159,6 +199,8 @@ export default function ArrivalScreen() {
               After entry is confirmed, your active session begins immediately and uses the lot&apos;s entry grace period while you proceed to your slot.
             </Text>
           </View>
+
+          <Text style={styles.syncHint}>This screen checks for operator or gate confirmation automatically every few seconds.</Text>
 
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
@@ -392,6 +434,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
+  },
+  syncHint: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
   },
   fullWidthButton: {
     width: '100%',

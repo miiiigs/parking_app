@@ -25,7 +25,7 @@ export default function ParkingSetupPage() {
         </div>
 
         <Card className="border-border bg-card">
-          <CardContent className="flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
+          <CardContent className="flex flex-col gap-4 p-4 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/30 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <MapPinned className="h-3.5 w-3.5 text-primary" />
