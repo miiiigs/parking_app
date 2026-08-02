@@ -24,10 +24,13 @@ begin
     for update of r skip locked
   loop
     -- Serialize with session start before changing the held inventory.
-    perform 1
-    from parking_slots ps
-    where ps.id = v_reservation.slot_id
-    for update;
+    if v_reservation.slot_id is not null then
+      perform 1
+      from parking_slots ps
+      where ps.id = v_reservation.slot_id
+        and ps.slot_kind = 'standard'
+      for update;
+    end if;
 
     update reservations
     set status = 'expired'
@@ -45,24 +48,27 @@ begin
       continue;
     end if;
 
-    update parking_slots
-    set status = 'available'
-    where id = v_reservation.slot_id
-      and status = 'reserved'
-      and not exists (
-        select 1
-        from parking_sessions s
-        where s.slot_id = v_reservation.slot_id
-          and s.status in ('active', 'disputed')
-      )
-      and not exists (
-        select 1
-        from reservations r
-        where r.slot_id = v_reservation.slot_id
-          and r.id <> v_reservation.id
-          and r.status in ('pending', 'confirmed')
-          and r.expires_at > now()
-      );
+    if v_reservation.slot_id is not null then
+      update parking_slots
+      set status = 'available'
+      where id = v_reservation.slot_id
+        and slot_kind = 'standard'
+        and status = 'reserved'
+        and not exists (
+          select 1
+          from parking_sessions s
+          where s.slot_id = v_reservation.slot_id
+            and s.status in ('active', 'disputed')
+        )
+        and not exists (
+          select 1
+          from reservations r
+          where r.slot_id = v_reservation.slot_id
+            and r.id <> v_reservation.id
+            and r.status in ('pending', 'confirmed')
+            and r.expires_at > now()
+        );
+    end if;
 
     v_slot_released := found;
 

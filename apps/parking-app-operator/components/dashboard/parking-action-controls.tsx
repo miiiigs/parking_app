@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { recordOperatorActionFailure, recordOperatorActionSuccess } from '@/lib/operatorDataStore';
 import type { ParkingSessionRecord, Reservation } from '@/lib/types';
 import { useOperatorData } from '@/lib/useOperatorData';
+import { buildReservationEntryPass, buildWalkInEntryPass } from '@parking/shared';
 
 type FeedbackTone = 'success' | 'warning' | 'error';
 
@@ -27,24 +28,28 @@ type ActionFeedback = {
   message: string;
 };
 
-export function buildOperatorEntryPass(reservation: Pick<Reservation, 'id' | 'source'>) {
+export function buildOperatorEntryPass(
+  reservation: Pick<Reservation, 'id' | 'source'>,
+  slotQrToken?: string | null,
+) {
   return reservation.source === 'walk_in'
-    ? `walkin-entry-pass|${reservation.id}`
-    : `reservation-entry|${reservation.id}`;
+    ? null
+    : buildReservationEntryPass({ reservationId: reservation.id, slotQrToken });
 }
 
 export function ReservationParkingActions({
   reservation,
 }: {
-  reservation: Pick<Reservation, 'id' | 'source' | 'status' | 'reservationId' | 'linkedSessionId'>;
+  reservation: Pick<Reservation, 'id' | 'source' | 'status' | 'reservationId' | 'linkedSessionId' | 'slotId'>;
 }) {
-  const { refresh } = useOperatorData();
+  const { data, refresh } = useOperatorData();
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
 
-  const entryPass = buildOperatorEntryPass(reservation);
+  const slotQrToken = data?.parkingMap.slots.find((slot) => slot.id === reservation.slotId)?.qrToken ?? null;
+  const entryPass = buildOperatorEntryPass(reservation, slotQrToken);
   const hasLinkedSession = Boolean(reservation.linkedSessionId);
-  const canVerifyEntry = reservation.status === 'active';
+  const canVerifyEntry = reservation.status === 'active' && Boolean(entryPass);
 
   async function handleVerifyEntry() {
     setSubmitting(true);
@@ -98,7 +103,7 @@ export function ReservationParkingActions({
           Verify Entry QR
         </Button>
         <Button type="button" size="sm" variant="outline" asChild className="w-full sm:w-auto">
-          <Link href={`/dashboard/parking-actions?entryPass=${encodeURIComponent(entryPass)}`}>
+          <Link href={`/dashboard/parking-actions?reservationId=${encodeURIComponent(reservation.id)}&source=${encodeURIComponent(reservation.source)}`}>
             Open Parking Actions
           </Link>
         </Button>
@@ -107,7 +112,9 @@ export function ReservationParkingActions({
         </Button>
       </div>
       <div className="text-xs text-muted-foreground">
-        {hasLinkedSession
+        {reservation.source === 'walk_in'
+          ? 'Walk-in entry now requires the customer QR because the one-time token is no longer reconstructable from the dashboard.'
+          : hasLinkedSession
           ? 'Entry verification can be replayed safely if the operator needs to re-check the active session. Exit verification is still blocked until the backend exit contract exists.'
           : 'Use the direct entry verification button when scan hardware is unavailable. Exit verification is still blocked until the backend exit contract exists.'}
       </div>
@@ -127,15 +134,14 @@ export function SessionParkingActions({
   session: Pick<ParkingSessionRecord, 'status'>;
   reservation: Pick<Reservation, 'id' | 'source'> | null;
 }) {
-  const entryPass = reservation ? buildOperatorEntryPass(reservation) : null;
-  const canOpenParkingActions = Boolean(entryPass);
+  const canOpenParkingActions = Boolean(reservation);
 
   return (
     <div className="space-y-2">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button type="button" size="sm" variant="outline" asChild disabled={!canOpenParkingActions} className="w-full sm:w-auto">
           {canOpenParkingActions ? (
-            <Link href={`/dashboard/parking-actions?entryPass=${encodeURIComponent(entryPass!)}`}>
+            <Link href={`/dashboard/parking-actions?reservationId=${encodeURIComponent(reservation!.id)}&source=${encodeURIComponent(reservation!.source)}`}>
               Open Parking Actions
             </Link>
           ) : (

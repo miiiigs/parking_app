@@ -40,6 +40,8 @@ let channel: RealtimeChannel | null = null;
 let initialized = false;
 let lastRefreshAt = 0;
 let fallbackIntervalId: number | null = null;
+let backgroundRefreshListenersBound = false;
+let backgroundRefreshIntervalMs: number | null = null;
 let lastRealtimeEventAt = 0;
 let failedActionCount = 0;
 let realtimeStatus: OperatorSystemHealth['realtime'] = 'unknown';
@@ -48,6 +50,8 @@ let activeDashboardRequestController: AbortController | null = null;
 
 const DASHBOARD_REFRESH_COOLDOWN_MS = 3000;
 const DASHBOARD_REQUEST_TIMEOUT_MS = 15000;
+const REALTIME_BACKGROUND_REFRESH_MS = 15000;
+const POLLING_BACKGROUND_REFRESH_MS = 8000;
 
 function toIsoTimestamp(value: number) {
   return value > 0 ? new Date(value).toISOString() : null;
@@ -476,6 +480,36 @@ function scheduleApplyEvents() {
   }, 200) as unknown as number;
 }
 
+function refreshWhileVisible() {
+  if (document.visibilityState !== 'visible') {
+    return;
+  }
+
+  void refreshOperatorData({ silent: true });
+}
+
+function ensureBackgroundRefresh() {
+  if (!backgroundRefreshListenersBound) {
+    backgroundRefreshListenersBound = true;
+    document.addEventListener('visibilitychange', refreshWhileVisible);
+    window.addEventListener('focus', refreshWhileVisible);
+  }
+
+  const nextIntervalMs = syncMode === 'polling' ? POLLING_BACKGROUND_REFRESH_MS : REALTIME_BACKGROUND_REFRESH_MS;
+  if (fallbackIntervalId && backgroundRefreshIntervalMs === nextIntervalMs) {
+    return;
+  }
+
+  if (fallbackIntervalId) {
+    window.clearInterval(fallbackIntervalId);
+  }
+
+  backgroundRefreshIntervalMs = nextIntervalMs;
+  fallbackIntervalId = window.setInterval(() => {
+    refreshWhileVisible();
+  }, nextIntervalMs) as unknown as number;
+}
+
 export function enqueueOperatorEvent(ev: RealtimePayload) {
   pendingEvents.push(ev);
   scheduleApplyEvents();
@@ -483,29 +517,12 @@ export function enqueueOperatorEvent(ev: RealtimePayload) {
 
 function ensureRealtimeSubscribed() {
   const realtimeClient = getOperatorRealtimeClient();
+  ensureBackgroundRefresh();
 
   if (!realtimeClient) {
     syncMode = 'polling';
     realtimeStatus = 'degraded';
-    if (!fallbackIntervalId) {
-      fallbackIntervalId = window.setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          void refreshOperatorData({ silent: true });
-        }
-      }, 8000) as unknown as number;
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshOperatorData({ silent: true });
-      }
-    };
-    const handleWindowFocus = () => {
-      void refreshOperatorData({ silent: true });
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleWindowFocus);
+    ensureBackgroundRefresh();
     applyHealthToCachedData();
     return;
   }
@@ -513,6 +530,7 @@ function ensureRealtimeSubscribed() {
   if (channel) return;
 
   syncMode = 'realtime';
+  ensureBackgroundRefresh();
   const topic = 'operator-dashboard-live-sync-store';
   channel = realtimeClient
     .channel(topic)

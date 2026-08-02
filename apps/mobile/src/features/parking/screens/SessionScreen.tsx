@@ -235,12 +235,14 @@ export default function SessionScreen() {
                 </View>
 
                 <View style={styles.infoCard}>
-                  <View style={styles.infoHeaderRow}>
-                    <MapPin color="#0F766E" size={16} strokeWidth={2.2} />
-                    <Text style={styles.infoHeaderTitle}>Location</Text>
-                  </View>
-                  <Text style={styles.infoPrimaryText}>{session.lotName}</Text>
-                  <Text style={styles.infoSecondaryText}>{session.address} - Slot {session.slot.number}</Text>
+                <View style={styles.infoHeaderRow}>
+                  <MapPin color="#0F766E" size={16} strokeWidth={2.2} />
+                  <Text style={styles.infoHeaderTitle}>Location</Text>
+                </View>
+                <Text style={styles.infoPrimaryText}>{session.lotName}</Text>
+                  <Text style={styles.infoSecondaryText}>
+                    {session.address} - {session.source === 'walk_in' ? 'Walk-In Access' : `Slot ${session.slot.number}`}
+                  </Text>
                 </View>
 
                 <View style={styles.infoCard}>

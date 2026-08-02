@@ -95,7 +95,7 @@ export const operatorSlotUpdateRouteRequestSchema = z.object({
 });
 
 export const operatorGateEntryRouteRequestSchema = z.object({
-  entryPass: z.string().trim().min(1),
+  entryPass: z.string().trim().min(1).max(512),
 });
 
 const uuidString = z.string().trim().uuid();

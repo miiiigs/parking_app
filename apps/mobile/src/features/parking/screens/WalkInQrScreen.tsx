@@ -1,20 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertTriangle, Car, Clock, Zap } from 'lucide-react-native';
+import { Car, MapPin, Zap } from 'lucide-react-native';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { ParkingDataStatusCard } from '../../../components/parking/ParkingDataStatusCard';
-import { AppScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
+import { FlowScreenHeader, AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { getRouteParam } from '../../auth/utils';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
+import { buildWalkInEntryPass } from '@parking/shared';
 
 export default function WalkInQrScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ lotId?: string; slotId?: string }>();
+  const params = useLocalSearchParams<{ lotId?: string }>();
   const { contentWidth, horizontalPadding, isCompact } = useResponsiveMetrics();
   const { lots, isLoading, isRefreshing, status, error: dataError, lastSyncedAt, refresh } = useMobileParkingData();
   const booking = useParkingFlowStore((state) => state.booking);
@@ -22,14 +23,9 @@ export default function WalkInQrScreen() {
   const refreshSession = useParkingFlowStore((state) => state.refreshSession);
   const clearExpiredEntryPass = useParkingFlowStore((state) => state.clearExpiredEntryPass);
   const vehicle = useWalkInPreferencesStore((state) => state.vehicle);
-  const lotId = getRouteParam(params.lotId);
-  const slotId = getRouteParam(params.slotId);
-  const lot = lots.find((entry) => entry.id === lotId) ?? null;
-  const slot = lot?.slots.find((entry) => entry.id === slotId) ?? null;
-  const activeWalkInBooking =
-    booking?.source === 'walk_in' && booking.lotId === lotId && booking.slot.id === slotId
-      ? booking
-      : null;
+  const preferredLotId = getRouteParam(params.lotId);
+  const preferredLot = lots.find((entry) => entry.id === preferredLotId) ?? lots[0] ?? null;
+  const activeWalkInBooking = booking?.source === 'walk_in' ? booking : null;
   const [secondsRemaining, setSecondsRemaining] = useState(600);
   const [isIssuing, setIsIssuing] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -38,13 +34,13 @@ export default function WalkInQrScreen() {
   const isPollingRef = useRef(false);
 
   useEffect(() => {
-    if ((!lotId || !slotId) || !vehicle) {
+    if (!vehicle) {
       router.replace('/home');
     }
-  }, [lotId, router, slotId, vehicle]);
+  }, [router, vehicle]);
 
   useEffect(() => {
-    if (!lot || !slot || !vehicle || activeWalkInBooking || isIssuing) {
+    if (!vehicle || (activeWalkInBooking && activeWalkInBooking.entryPassToken) || isIssuing) {
       return;
     }
 
@@ -55,8 +51,7 @@ export default function WalkInQrScreen() {
         setIsIssuing(true);
         setErrorMessage(null);
         await issueWalkInEntryPass({
-          lot,
-          slot,
+          lot: preferredLot ?? undefined,
           plateNumber: vehicle.plate,
           holdMinutes: 10,
         });
@@ -74,7 +69,7 @@ export default function WalkInQrScreen() {
     return () => {
       active = false;
     };
-  }, [activeWalkInBooking, isIssuing, issueAttempt, issueWalkInEntryPass, lot, slot, vehicle]);
+  }, [activeWalkInBooking, isIssuing, issueAttempt, issueWalkInEntryPass, preferredLot, vehicle]);
 
   useEffect(() => {
     const expiresAt = activeWalkInBooking?.expiresAt;
@@ -119,7 +114,7 @@ export default function WalkInQrScreen() {
           router.replace('/session');
         }
       } catch {
-        // Keep silent background polling non-disruptive; manual checks surface errors.
+        // Keep silent background polling non-disruptive.
       } finally {
         isPollingRef.current = false;
       }
@@ -139,28 +134,28 @@ export default function WalkInQrScreen() {
     };
   }, [activeWalkInBooking?.expiresAt, activeWalkInBooking?.reservationId, refreshSession, router]);
 
-  if ((!lot || !slot) && isLoading) {
+  if (isLoading && !preferredLot) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Preparing entrance pass...</Text>
-        <Text style={styles.loadingCopy}>Loading the selected parking lot and slot details.</Text>
+        <Text style={styles.loadingTitle}>Preparing walk-in QR...</Text>
+        <Text style={styles.loadingCopy}>Loading the supported parking locations.</Text>
       </View>
     );
   }
 
-  if (!activeWalkInBooking && (isLoading || isIssuing) && lot && slot && vehicle) {
+  if (!activeWalkInBooking && (isLoading || isIssuing) && vehicle) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Preparing entrance pass...</Text>
-        <Text style={styles.loadingCopy}>Issuing the backend walk-in hold and loading your slot details.</Text>
+        <Text style={styles.loadingTitle}>Preparing walk-in QR...</Text>
+        <Text style={styles.loadingCopy}>Issuing your backend walk-in access pass.</Text>
       </View>
     );
   }
 
-  if (!activeWalkInBooking && lot && slot && vehicle) {
+  if (!activeWalkInBooking && vehicle) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Entrance pass not available.</Text>
+        <Text style={styles.loadingTitle}>Walk-in QR not available.</Text>
         {errorMessage ? <Text style={styles.loadingCopy}>{errorMessage}</Text> : null}
         <AuthActionButton label="Retry" onPress={() => setIssueAttempt((value) => value + 1)} style={styles.loadingButton} />
         <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
@@ -168,10 +163,10 @@ export default function WalkInQrScreen() {
     );
   }
 
-  if (!lot || !slot || !vehicle) {
+  if (!activeWalkInBooking || !vehicle) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>{dataError ? 'Unable to load the entrance pass.' : 'Entrance pass not available.'}</Text>
+        <Text style={styles.loadingTitle}>{dataError ? 'Unable to load the walk-in QR.' : 'Walk-in QR not available.'}</Text>
         {dataError ? <Text style={styles.loadingCopy}>{dataError}</Text> : null}
         <AuthActionButton label="Retry" onPress={() => void refresh()} style={styles.loadingButton} />
         <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
@@ -179,153 +174,85 @@ export default function WalkInQrScreen() {
     );
   }
 
-  const issuedAt = new Date(activeWalkInBooking?.createdAt ?? new Date().toISOString());
+  const issuedAt = new Date(activeWalkInBooking.createdAt ?? new Date().toISOString());
   const timeLabel = issuedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
   const dateLabel = issuedAt.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
-  const qrValue = activeWalkInBooking?.reservationId
-    ? `walkin-entry-pass|${activeWalkInBooking.reservationId}`
-    : activeWalkInBooking?.reservationCode ?? `walkin|${lot.id}|${slot.id}|${vehicle.plate}`;
-  const minutesLabel = String(Math.floor(secondsRemaining / 60)).padStart(2, '0');
-  const secondsLabel = String(secondsRemaining % 60).padStart(2, '0');
-  const isUrgent = secondsRemaining <= 120;
+  const qrValue = activeWalkInBooking.reservationId
+    ? buildWalkInEntryPass({
+        reservationId: activeWalkInBooking.reservationId,
+        entryToken: activeWalkInBooking.entryPassToken ?? null,
+      })
+    : activeWalkInBooking.reservationCode;
   const isExpired = secondsRemaining <= 0;
-  const progressPercent = ((600 - secondsRemaining) / 600) * 100;
-  const qrSize = isCompact ? 144 : 160;
+  const qrSize = isCompact ? 220 : 256;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <AppScreenHeader title="Walk-In Entrance Pass" />
-      </View>
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 18 : 22 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.contentFrame, { maxWidth: contentWidth }]}>
-        <ParkingDataStatusCard
-          status={status}
-          error={dataError}
-          isRefreshing={isRefreshing}
-          lastSyncedAt={lastSyncedAt}
-          onRetry={() => void refresh()}
-        />
+          <FlowScreenHeader title="Entrance Pass" onBack={() => router.back()} />
 
-        <View style={styles.heroCard}>
-          <View style={styles.heroIcon}>
-            <Zap color="#FFFFFF" size={22} strokeWidth={2.4} />
-          </View>
-          <View style={styles.heroCopyBlock}>
-            <Text style={styles.heroTitle}>Gate Access Granted</Text>
-            <Text style={styles.heroCopy}>Find your selected slot and park your vehicle before the timer runs out.</Text>
-          </View>
-        </View>
+          <ParkingDataStatusCard
+            status={status}
+            error={dataError}
+            isRefreshing={isRefreshing}
+            lastSyncedAt={lastSyncedAt}
+            onRetry={() => void refresh()}
+          />
 
-        <View style={[styles.countdownCard, isUrgent ? styles.countdownCardUrgent : null]}>
-          <View style={styles.countdownHeader}>
-            <Clock color={isUrgent ? '#DC2626' : '#0F766E'} size={15} strokeWidth={2.3} />
-            <Text style={[styles.countdownLabel, isUrgent ? styles.countdownLabelUrgent : null]}>TIME TO FIND A SLOT</Text>
-          </View>
-
-          <Text style={[styles.countdownValue, isUrgent ? styles.countdownValueUrgent : null]}>
-            {minutesLabel}:{secondsLabel}
-          </Text>
-
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }, isUrgent ? styles.progressFillUrgent : null]} />
-          </View>
-
-          <Text style={styles.countdownHint}>
-            {isExpired
-              ? 'This entry pass expired before gate entry was confirmed.'
-              : 'Present this entry QR at the gate or to the operator before the timer reaches 00:00.'}
-          </Text>
-        </View>
-
-        <View style={styles.qrCard}>
-          <View style={styles.qrHeader}>
-            <View>
-              <Text style={styles.qrHeaderTitle}>Walk-In Entrance QR</Text>
-              <Text style={styles.qrHeaderSubtitle}>{dateLabel} - {timeLabel}</Text>
+          <View style={styles.heroCard}>
+            <View style={styles.heroIcon}>
+              <Zap color="#FFFFFF" size={22} strokeWidth={2.4} />
             </View>
-            <View style={[styles.qrStatusBadge, isExpired ? styles.qrStatusBadgeExpired : styles.qrStatusBadgeActive]}>
-              <Text style={[styles.qrStatusText, isExpired ? styles.qrStatusTextExpired : styles.qrStatusTextActive]}>
-                {isExpired ? 'EXPIRED' : 'ENTRY PASS'}
-              </Text>
+            <View style={styles.heroCopyBlock}>
+              <Text style={styles.heroTitle}>Universal walk-in access</Text>
+              <Text style={styles.heroCopy}>Present this QR at any supported parking lot. The operator will identify your vehicle and confirm entry at the actual location.</Text>
             </View>
           </View>
 
-          <View style={styles.qrBody}>
-            <View style={[styles.qrFrame, styles.qrFrameFaded]}>
-              <QRCode value={qrValue} size={qrSize} color="#0F766E" backgroundColor="#FFFFFF" />
+          <View style={styles.qrCard}>
+            <View style={styles.qrHeader}>
+              <View>
+                <Text style={styles.qrHeaderTitle}>Walk-In Entrance QR</Text>
+                <Text style={styles.qrHeaderSubtitle}>{dateLabel} - {timeLabel}</Text>
+              </View>
+              <View style={[styles.qrStatusBadge, isExpired ? styles.qrStatusBadgeExpired : styles.qrStatusBadgeActive]}>
+                <Text style={[styles.qrStatusText, isExpired ? styles.qrStatusTextExpired : styles.qrStatusTextActive]}>
+                  {isExpired ? 'EXPIRED' : 'ENTRY PASS'}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.qrIdBadge}>
-              <Text style={styles.qrIdText}>{activeWalkInBooking?.reservationCode ?? `WI-${lot.id}-${slot.number}`}</Text>
+            <View style={styles.qrBody}>
+              <View style={styles.qrFrame}>
+                <QRCode value={qrValue} size={qrSize} color="#0F766E" backgroundColor="#FFFFFF" />
+              </View>
+            </View>
+
+            <View style={styles.ticketSection}>
+              <TicketRow label="Access" value="Any supported parking lot" />
+              <TicketRow label="Vehicle" value={vehicle.plate} />
+              <TicketRow label="Preview lot" value={preferredLot?.name ?? 'Assigned on entry'} />
+              <TicketRow label="Billing" value="Metered - paid on exit" />
             </View>
           </View>
 
-          <View style={styles.ticketSection}>
-            <TicketRow label="Slot" value={`${slot.number} - ${lot.name}`} />
-            <TicketRow label="Plate" value={vehicle.plate} />
-            <TicketRow label="Billing" value="Metered - paid on exit" />
+          <View style={styles.noticeCardInfo}>
+            <MapPin color="#1D4ED8" size={14} strokeWidth={2.2} />
+            <Text style={styles.noticeCopyInfo}>
+              {isExpired
+                ? 'This walk-in pass expired before entry was confirmed.'
+                : 'The final rate follows the operator location that confirms your entry.'}
+            </Text>
           </View>
-        </View>
 
-        {isUrgent ? (
-          <View style={styles.urgentCard}>
-            <AlertTriangle color="#DC2626" size={14} strokeWidth={2.3} />
-            <Text style={styles.urgentCopy}>Running low on time. Enter the lot now to avoid losing the walk-in entry window.</Text>
-          </View>
-        ) : null}
-
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-        <Text style={styles.syncHint}>This screen checks for operator or gate confirmation automatically every few seconds.</Text>
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          <Text style={styles.syncHint}>This screen checks for operator or gate confirmation automatically every few seconds.</Text>
         </View>
       </ScrollView>
-
-      <View style={[styles.footer, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 14 : 18 }]}>
-        <AuthActionButton
-          label={isExpired ? 'Entry Pass Expired' : isStarting ? 'Checking Entry...' : 'Check Gate Confirmation'}
-          onPress={async () => {
-            if (isExpired) {
-              await clearExpiredEntryPass();
-              router.replace('/home');
-              return;
-            }
-
-            if (isStarting || isIssuing) {
-              return;
-            }
-
-            try {
-              setIsStarting(true);
-              setErrorMessage(null);
-              const confirmedSession = await refreshSession();
-              if (confirmedSession) {
-                router.replace('/session');
-                return;
-              }
-              setErrorMessage('Entry has not been confirmed yet. Present this QR to the gate or operator, then check again.');
-            } catch (error) {
-              setErrorMessage(error instanceof Error ? error.message : 'Unable to check the gate confirmation right now.');
-            } finally {
-              setIsStarting(false);
-            }
-          }}
-          disabled={isIssuing || isStarting}
-          loading={isIssuing || isStarting}
-          style={styles.fullWidthButton}
-        />
-        <View style={styles.footerHintRow}>
-          <Car color="#94A3B8" size={13} strokeWidth={2.2} />
-          <Text style={styles.footerHint}>
-            {isExpired
-              ? 'Request a new walk-in entry pass to resume.'
-              : 'Your parking session begins after the gate or operator confirms this entry pass.'}
-          </Text>
-        </View>
-      </View>
     </SafeAreaView>
   );
 }
@@ -353,7 +280,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAF9',
   },
-  header: {},
   loadingRoot: {
     flex: 1,
     alignItems: 'center',
@@ -380,7 +306,6 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   scrollContent: {
-    paddingTop: 22,
     paddingBottom: 24,
     gap: 16,
   },
@@ -422,44 +347,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     marginTop: 2,
   },
-  countdownCard: {
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 20,
-  },
-  countdownCardUrgent: {
-    borderColor: '#FECACA',
-  },
-  countdownHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  countdownLabel: {
-    color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 17,
-    fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: 0.5,
-  },
-  countdownLabelUrgent: {
-    color: '#DC2626',
-  },
-  countdownValue: {
-    color: '#0F766E',
-    fontSize: 48,
-    lineHeight: 52,
-    fontFamily: 'Poppins_700Bold',
-    letterSpacing: 2.6,
-    marginTop: 12,
-  },
-  countdownValueUrgent: {
-    color: '#DC2626',
-  },
   qrCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -493,7 +380,6 @@ const styles = StyleSheet.create({
   },
   qrStatusBadge: {
     borderRadius: 8,
-    backgroundColor: '#0F766E',
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -504,7 +390,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FECACA',
   },
   qrStatusText: {
-    color: '#FFFFFF',
     fontSize: 10,
     lineHeight: 13,
     fontFamily: 'Poppins_700Bold',
@@ -525,50 +410,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FAFAF9',
-    padding: 14,
-  },
-  qrFrameFaded: {
-    opacity: 0.42,
-  },
-  progressTrack: {
-    width: '100%',
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#E2E8F0',
-    overflow: 'hidden',
-    marginTop: 16,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#0F766E',
-  },
-  progressFillUrgent: {
-    backgroundColor: '#EF4444',
-  },
-  countdownHint: {
-    color: '#64748B',
-    fontSize: 13,
-    lineHeight: 20,
-    fontFamily: 'Poppins_400Regular',
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  qrIdBadge: {
-    marginTop: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  qrIdText: {
-    color: '#0F766E',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'Poppins_700Bold',
-    letterSpacing: 0.4,
+    padding: 10,
   },
   ticketSection: {
     borderTopWidth: 1,
@@ -598,20 +440,19 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     flex: 1,
   },
-  urgentCard: {
-    borderRadius: 18,
+  noticeCardInfo: {
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
   },
-  urgentCopy: {
+  noticeCopyInfo: {
     flex: 1,
-    color: '#DC2626',
+    color: '#1D4ED8',
     fontSize: 12,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
@@ -628,27 +469,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     textAlign: 'center',
-  },
-  footer: {
-    backgroundColor: '#FAFAF9',
-    paddingTop: 4,
-    paddingBottom: 26,
-  },
-  fullWidthButton: {
-    width: '100%',
-  },
-  footerHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 9,
-  },
-  footerHint: {
-    color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 17,
-    textAlign: 'center',
-    fontFamily: 'Poppins_400Regular',
   },
 });

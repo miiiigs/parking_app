@@ -29,6 +29,7 @@ export interface ParkingSlot {
   id: string;
   slotNumber: string;
   status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  qrToken?: string | null;
   x: number;
   y: number;
   width: number;

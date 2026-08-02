@@ -16,8 +16,9 @@ test('walk-in entry pass rpc derives identity and source on the server', () => {
   assert.equal(source.includes('auth.uid()'), true);
   assert.equal(source.includes("'walk_in'"), true);
   assert.equal(source.includes('p_user_id'), false);
-  assert.equal(source.includes('You already have an active walk-in entry pass for this location'), true);
-  assert.equal(source.includes('grant execute on function issue_walk_in_entry_pass(uuid, text, integer)'), true);
+  assert.equal(source.includes('You already have an active walk-in entry pass'), true);
+  assert.equal(source.includes("'scope', 'multi_location'"), true);
+  assert.equal(source.includes('grant execute on function issue_walk_in_entry_pass(text, integer)'), true);
 });
 
 test('mobile walk-in contract uses backend issuance and observes gate-created sessions', () => {
@@ -37,6 +38,7 @@ test('walk-in entry pass flow no longer routes through slot-qr validation', () =
   assert.equal(screenSource.includes('Session starts automatically when the timer reaches 00:00.'), false);
   assert.equal(screenSource.includes('Check Gate Confirmation'), true);
   assert.equal(screenSource.includes('scan the QR posted at your parked slot'), false);
+  assert.equal(screenSource.includes('Any supported parking lot'), true);
   assert.equal(storeSource.includes('startWalkInSession: async'), false);
   assert.equal(storeSource.includes('refreshSession: async'), true);
   assert.equal(storeSource.includes('clearExpiredEntryPass: async'), true);

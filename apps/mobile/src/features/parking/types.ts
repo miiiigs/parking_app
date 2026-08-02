@@ -33,6 +33,7 @@ export interface Booking {
   reservationId?: string;
   reservationCode: string;
   source?: 'reservation' | 'walk_in' | 'local';
+  entryPassToken?: string | null;
   lotId: string;
   lotName: string;
   address: string;

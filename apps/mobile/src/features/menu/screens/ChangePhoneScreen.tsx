@@ -42,7 +42,7 @@ export default function ChangePhoneScreen() {
         params: {
           phone: normalizedPhone,
           phoneLabel,
-          returnTo: '/menu',
+          returnTo: '/profile',
           mode: 'change-phone',
         },
       });

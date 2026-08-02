@@ -26,7 +26,7 @@ import {
   syncPayMongoPaymentIntent,
   type PayMongoMethodType,
 } from '../../../lib/payments';
-import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
+import { FlowScreenHeader } from '../../auth/components/AuthPrimitives';
 import { usePaymentMethodsStore } from '../../menu/store/usePaymentMethodsStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
@@ -482,18 +482,9 @@ export default function PaymentScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
           <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View
-              style={[
-                styles.header,
-                {
-                  marginHorizontal: -horizontalPadding,
-                },
-              ]}
-            >
-              <AppScreenHeader title="Complete Payment" onBack={() => router.back()} />
-            </View>
-
             <View style={styles.content}>
+              <FlowScreenHeader title="Payment" onBack={() => router.back()} />
+
               <View style={styles.breakdownCard}>
                 <View style={styles.breakdownHeader}>
                   <Text style={styles.breakdownTitle}>Fee Breakdown</Text>
@@ -712,7 +703,6 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {},
   content: {
     gap: 18,
     paddingTop: 20,

@@ -73,29 +73,29 @@ export function VehiclePickerSheet({
           )}
 
           <View style={styles.actionGroup}>
-            <Pressable
-              onPress={() => {
-                onClose();
-                onAddAnother();
-              }}
-              style={styles.secondaryAction}
-            >
-              <Plus color="#0F766E" size={15} strokeWidth={2.4} />
-              <Text style={styles.secondaryActionText}>{vehicles.length ? 'Add Another Vehicle' : 'Add First Vehicle'}</Text>
-            </Pressable>
-
-            {onManageVehicles ? (
+            {vehicles.length > 0 && onManageVehicles ? (
               <Pressable
                 onPress={() => {
                   onClose();
                   onManageVehicles();
                 }}
-                style={styles.tertiaryAction}
+                style={styles.secondaryAction}
               >
-                <Settings2 color="#64748B" size={15} strokeWidth={2.3} />
-                <Text style={styles.tertiaryActionText}>Manage Vehicles</Text>
+                <Settings2 color="#0F766E" size={15} strokeWidth={2.3} />
+                <Text style={styles.secondaryActionText}>Manage Vehicles</Text>
               </Pressable>
-            ) : null}
+            ) : (
+              <Pressable
+                onPress={() => {
+                  onClose();
+                  onAddAnother();
+                }}
+                style={styles.secondaryAction}
+              >
+                <Plus color="#0F766E" size={15} strokeWidth={2.4} />
+                <Text style={styles.secondaryActionText}>Add First Vehicle</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -251,20 +251,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
-  },
-  tertiaryAction: {
-    minHeight: 44,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  tertiaryActionText: {
-    color: '#64748B',
-    fontSize: 14,
-    lineHeight: 18,
-    fontFamily: 'Poppins_500Medium',
   },
 });

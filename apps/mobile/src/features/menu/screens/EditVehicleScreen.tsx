@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Car, Check, ChevronDown, Hash, Palette, PencilLine, Plus, Trash2 } from 'lucide-react-native';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileAuth } from '../../../providers/MobileAuthProvider';
@@ -23,6 +23,8 @@ const VEHICLE_MODELS = [
 
 const COLORS = ['Pearl White', 'Metallic Silver', 'Jet Black', 'Midnight Blue', 'Red', 'Gray', 'Beige / Cream', 'Orange', 'Green', 'Brown', 'Others'];
 
+type ScreenMode = 'manage' | 'create' | 'edit';
+
 export default function EditVehicleScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
@@ -40,6 +42,8 @@ export default function EditVehicleScreen() {
     removeVehicle,
   } = useMobileVehicles();
 
+  const openedInCreateModeRef = useRef(getRouteParam(params.mode) === 'new');
+  const [screenMode, setScreenMode] = useState<ScreenMode>(openedInCreateModeRef.current ? 'create' : 'manage');
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
@@ -48,61 +52,28 @@ export default function EditVehicleScreen() {
   const [selectedColor, setSelectedColor] = useState('');
   const [customColor, setCustomColor] = useState('');
   const [plate, setPlate] = useState('');
-  const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [isCreatingNewVehicle, setIsCreatingNewVehicle] = useState(getRouteParam(params.mode) === 'new');
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const activeEditingVehicle = useMemo(
     () => (editingVehicleId ? vehicles.find((entry) => entry.id === editingVehicleId) ?? null : null),
     [editingVehicleId, vehicles],
   );
-
+  const isFormMode = screenMode !== 'manage';
   const isOtherModel = selectedModel === 'Others';
   const isOtherColor = selectedColor === 'Others';
   const displayModel = isOtherModel ? customModel.trim() : selectedModel.trim();
   const displayColor = isOtherColor ? customColor.trim() : selectedColor.trim();
   const normalizedPlate = plate.toUpperCase().replace(/[^A-Z0-9- ]/g, '');
   const isValid = displayModel.length >= 2 && displayColor.length >= 2 && normalizedPlate.trim().length >= 3;
-  const vehicleChanged = useMemo(
-    () =>
-      displayModel !== (activeEditingVehicle?.model ?? '')
-      || displayColor !== (activeEditingVehicle?.color ?? '')
-      || normalizedPlate.trim() !== (activeEditingVehicle?.plate ?? ''),
-    [activeEditingVehicle?.color, activeEditingVehicle?.model, activeEditingVehicle?.plate, displayColor, displayModel, normalizedPlate],
-  );
+  const vehicleChanged =
+    displayModel !== (activeEditingVehicle?.model ?? '')
+    || displayColor !== (activeEditingVehicle?.color ?? '')
+    || normalizedPlate.trim() !== (activeEditingVehicle?.plate ?? '');
+  const headerTitle = screenMode === 'manage' ? 'Vehicles' : screenMode === 'create' ? 'Add Vehicle' : 'Edit Vehicle';
+  const shouldReturnToManageOnBack = isFormMode && !openedInCreateModeRef.current;
 
-  useEffect(() => {
-    if (!activeEditingVehicle && vehicles.length === 0) {
-      return;
-    }
-
-    if (!editingVehicleId && selectedVehicle && !isCreatingNewVehicle) {
-      seedForm(selectedVehicle);
-    }
-  }, [editingVehicleId, isCreatingNewVehicle, selectedVehicle, vehicles.length]);
-
-  useEffect(() => {
-    if (getRouteParam(params.mode) === 'new') {
-      resetFormForNewVehicle();
-    }
-  }, [params.mode]);
-
-  function seedForm(vehicle: { id?: string; model: string; color: string; plate: string }) {
-    setSaved(false);
-    clearError();
-    setIsCreatingNewVehicle(false);
-    setEditingVehicleId(vehicle.id ?? null);
-    setSelectedModel(VEHICLE_MODELS.includes(vehicle.model) ? vehicle.model : 'Others');
-    setCustomModel(VEHICLE_MODELS.includes(vehicle.model) ? '' : vehicle.model);
-    setSelectedColor(COLORS.includes(vehicle.color) ? vehicle.color : 'Others');
-    setCustomColor(COLORS.includes(vehicle.color) ? '' : vehicle.color);
-    setPlate(vehicle.plate);
-  }
-
-  function resetFormForNewVehicle() {
-    setSaved(false);
-    clearError();
-    setIsCreatingNewVehicle(true);
+  function resetFormState() {
     setEditingVehicleId(null);
     setSelectedModel('');
     setCustomModel('');
@@ -113,13 +84,60 @@ export default function EditVehicleScreen() {
     setColorDropdownOpen(false);
   }
 
+  function openCreateForm() {
+    clearError();
+    setFeedbackMessage(null);
+    openedInCreateModeRef.current = false;
+    setScreenMode('create');
+    resetFormState();
+  }
+
+  function openEditForm(vehicle: { id?: string; model: string; color: string; plate: string }) {
+    clearError();
+    setFeedbackMessage(null);
+    openedInCreateModeRef.current = false;
+    setScreenMode('edit');
+    setEditingVehicleId(vehicle.id ?? null);
+    setSelectedModel(VEHICLE_MODELS.includes(vehicle.model) ? vehicle.model : 'Others');
+    setCustomModel(VEHICLE_MODELS.includes(vehicle.model) ? '' : vehicle.model);
+    setSelectedColor(COLORS.includes(vehicle.color) ? vehicle.color : 'Others');
+    setCustomColor(COLORS.includes(vehicle.color) ? '' : vehicle.color);
+    setPlate(vehicle.plate);
+    setModelDropdownOpen(false);
+    setColorDropdownOpen(false);
+  }
+
+  function closeForm() {
+    clearError();
+    setFeedbackMessage(null);
+    setScreenMode('manage');
+    resetFormState();
+  }
+
+  function handleHeaderBack() {
+    if (shouldReturnToManageOnBack) {
+      closeForm();
+      return;
+    }
+
+    router.back();
+  }
+
+  async function handleSelectVehicle(vehicleId: string) {
+    clearError();
+    setFeedbackMessage(null);
+    await selectVehicle(vehicleId);
+  }
+
   async function handleSave() {
     if (!isValid || saving) {
       return;
     }
 
+    const wasEditing = screenMode === 'edit';
     setSaving(true);
     clearError();
+    setFeedbackMessage(null);
 
     try {
       await saveVehicle({
@@ -129,12 +147,35 @@ export default function EditVehicleScreen() {
         plate: normalizedPlate.trim(),
         isDefault: true,
       });
-      setSaved(true);
-      setIsCreatingNewVehicle(false);
-      setEditingVehicleId(null);
+
+      openedInCreateModeRef.current = false;
+      setScreenMode('manage');
+      resetFormState();
+      setFeedbackMessage(wasEditing ? 'Vehicle updated.' : 'Vehicle saved.');
     } finally {
       setSaving(false);
     }
+  }
+
+  function confirmRemoveVehicle(vehicleId: string) {
+    Alert.alert(
+      'Remove vehicle?',
+      'This vehicle will be removed from your saved list.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              clearError();
+              setFeedbackMessage(null);
+              await removeVehicle(vehicleId);
+            })();
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -150,214 +191,261 @@ export default function EditVehicleScreen() {
                 },
               ]}
             >
-              <AppScreenHeader title="Vehicles" onBack={() => router.back()} />
+              <AppScreenHeader title={headerTitle} onBack={handleHeaderBack} />
             </View>
 
             <View style={styles.content}>
-              <View style={styles.summaryBand}>
-                <View>
-                  <Text style={styles.summaryTitle}>Saved vehicles</Text>
-                  <Text style={styles.summaryCopy}>
-                    {auth.user && !auth.isGuest
-                      ? 'These vehicles are tied to your account and stay available across sessions.'
-                      : 'Vehicle info is stored on this device. Sign in to keep multiple vehicles in your account.'}
-                  </Text>
-                </View>
-                <View style={styles.summaryCountBadge}>
-                  <Text style={styles.summaryCountText}>{vehicles.length}</Text>
-                </View>
-              </View>
+              {isFormMode ? (
+                <>
+                  <View style={styles.formIntroCard}>
+                    <Text style={styles.formIntroTitle}>{screenMode === 'create' ? 'Add a vehicle for parking' : 'Update vehicle details'}</Text>
+                    <Text style={styles.formIntroCopy}>
+                      {screenMode === 'create'
+                        ? 'Save a vehicle first, then use it in reservation and walk-in flows without re-entering the details.'
+                        : 'Changes here update the saved vehicle and keep the flow focused on one vehicle at a time.'}
+                    </Text>
+                  </View>
 
-              {vehicles.length ? (
-                <View style={styles.vehicleList}>
-                  {vehicles.map((vehicle) => {
-                    const active = vehicle.id === selectedVehicleId;
-                    return (
-                      <Pressable
-                        key={vehicle.id}
-                        onPress={() => void selectVehicle(vehicle.id)}
-                        style={[styles.vehicleCard, active ? styles.vehicleCardActive : null]}
-                      >
-                        <View style={styles.vehicleCardTopRow}>
-                          <View style={styles.vehicleCardLeading}>
-                            <View style={[styles.vehicleCardIcon, active ? styles.vehicleCardIconActive : null]}>
-                              <Car color={active ? '#0F766E' : '#64748B'} size={17} strokeWidth={2.2} />
-                            </View>
-                            <View style={styles.vehicleCardCopy}>
-                              <Text style={styles.vehicleCardTitle}>{vehicle.model}</Text>
-                              <Text style={styles.vehicleCardSubtitle}>{vehicle.color} - {vehicle.plate}</Text>
-                            </View>
-                          </View>
-                          {active ? (
-                            <View style={styles.selectedBadge}>
-                              <Check color="#FFFFFF" size={12} strokeWidth={3} />
-                            </View>
-                          ) : null}
-                        </View>
+                  <Field label="Vehicle Model">
+                    <Pressable
+                      onPress={() => {
+                        setModelDropdownOpen((value) => !value);
+                        setColorDropdownOpen(false);
+                      }}
+                      style={[styles.selectorButton, selectedModel ? styles.selectorButtonActive : null]}
+                    >
+                      <View style={styles.selectorLeft}>
+                        <Car color="#94A3B8" size={16} strokeWidth={2.2} />
+                        <Text style={[styles.selectorText, !selectedModel ? styles.selectorPlaceholder : null]}>
+                          {selectedModel || 'Select vehicle model'}
+                        </Text>
+                      </View>
+                      <ChevronDown color="#64748B" size={16} strokeWidth={2.2} style={{ transform: [{ rotate: modelDropdownOpen ? '180deg' : '0deg' }] }} />
+                    </Pressable>
+                    {modelDropdownOpen ? (
+                      <DropdownList
+                        items={VEHICLE_MODELS}
+                        selectedValue={selectedModel}
+                        onSelect={(value) => {
+                          setSelectedModel(value);
+                          setModelDropdownOpen(false);
+                        }}
+                      />
+                    ) : null}
+                    {isOtherModel ? (
+                      <View style={styles.inlineInputShell}>
+                        <Car color="#94A3B8" size={16} strokeWidth={2.2} />
+                        <TextInput
+                          autoFocus
+                          value={customModel}
+                          onChangeText={setCustomModel}
+                          placeholder="Enter vehicle model"
+                          placeholderTextColor="#94A3B8"
+                          style={styles.inlineInput}
+                        />
+                      </View>
+                    ) : null}
+                  </Field>
 
-                        <View style={styles.vehicleCardActions}>
-                          <Pressable
-                            onPress={() => seedForm(vehicle)}
-                            style={styles.vehicleCardAction}
-                          >
-                            <PencilLine color="#0F766E" size={14} strokeWidth={2.2} />
-                            <Text style={styles.vehicleCardActionText}>Edit</Text>
-                          </Pressable>
+                  <Field label="Vehicle Color">
+                    <Pressable
+                      onPress={() => {
+                        setColorDropdownOpen((value) => !value);
+                        setModelDropdownOpen(false);
+                      }}
+                      style={[styles.selectorButton, selectedColor ? styles.selectorButtonActive : null]}
+                    >
+                      <View style={styles.selectorLeft}>
+                        <Palette color="#94A3B8" size={16} strokeWidth={2.2} />
+                        <Text style={[styles.selectorText, !selectedColor ? styles.selectorPlaceholder : null]}>
+                          {selectedColor || 'Select vehicle color'}
+                        </Text>
+                      </View>
+                      <ChevronDown color="#64748B" size={16} strokeWidth={2.2} style={{ transform: [{ rotate: colorDropdownOpen ? '180deg' : '0deg' }] }} />
+                    </Pressable>
+                    {colorDropdownOpen ? (
+                      <DropdownList
+                        items={COLORS}
+                        selectedValue={selectedColor}
+                        onSelect={(value) => {
+                          setSelectedColor(value);
+                          setColorDropdownOpen(false);
+                        }}
+                      />
+                    ) : null}
+                    {isOtherColor ? (
+                      <View style={styles.inlineInputShell}>
+                        <Palette color="#94A3B8" size={16} strokeWidth={2.2} />
+                        <TextInput
+                          autoFocus
+                          value={customColor}
+                          onChangeText={setCustomColor}
+                          placeholder="Enter vehicle color"
+                          placeholderTextColor="#94A3B8"
+                          style={styles.inlineInput}
+                        />
+                      </View>
+                    ) : null}
+                  </Field>
 
-                          {vehicles.length > 1 ? (
+                  <Field label="Plate Number">
+                    <View style={[styles.selectorButton, normalizedPlate.trim().length >= 3 ? styles.selectorButtonActive : null]}>
+                      <View style={styles.selectorLeft}>
+                        <Hash color="#94A3B8" size={16} strokeWidth={2.2} />
+                        <TextInput
+                          value={normalizedPlate}
+                          onChangeText={setPlate}
+                          autoCapitalize="characters"
+                          placeholder="e.g. ABC 1234"
+                          placeholderTextColor="#94A3B8"
+                          style={styles.selectorInput}
+                        />
+                      </View>
+                    </View>
+                  </Field>
+
+                  {isValid ? (
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryEyebrow}>{screenMode === 'edit' ? 'VEHICLE PREVIEW' : 'NEW VEHICLE'}</Text>
+                      <SummaryRow label="Model" value={displayModel} />
+                      <SummaryRow label="Color" value={displayColor} />
+                      <SummaryRow label="Plate No." value={normalizedPlate.trim()} last />
+                    </View>
+                  ) : null}
+
+                  {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                  <Pressable
+                    onPress={() => void handleSave()}
+                    disabled={!isValid || saving || (screenMode === 'edit' && !vehicleChanged)}
+                    style={[
+                      styles.saveButton,
+                      (!isValid || (screenMode === 'edit' && !vehicleChanged)) ? styles.saveButtonDisabled : null,
+                    ]}
+                  >
+                    <View style={styles.saveRow}>
+                      <Text style={styles.saveText}>{saving ? 'Saving...' : screenMode === 'edit' ? 'Update Vehicle' : 'Save Vehicle'}</Text>
+                    </View>
+                  </Pressable>
+
+                  {shouldReturnToManageOnBack ? (
+                    <Pressable onPress={closeForm} style={styles.cancelButton}>
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                  ) : null}
+
+                  {!auth.user || auth.isGuest ? (
+                    <Text style={styles.guestFootnote}>
+                      You can keep one or more vehicles on this device, but account sync for vehicles starts once you sign in.
+                    </Text>
+                  ) : null}
+
+                  {isLoading ? <Text style={styles.helperText}>Syncing vehicles...</Text> : null}
+                </>
+              ) : (
+                <>
+                  <View style={styles.summaryBand}>
+                    <View style={styles.summaryCopyBlock}>
+                      <Text style={styles.summaryTitle}>Current vehicle for parking</Text>
+                      {selectedVehicle ? (
+                        <>
+                          <Text style={styles.summaryPrimary}>{selectedVehicle.plate}</Text>
+                          <Text style={styles.summaryCopy}>{selectedVehicle.model} - {selectedVehicle.color}</Text>
+                        </>
+                      ) : (
+                        <Text style={styles.summaryCopy}>Choose a saved vehicle before continuing to reservation or walk-in parking.</Text>
+                      )}
+                    </View>
+                    <View style={styles.summaryCountBadge}>
+                      <Text style={styles.summaryCountText}>{vehicles.length}</Text>
+                    </View>
+                  </View>
+
+                  {feedbackMessage ? (
+                    <View style={styles.feedbackBanner}>
+                      <Check color="#0F766E" size={15} strokeWidth={2.5} />
+                      <Text style={styles.feedbackText}>{feedbackMessage}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.sectionBlock}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionTitle}>Saved vehicles</Text>
+                      <Text style={styles.sectionMeta}>{vehicles.length}</Text>
+                    </View>
+
+                    {vehicles.length ? (
+                      <View style={styles.vehicleList}>
+                        {vehicles.map((vehicle) => {
+                          const active = vehicle.id === selectedVehicleId;
+
+                          return (
                             <Pressable
-                              onPress={() => void removeVehicle(vehicle.id)}
-                              style={styles.vehicleCardAction}
+                              key={vehicle.id}
+                              onPress={() => void handleSelectVehicle(vehicle.id)}
+                              style={[styles.vehicleCard, active ? styles.vehicleCardActive : null]}
                             >
-                              <Trash2 color="#DC2626" size={14} strokeWidth={2.2} />
-                              <Text style={styles.vehicleCardDeleteText}>Remove</Text>
+                              <View style={styles.vehicleCardTopRow}>
+                                <View style={styles.vehicleCardLeading}>
+                                  <View style={[styles.vehicleCardIcon, active ? styles.vehicleCardIconActive : null]}>
+                                    <Car color={active ? '#0F766E' : '#64748B'} size={17} strokeWidth={2.2} />
+                                  </View>
+                                  <View style={styles.vehicleCardCopy}>
+                                    <Text style={styles.vehicleCardTitle}>{vehicle.plate}</Text>
+                                    <Text style={styles.vehicleCardSubtitle}>{vehicle.model} - {vehicle.color}</Text>
+                                  </View>
+                                </View>
+
+                                {active ? (
+                                  <View style={styles.selectedBadge}>
+                                    <Check color="#FFFFFF" size={12} strokeWidth={3} />
+                                  </View>
+                                ) : null}
+                              </View>
+
+                              <View style={styles.vehicleCardActions}>
+                                <Pressable onPress={() => openEditForm(vehicle)} style={styles.vehicleCardActionButton}>
+                                  <PencilLine color="#0F766E" size={14} strokeWidth={2.2} />
+                                  <Text style={styles.vehicleCardActionButtonText}>Edit</Text>
+                                </Pressable>
+
+                                {vehicles.length > 1 ? (
+                                  <Pressable onPress={() => confirmRemoveVehicle(vehicle.id)} style={styles.vehicleCardDeleteButton}>
+                                    <Trash2 color="#DC2626" size={14} strokeWidth={2.2} />
+                                    <Text style={styles.vehicleCardDeleteButtonText}>Remove</Text>
+                                  </Pressable>
+                                ) : null}
+                              </View>
                             </Pressable>
-                          ) : null}
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.emptyManagerCard}>
+                        <View style={styles.emptyManagerIcon}>
+                          <Car color="#0F766E" size={18} strokeWidth={2.2} />
                         </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
+                        <Text style={styles.emptyManagerTitle}>No vehicles saved yet</Text>
+                        <Text style={styles.emptyManagerCopy}>Add your first vehicle so it can be reused in reservation and walk-in parking.</Text>
+                      </View>
+                    )}
+                  </View>
 
-              <Pressable onPress={resetFormForNewVehicle} style={styles.addAnotherButton}>
-                <Plus color="#0F766E" size={16} strokeWidth={2.4} />
-                <Text style={styles.addAnotherText}>{vehicles.length ? 'Add another vehicle' : 'Add your first vehicle'}</Text>
-              </Pressable>
+                  <Pressable onPress={openCreateForm} style={styles.addAnotherButton}>
+                    <Plus color="#0F766E" size={16} strokeWidth={2.4} />
+                    <Text style={styles.addAnotherText}>{vehicles.length ? 'Add another vehicle' : 'Add your first vehicle'}</Text>
+                  </Pressable>
 
-              <Field label="Vehicle Model">
-                <Pressable
-                  onPress={() => {
-                    setModelDropdownOpen((value) => !value);
-                    setColorDropdownOpen(false);
-                  }}
-                  style={[styles.selectorButton, selectedModel ? styles.selectorButtonActive : null]}
-                >
-                  <View style={styles.selectorLeft}>
-                    <Car color="#94A3B8" size={16} strokeWidth={2.2} />
-                    <Text style={[styles.selectorText, !selectedModel ? styles.selectorPlaceholder : null]}>
-                      {selectedModel || 'Select vehicle model'}
+                  {!auth.user || auth.isGuest ? (
+                    <Text style={styles.guestFootnote}>
+                      Vehicles saved here stay on this device. Sign in to keep them tied to your account.
                     </Text>
-                  </View>
-                  <ChevronDown color="#64748B" size={16} strokeWidth={2.2} style={{ transform: [{ rotate: modelDropdownOpen ? '180deg' : '0deg' }] }} />
-                </Pressable>
-                {modelDropdownOpen ? (
-                  <DropdownList
-                    items={VEHICLE_MODELS}
-                    selectedValue={selectedModel}
-                    onSelect={(value) => {
-                      setSelectedModel(value);
-                      setModelDropdownOpen(false);
-                    }}
-                  />
-                ) : null}
-                {isOtherModel ? (
-                  <View style={styles.inlineInputShell}>
-                    <Car color="#94A3B8" size={16} strokeWidth={2.2} />
-                    <TextInput
-                      autoFocus
-                      value={customModel}
-                      onChangeText={setCustomModel}
-                      placeholder="Enter vehicle model"
-                      placeholderTextColor="#94A3B8"
-                      style={styles.inlineInput}
-                    />
-                  </View>
-                ) : null}
-              </Field>
+                  ) : null}
 
-              <Field label="Vehicle Color">
-                <Pressable
-                  onPress={() => {
-                    setColorDropdownOpen((value) => !value);
-                    setModelDropdownOpen(false);
-                  }}
-                  style={[styles.selectorButton, selectedColor ? styles.selectorButtonActive : null]}
-                >
-                  <View style={styles.selectorLeft}>
-                    <Palette color="#94A3B8" size={16} strokeWidth={2.2} />
-                    <Text style={[styles.selectorText, !selectedColor ? styles.selectorPlaceholder : null]}>
-                      {selectedColor || 'Select vehicle color'}
-                    </Text>
-                  </View>
-                  <ChevronDown color="#64748B" size={16} strokeWidth={2.2} style={{ transform: [{ rotate: colorDropdownOpen ? '180deg' : '0deg' }] }} />
-                </Pressable>
-                {colorDropdownOpen ? (
-                  <DropdownList
-                    items={COLORS}
-                    selectedValue={selectedColor}
-                    onSelect={(value) => {
-                      setSelectedColor(value);
-                      setColorDropdownOpen(false);
-                    }}
-                  />
-                ) : null}
-                {isOtherColor ? (
-                  <View style={styles.inlineInputShell}>
-                    <Palette color="#94A3B8" size={16} strokeWidth={2.2} />
-                    <TextInput
-                      autoFocus
-                      value={customColor}
-                      onChangeText={setCustomColor}
-                      placeholder="Enter vehicle color"
-                      placeholderTextColor="#94A3B8"
-                      style={styles.inlineInput}
-                    />
-                  </View>
-                ) : null}
-              </Field>
-
-              <Field label="Plate Number">
-                <View style={[styles.selectorButton, normalizedPlate.trim().length >= 3 ? styles.selectorButtonActive : null]}>
-                  <View style={styles.selectorLeft}>
-                    <Hash color="#94A3B8" size={16} strokeWidth={2.2} />
-                    <TextInput
-                      value={normalizedPlate}
-                      onChangeText={setPlate}
-                      autoCapitalize="characters"
-                      placeholder="e.g. ABC 1234"
-                      placeholderTextColor="#94A3B8"
-                      style={styles.selectorInput}
-                    />
-                  </View>
-                </View>
-              </Field>
-
-              {isValid ? (
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryEyebrow}>{editingVehicleId ? 'EDITING VEHICLE' : 'NEW VEHICLE'}</Text>
-                  <SummaryRow label="Model" value={displayModel} />
-                  <SummaryRow label="Color" value={displayColor} />
-                  <SummaryRow label="Plate No." value={normalizedPlate.trim()} last />
-                </View>
-              ) : null}
-
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-              <Pressable
-                onPress={() => void handleSave()}
-                disabled={!isValid || saving || (!vehicleChanged && editingVehicleId !== null)}
-                style={[
-                  styles.saveButton,
-                  (!isValid || (!vehicleChanged && editingVehicleId !== null)) ? styles.saveButtonDisabled : null,
-                  saved ? styles.saveButtonSaved : null,
-                ]}
-              >
-                <View style={styles.saveRow}>
-                  {saved ? <Check color="#FFFFFF" size={18} strokeWidth={2.4} /> : null}
-                  <Text style={styles.saveText}>
-                    {saving ? 'Saving...' : saved ? 'Saved!' : editingVehicleId ? 'Update Vehicle' : 'Save Vehicle'}
-                  </Text>
-                </View>
-              </Pressable>
-
-              {!auth.user || auth.isGuest ? (
-                <Text style={styles.guestFootnote}>
-                  You can keep one or more vehicles on this device, but account sync for vehicles starts once you sign in.
-                </Text>
-              ) : null}
-
-              {isLoading ? <Text style={styles.helperText}>Syncing vehicles...</Text> : null}
+                  {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                  {isLoading ? <Text style={styles.helperText}>Syncing vehicles...</Text> : null}
+                </>
+              )}
             </View>
           </View>
         </View>
@@ -396,7 +484,15 @@ function DropdownList({
         const active = selectedValue === item;
 
         return (
-          <Pressable key={item} onPress={() => onSelect(item)} style={[styles.dropdownItem, index < items.length - 1 ? styles.dropdownItemBorder : null, active ? styles.dropdownItemActive : null]}>
+          <Pressable
+            key={item}
+            onPress={() => onSelect(item)}
+            style={[
+              styles.dropdownItem,
+              index < items.length - 1 ? styles.dropdownItemBorder : null,
+              active ? styles.dropdownItemActive : null,
+            ]}
+          >
             <Text style={[styles.dropdownText, active ? styles.dropdownTextActive : null]}>{item}</Text>
             {active ? <Check color="#0F766E" size={15} strokeWidth={2.3} /> : null}
           </Pressable>
@@ -446,20 +542,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDFA',
     padding: 16,
   },
+  summaryCopyBlock: {
+    flex: 1,
+  },
   summaryTitle: {
     color: '#0F766E',
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  summaryPrimary: {
+    color: '#134E4A',
+    fontSize: 18,
+    lineHeight: 24,
     fontFamily: 'Poppins_700Bold',
+    marginTop: 4,
   },
   summaryCopy: {
     color: '#0F766E',
-    opacity: 0.8,
+    opacity: 0.82,
     fontSize: 13,
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     marginTop: 4,
-    maxWidth: 240,
   },
   summaryCountBadge: {
     minWidth: 40,
@@ -476,6 +581,45 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: 'Poppins_700Bold',
   },
+  feedbackBanner: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedbackText: {
+    color: '#065F46',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'Poppins_500Medium',
+    flex: 1,
+  },
+  sectionBlock: {
+    gap: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionTitle: {
+    color: '#1E293B',
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  sectionMeta: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: 'Poppins_500Medium',
+  },
   vehicleList: {
     gap: 10,
   },
@@ -490,6 +634,11 @@ const styles = StyleSheet.create({
   vehicleCardActive: {
     borderColor: '#0F766E',
     backgroundColor: '#F0FDFA',
+    shadowColor: '#0F766E',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   vehicleCardTopRow: {
     flexDirection: 'row',
@@ -540,25 +689,78 @@ const styles = StyleSheet.create({
   },
   vehicleCardActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     justifyContent: 'flex-end',
-    gap: 16,
   },
-  vehicleCardAction: {
+  vehicleCardActionButton: {
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#F8FAFC',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
+    paddingHorizontal: 12,
   },
-  vehicleCardActionText: {
+  vehicleCardActionButtonText: {
     color: '#0F766E',
     fontSize: 13,
     lineHeight: 17,
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: 'Poppins_600SemiBold',
   },
-  vehicleCardDeleteText: {
-    color: '#DC2626',
+  vehicleCardDeleteButton: {
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  vehicleCardDeleteButtonText: {
+    color: '#B91C1C',
     fontSize: 13,
     lineHeight: 17,
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  emptyManagerCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#D1FAE5',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  emptyManagerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#F0FDFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  emptyManagerTitle: {
+    color: '#1E293B',
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
+  },
+  emptyManagerCopy: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+    textAlign: 'center',
+    marginTop: 4,
   },
   addAnotherButton: {
     minHeight: 48,
@@ -576,6 +778,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     fontFamily: 'Poppins_600SemiBold',
+  },
+  formIntroCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    backgroundColor: '#F0FDFA',
+    padding: 16,
+  },
+  formIntroTitle: {
+    color: '#0F766E',
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: 'Poppins_700Bold',
+  },
+  formIntroCopy: {
+    color: '#0F766E',
+    opacity: 0.82,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 4,
   },
   fieldGroup: {
     gap: 6,
@@ -733,9 +956,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  saveButtonSaved: {
-    backgroundColor: '#16A34A',
-  },
   saveRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -745,6 +965,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     lineHeight: 22,
+    fontFamily: 'Poppins_500Medium',
+  },
+  cancelButton: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#475569',
+    fontSize: 16,
+    lineHeight: 20,
     fontFamily: 'Poppins_500Medium',
   },
   errorText: {
@@ -768,4 +1003,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
