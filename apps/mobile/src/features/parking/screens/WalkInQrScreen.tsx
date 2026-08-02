@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Car, MapPin, Zap } from 'lucide-react-native';
+import { MapPin, Zap } from 'lucide-react-native';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -21,14 +21,12 @@ export default function WalkInQrScreen() {
   const booking = useParkingFlowStore((state) => state.booking);
   const issueWalkInEntryPass = useParkingFlowStore((state) => state.issueWalkInEntryPass);
   const refreshSession = useParkingFlowStore((state) => state.refreshSession);
-  const clearExpiredEntryPass = useParkingFlowStore((state) => state.clearExpiredEntryPass);
   const vehicle = useWalkInPreferencesStore((state) => state.vehicle);
   const preferredLotId = getRouteParam(params.lotId);
   const preferredLot = lots.find((entry) => entry.id === preferredLotId) ?? lots[0] ?? null;
   const activeWalkInBooking = booking?.source === 'walk_in' ? booking : null;
   const [secondsRemaining, setSecondsRemaining] = useState(600);
   const [isIssuing, setIsIssuing] = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [issueAttempt, setIssueAttempt] = useState(0);
   const isPollingRef = useRef(false);
