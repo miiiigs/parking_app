@@ -59,6 +59,32 @@ The previous debugger log was accepted and cleared by review.
 - `Resolution status`:
   `Patched, manual validation required`
 
+### 2026-08-02 - Operator scan errors not aligned with hardened entry QR formats
+
+- `Issue summary`:
+  Operator QR scanning could reject a scan with the generic message `Entry verification failed` or `malformed reservation entry pass` even after the entry QR format was hardened for reservation and walk-in flows.
+- `Why debugger was called`:
+  The operator workflow needed a support pass to align current scan behavior with the newer entry QR payload formats and make field failures understandable for real operators.
+- `Scope inspected`:
+  `packages/shared/src/entryPass.ts`, `apps/parking-app-operator/app/api/operator/gate-entry/route.ts`, `apps/parking-app-operator/app/dashboard/parking-actions/page.tsx`, and `workflow/logs/DEBUGGER_OUTPUT_LOG.md`.
+- `Observed root cause`:
+  The operator API already had enough context to distinguish malformed, legacy, mismatched, reused, expired, and wrong-type QR cases, but the parking-actions screen still collapsed all non-OK responses into a generic thrown error. That hid the real failure reason and made hardened QR changes look like scanner breakage.
+- `What was changed`:
+  Kept the gate-entry route on structured `{ code, error }` responses for entry-pass validation failures and updated the parking-actions screen to consume those codes directly instead of always throwing a generic error.
+  The operator UI now shows targeted feedback for wrong QR type, scanned reference text, outdated walk-in QR, expired pass, reused pass, not-found pass, mismatched pass, and validation-unavailable states.
+- `Validation run`:
+  `npm.cmd --workspace apps/parking-app-operator run build`
+  Result: passed with successful Next.js production build and TypeScript checks.
+- `Manual actions still required`:
+  Smoke-test the operator scanner on a real device or browser with the current reservation entry QR and walk-in entry QR.
+  Confirm the expected operator-facing wording for at least one invalid scan from each major class: wrong QR type, old walk-in QR, reused QR, and mismatched reservation QR.
+- `Residual risk or follow-up`:
+  This pass improves operator diagnosis only. If any mobile screen is still rendering an older QR payload or stale cached token, the operator now reports it more clearly, but the upstream generator would still need a separate fix.
+- `Suggested planner note`:
+  Treat this as a scan-alignment hardening follow-up across shared QR payload generation, mobile QR presentation, and operator verification UX. Future hardening should keep these three layers versioned together.
+- `Resolution status`:
+  `Patched, manual validation required`
+
 ### 2026-06-25 - Admin hardening SQL rerun fails on existing trigger
 
 - `Issue summary`:

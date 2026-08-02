@@ -25,6 +25,17 @@ type ActionFeedback = {
   message: string;
 };
 
+type GateEntryErrorCode =
+  | 'malformed-entry-pass'
+  | 'wrong-qr-type'
+  | 'entry-pass-reference-only'
+  | 'legacy-walkin-pass'
+  | 'expired-entry-pass'
+  | 'used-entry-pass'
+  | 'entry-pass-not-found'
+  | 'entry-pass-mismatch'
+  | 'validation-unavailable';
+
 type BarcodeResult = {
   rawValue?: string;
 };
@@ -65,6 +76,71 @@ function feedbackClasses(tone: FeedbackTone) {
       return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
     default:
       return 'border-destructive/30 bg-destructive/10 text-destructive';
+  }
+}
+
+function buildEntryFailureFeedback(code: GateEntryErrorCode | null, message: string) {
+  switch (code) {
+    case 'wrong-qr-type':
+      return {
+        tone: 'warning' as const,
+        title: 'Wrong QR type',
+        message,
+      };
+    case 'entry-pass-reference-only':
+      return {
+        tone: 'warning' as const,
+        title: 'Reference scanned instead of QR',
+        message,
+      };
+    case 'legacy-walkin-pass':
+      return {
+        tone: 'warning' as const,
+        title: 'Old walk-in QR',
+        message,
+      };
+    case 'expired-entry-pass':
+      return {
+        tone: 'warning' as const,
+        title: 'Entry pass expired',
+        message,
+      };
+    case 'used-entry-pass':
+      return {
+        tone: 'warning' as const,
+        title: 'Entry pass already used',
+        message,
+      };
+    case 'entry-pass-not-found':
+      return {
+        tone: 'error' as const,
+        title: 'Entry pass not found',
+        message,
+      };
+    case 'entry-pass-mismatch':
+      return {
+        tone: 'warning' as const,
+        title: 'Entry QR no longer matches',
+        message,
+      };
+    case 'validation-unavailable':
+      return {
+        tone: 'error' as const,
+        title: 'Entry validation unavailable',
+        message,
+      };
+    case 'malformed-entry-pass':
+      return {
+        tone: 'warning' as const,
+        title: 'Invalid entry QR',
+        message,
+      };
+    default:
+      return {
+        tone: 'error' as const,
+        title: 'Entry verification failed',
+        message,
+      };
   }
 }
 
@@ -176,13 +252,24 @@ export default function ParkingActionsPage() {
         },
         body: JSON.stringify({ entryPass: normalized }),
       });
-      const payload = await response.json().catch(() => ({}));
+      const payload = await response.json().catch(() => ({})) as {
+        code?: GateEntryErrorCode;
+        error?: string;
+        confirmation?: {
+          idempotent_replay?: boolean;
+          parking_grace_ends_at?: string | null;
+          session_id?: string | null;
+        } | null;
+      };
 
       if (!response.ok) {
-        throw new Error(payload?.error || 'Unable to verify entry QR.');
+        const failureMessage = payload.error || 'Unable to verify entry QR.';
+        recordOperatorActionFailure();
+        setFeedback(buildEntryFailureFeedback(payload.code ?? null, failureMessage));
+        return;
       }
 
-      const confirmation = payload?.confirmation ?? null;
+      const confirmation = payload.confirmation ?? null;
       const idempotentReplay = Boolean(confirmation?.idempotent_replay);
       const graceEndsAt = formatTimestamp(confirmation?.parking_grace_ends_at);
       const sessionId = typeof confirmation?.session_id === 'string' ? confirmation.session_id : null;
@@ -199,11 +286,8 @@ export default function ParkingActionsPage() {
       await refresh({ silent: true, force: true });
     } catch (error) {
       recordOperatorActionFailure();
-      setFeedback({
-        tone: 'error',
-        title: 'Entry verification failed',
-        message: error instanceof Error ? error.message : 'Unable to verify entry QR.',
-      });
+      const fallbackMessage = error instanceof Error ? error.message : 'Unable to verify entry QR.';
+      setFeedback(buildEntryFailureFeedback(null, fallbackMessage));
     } finally {
       setSubmitting(false);
     }
