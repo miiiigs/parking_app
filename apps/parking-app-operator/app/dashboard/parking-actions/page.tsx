@@ -370,16 +370,21 @@ export default function ParkingActionsPage() {
                     ? 'Use the device camera to read any valid customer entry QR. Once verified, the entry is attached to the active operator location automatically.'
                     : 'This browser does not expose in-app QR detection, so operators should use the manual QR payload field below.'}
                 </div>
-                <div className="mt-4 overflow-hidden rounded-lg border border-border bg-black/60">
-                  {cameraActive ? (
-                    <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
-                  ) : (
+                <div className="relative mt-4 overflow-hidden rounded-lg border border-border bg-black/60">
+                  <video
+                    ref={videoRef}
+                    className={`aspect-video w-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
+                    autoPlay
+                    muted
+                    playsInline
+                  />
+                  {!cameraActive ? (
                     <div className="flex aspect-video items-center justify-center px-6 text-center text-sm text-muted-foreground">
                       {cameraLoading
                         ? 'Starting camera preview...'
                         : 'Camera preview will appear here when Scan QR is started.'}
                     </div>
-                  )}
+                  ) : null}
                 </div>
                 {scanMessage ? (
                   <div className="mt-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
