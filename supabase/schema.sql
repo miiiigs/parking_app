@@ -29,6 +29,7 @@ create table if not exists parking_slots (
   location_id uuid not null references locations(id) on delete cascade,
   slot_label text not null,
   display_order integer not null,
+  slot_kind text not null default 'standard' check (slot_kind in ('standard', 'walk_in_hub')),
   status text not null default 'available' check (status in ('available', 'reserved', 'occupied', 'blocked', 'disputed')),
   qr_token text not null unique,
   created_at timestamptz not null default now(),
@@ -39,7 +40,7 @@ create table if not exists parking_slots (
 create table if not exists reservations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
-  slot_id uuid not null references parking_slots(id) on delete restrict,
+  slot_id uuid references parking_slots(id) on delete restrict,
   source text not null default 'reservation' check (source in ('reservation', 'walk_in')),
   plate_number text not null,
   arrival_window_minutes integer not null,
@@ -54,6 +55,20 @@ create table if not exists reservations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists walk_in_entry_pass_tokens (
+  id uuid primary key default gen_random_uuid(),
+  reservation_id uuid not null unique references reservations(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  consumed_by_location_id uuid references locations(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists walk_in_entry_pass_tokens_expires_at_idx
+  on walk_in_entry_pass_tokens (expires_at);
 
 create table if not exists parking_sessions (
   id uuid primary key default gen_random_uuid(),
@@ -161,6 +176,10 @@ create trigger set_reservations_updated_at
 before update on reservations
 for each row execute function set_updated_at();
 
+create trigger set_walk_in_entry_pass_tokens_updated_at
+before update on walk_in_entry_pass_tokens
+for each row execute function set_updated_at();
+
 create or replace function calculate_parking_fee(
   p_elapsed_minutes integer,
   p_parking_rate numeric
@@ -241,6 +260,7 @@ for each row execute function clear_other_default_user_vehicles();
 alter table locations enable row level security;
 alter table parking_slots enable row level security;
 alter table reservations enable row level security;
+alter table walk_in_entry_pass_tokens enable row level security;
 alter table parking_sessions enable row level security;
 alter table payments enable row level security;
 alter table user_vehicles enable row level security;

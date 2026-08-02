@@ -40,14 +40,16 @@ begin
     raise exception 'Reservation is not active';
   end if;
 
-  select *
-    into v_slot
-    from parking_slots
-    where id = v_reservation.slot_id
-    for update;
+  if v_reservation.slot_id is not null then
+    select *
+      into v_slot
+      from parking_slots
+      where id = v_reservation.slot_id
+      for update;
 
-  if not found then
-    raise exception 'Slot not found';
+    if not found then
+      raise exception 'Slot not found';
+    end if;
   end if;
 
   select *
@@ -67,6 +69,8 @@ begin
   update parking_slots
     set status = 'available'
     where id = v_reservation.slot_id
+      and v_reservation.slot_id is not null
+      and v_slot.slot_kind = 'standard'
       and not exists (
         select 1
         from parking_sessions
@@ -94,7 +98,10 @@ begin
       v_reservation.id,
       v_reservation.slot_id,
       'cancelled',
-      'available';
+      case
+        when v_reservation.slot_id is null or v_slot.slot_kind <> 'standard' then null
+        else 'available'
+      end;
 end;
 $$;
 

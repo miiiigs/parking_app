@@ -19,6 +19,7 @@ import {
   issueWalkInEntryPass as issueWalkInEntryPassRequest,
   mapCompletedSession,
   mapReservationToBooking,
+  mapWalkInReservationToBooking,
   mapSessionToParkingSession,
   type ParkingSessionResult,
   type ReservationResult,
@@ -38,8 +39,7 @@ interface ReserveSlotInput {
 }
 
 interface IssueWalkInEntryPassInput {
-  lot: ParkingLot;
-  slot: ParkingSlot;
+  lot?: ParkingLot | null;
   plateNumber: string;
   holdMinutes?: number;
 }
@@ -245,10 +245,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
 
         return booking;
       },
-      issueWalkInEntryPass: async ({ lot, slot, plateNumber, holdMinutes = 10 }) => {
+      issueWalkInEntryPass: async ({ lot, plateNumber, holdMinutes = 10 }) => {
         const booking = await issueWalkInEntryPassRequest({
           lot,
-          slot,
           plateNumber,
           holdMinutes,
         });
@@ -270,18 +269,19 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           buildStoredWorkflowSnapshot(
             {
               stage: 'arrival',
-              selectedSlotId: booking.slotId ?? booking.slot.id,
+              selectedSlotId: null,
               selectedArrivalWindowMinutes: booking.arrivalWindowMinutes,
               plateNumber,
               validationQrToken: '',
               createdReservation: booking.reservationId
                 ? ({
                     reservation_id: booking.reservationId,
-                    slot_id: booking.slotId ?? booking.slot.id,
-                    slot_label: booking.slot.number,
-                    slot_status: booking.slot.status ?? 'reserved',
+                    slot_id: booking.slotId ?? null,
+                    slot_label: booking.slotLabel ?? booking.slot.number,
+                    slot_status: booking.slot.status ?? null,
                     reservation_status: booking.reservationStatus ?? 'confirmed',
                     source: 'walk_in',
+                    walk_in_entry_token: booking.entryPassToken ?? null,
                     reserved_at: booking.createdAt,
                     expires_at: booking.expiresAt ?? booking.createdAt,
                     arrival_window_minutes: booking.arrivalWindowMinutes,
@@ -331,7 +331,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           buildStoredWorkflowSnapshot(
             {
               stage: 'session',
-              selectedSlotId: booking.slotId ?? booking.slot.id,
+              selectedSlotId: booking.source === 'walk_in' ? null : booking.slotId ?? booking.slot.id,
               selectedArrivalWindowMinutes: booking.arrivalWindowMinutes,
               plateNumber: booking.plateNumber,
               validationQrToken: '',
@@ -475,24 +475,42 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
         set({ isRestoring: true });
 
         try {
+          const currentBooking = get().booking;
           const [storedWorkflow, backendWorkflow] = await Promise.all([
             loadStoredWorkflowSnapshot(),
             getCurrentMobileWorkflowState().catch(() => null),
           ]);
 
           if (backendWorkflow) {
+            const preferredLot =
+              lots.find((lot) => lot.id === backendWorkflow.session?.location_id)
+              ?? lots.find((lot) => lot.id === backendWorkflow.reservation.location_id)
+              ?? null;
             const resolved = findResolvedSlot(
               lots,
               backendWorkflow.reservation.slot_id,
               backendWorkflow.reservation.slot_label,
             );
 
-            if (resolved) {
-              const booking = buildBookingFromState({
-                lot: resolved.lot,
-                slot: resolved.slot,
-                reservation: backendWorkflow.reservation,
-              });
+            if (resolved || backendWorkflow.reservation.source === 'walk_in') {
+              const booking = resolved
+                ? buildBookingFromState({
+                    lot: resolved.lot,
+                    slot: resolved.slot,
+                    reservation: backendWorkflow.reservation,
+                  })
+                : mapWalkInReservationToBooking(
+                    {
+                      ...backendWorkflow.reservation,
+                      walk_in_entry_token:
+                        currentBooking?.source === 'walk_in' && currentBooking.reservationId === backendWorkflow.reservation.reservation_id
+                          ? currentBooking.entryPassToken ?? null
+                          : storedWorkflow?.createdReservation?.reservation_id === backendWorkflow.reservation.reservation_id
+                            ? storedWorkflow.createdReservation.walk_in_entry_token ?? null
+                            : null,
+                    },
+                    preferredLot,
+                  );
 
               const session = backendWorkflow.session
                 ? mapSessionToParkingSession(
@@ -521,7 +539,7 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
                 buildStoredWorkflowSnapshot(
                   {
                 stage: session ? 'session' : 'arrival',
-                selectedSlotId: booking.slotId ?? booking.slot.id,
+                selectedSlotId: booking.source === 'walk_in' ? null : booking.slotId ?? booking.slot.id,
                 selectedArrivalWindowMinutes: storedWorkflow?.selectedArrivalWindowMinutes ?? booking.arrivalWindowMinutes,
                 plateNumber: storedWorkflow?.plateNumber ?? booking.plateNumber,
                     validationQrToken: storedWorkflow?.validationQrToken ?? '',
@@ -538,18 +556,32 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
           }
 
           if (storedWorkflow?.createdReservation) {
+            const preferredLot =
+              lots.find((lot) => lot.id === storedWorkflow.createdReservation?.location_id)
+              ?? null;
             const resolved = findResolvedSlot(
               lots,
               storedWorkflow.createdReservation.slot_id,
               storedWorkflow.createdReservation.slot_label,
             );
 
-            if (resolved) {
-              const booking = buildBookingFromState({
-                lot: resolved.lot,
-                slot: resolved.slot,
-                reservation: storedWorkflow.createdReservation,
-              });
+            if (resolved || storedWorkflow.createdReservation.source === 'walk_in') {
+              const booking = resolved
+                ? buildBookingFromState({
+                    lot: resolved.lot,
+                    slot: resolved.slot,
+                    reservation: storedWorkflow.createdReservation,
+                  })
+                : mapWalkInReservationToBooking(
+                    {
+                      ...storedWorkflow.createdReservation,
+                      walk_in_entry_token:
+                        currentBooking?.source === 'walk_in' && currentBooking.reservationId === storedWorkflow.createdReservation.reservation_id
+                          ? currentBooking.entryPassToken ?? null
+                          : storedWorkflow.createdReservation.walk_in_entry_token ?? null,
+                    },
+                    preferredLot,
+                  );
               const session = storedWorkflow.activeParkingSession
                 ? mapSessionToParkingSession(
                     storedWorkflow.activeParkingSession,

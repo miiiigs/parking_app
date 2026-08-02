@@ -12,9 +12,9 @@ import {
 
 export type ReservationResult = {
   reservation_id: string;
-  slot_id: string;
-  slot_label: string;
-  slot_status: string;
+  slot_id: string | null;
+  slot_label: string | null;
+  slot_status: string | null;
   reservation_status: string;
   source?: string | null;
   reserved_at: string;
@@ -24,14 +24,18 @@ export type ReservationResult = {
   reservation_fee?: number | null;
   parking_rate?: number | null;
   pricing_config?: ParkingPricingConfig | null;
+  location_id?: string | null;
+  location_name?: string | null;
+  location_address?: string | null;
+  walk_in_entry_token?: string | null;
 };
 
 export type ParkingSessionResult = {
   session_id: string;
   reservation_id: string;
   slot_id: string;
-  slot_label: string;
-  slot_status: string;
+  slot_label: string | null;
+  slot_status: string | null;
   reservation_status: string;
   source?: string | null;
   session_status: string;
@@ -47,6 +51,9 @@ export type ParkingSessionResult = {
   billed_amount: number | null;
   payment_status: string | null;
   pricing_config?: ParkingPricingConfig | null;
+  location_id?: string | null;
+  location_name?: string | null;
+  location_address?: string | null;
 };
 
 export type MobileWorkflowState = {
@@ -62,11 +69,71 @@ export type ReservationRequest = {
 };
 
 export type WalkInEntryPassRequest = {
-  lot: ParkingLot;
-  slot: ParkingSlot;
+  lot?: ParkingLot | null;
   plateNumber: string;
   holdMinutes?: number;
 };
+
+const GENERIC_WALK_IN_LOT_ID = 'walkin-any';
+const GENERIC_WALK_IN_SLOT_ID = 'walkin-access';
+
+function createPublicReservationReference(reservationId: string, source: 'reservation' | 'walk_in') {
+  const prefix = source === 'walk_in' ? 'WIN' : 'RSV';
+  return `${prefix}-${reservationId.slice(0, 8).toUpperCase()}`;
+}
+
+function createWalkInPlaceholderSlot(slotId = GENERIC_WALK_IN_SLOT_ID, label = 'Walk-In Access'): ParkingSlot {
+  return {
+    id: slotId,
+    number: label,
+    isAvailable: true,
+    status: 'available',
+    x: 0,
+    y: 0,
+  };
+}
+
+function resolveWalkInLotSnapshot({
+  preferredLot,
+  lotId,
+  lotName,
+  address,
+  slotId,
+  slotLabel,
+  parkingRate,
+  pricingConfig,
+}: {
+  preferredLot?: ParkingLot | null;
+  lotId?: string | null;
+  lotName?: string | null;
+  address?: string | null;
+  slotId?: string | null;
+  slotLabel?: string | null;
+  parkingRate?: number | null;
+  pricingConfig?: ParkingPricingConfig | null;
+}) {
+  const normalizedPricingConfig = normalizeParkingPricingConfig(
+    pricingConfig ?? preferredLot?.pricingConfig ?? DEFAULT_PARKING_PRICING,
+  );
+  const pricePerHour =
+    parkingRate
+    ?? preferredLot?.pricePerHour
+    ?? (normalizedPricingConfig.mode === 'flat_rate'
+      ? normalizedPricingConfig.flatRateAmount
+      : normalizedPricingConfig.mode === 'tiered'
+        ? normalizedPricingConfig.firstPeriodRate
+        : normalizedPricingConfig.fixedRateAmount);
+  const slot = createWalkInPlaceholderSlot(slotId ?? GENERIC_WALK_IN_SLOT_ID, slotLabel ?? 'Walk-In Access');
+
+  return {
+    lotId: lotId ?? preferredLot?.id ?? GENERIC_WALK_IN_LOT_ID,
+    lotName: lotName ?? preferredLot?.name ?? 'Any supported lot',
+    address: address ?? preferredLot?.address ?? 'Assigned after operator confirmation',
+    slot,
+    pricePerHour,
+    pricingConfig: normalizedPricingConfig,
+  };
+}
 
 function isUuidLike(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -185,7 +252,7 @@ function toBookingFromReservation({
 
   return {
     reservationId: reservationId ?? undefined,
-    reservationCode: reservationId ?? createReservationCode(slot.id),
+    reservationCode: reservationId ? createPublicReservationReference(reservationId, source === 'walk_in' ? 'walk_in' : 'reservation') : createReservationCode(slot.id),
     source: source ?? (reservationId ? 'reservation' : 'local'),
     lotId: lot.id,
     lotName: lot.name,
@@ -207,31 +274,101 @@ function toBookingFromReservation({
 
 function toLocalWalkInBooking({
   lot,
-  slot,
   plateNumber,
   holdMinutes = 10,
 }: WalkInEntryPassRequest): Booking {
   const createdAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
+  const walkInSnapshot = resolveWalkInLotSnapshot({ preferredLot: lot ?? null, slotLabel: 'Any supported lot' });
 
   return {
-    reservationCode: createWalkInCode(slot.id),
+    reservationCode: createWalkInCode(walkInSnapshot.slot.id),
     source: 'walk_in',
-    lotId: lot.id,
-    lotName: lot.name,
-    address: lot.address,
-    slotId: slot.id,
-    slotLabel: slot.number,
-    slot,
+    entryPassToken: null,
+    lotId: walkInSnapshot.lotId,
+    lotName: walkInSnapshot.lotName,
+    address: walkInSnapshot.address,
+    slotId: walkInSnapshot.slot.id,
+    slotLabel: walkInSnapshot.slot.number,
+    slot: walkInSnapshot.slot,
     arrivalWindowMinutes: holdMinutes,
     plateNumber,
     reservationFee: 0,
-    pricePerHour: lot.pricePerHour,
-    pricingConfig: normalizeParkingPricingConfig(lot.pricingConfig ?? DEFAULT_PARKING_PRICING),
+    pricePerHour: walkInSnapshot.pricePerHour,
+    pricingConfig: walkInSnapshot.pricingConfig,
     reservationStatus: 'confirmed',
     expiresAt,
-    qrToken: slot.qrToken ?? null,
+    qrToken: null,
     createdAt,
+  };
+}
+
+function toWalkInBooking({
+  preferredLot,
+  plateNumber,
+  holdMinutes,
+  reservationId,
+  expiresAt,
+  reservationStatus,
+  parkingRate,
+  reservationFee,
+  pricingConfig,
+  createdAt,
+  slotId,
+  slotLabel,
+  lotId,
+  lotName,
+  address,
+  entryPassToken,
+}: {
+  preferredLot?: ParkingLot | null;
+  plateNumber: string;
+  holdMinutes: number;
+  reservationId?: string | null;
+  expiresAt?: string | null;
+  reservationStatus?: string;
+  parkingRate?: number | null;
+  reservationFee?: number | null;
+  pricingConfig?: ParkingPricingConfig | null;
+  createdAt?: string | null;
+  slotId?: string | null;
+  slotLabel?: string | null;
+  lotId?: string | null;
+  lotName?: string | null;
+  address?: string | null;
+  entryPassToken?: string | null;
+}): Booking {
+  const walkInSnapshot = resolveWalkInLotSnapshot({
+    preferredLot,
+    lotId,
+    lotName,
+    address,
+    slotId,
+    slotLabel: slotLabel ?? (slotId ? 'Walk-In Access' : 'Any supported lot'),
+    parkingRate,
+    pricingConfig,
+  });
+
+  return {
+    reservationId: reservationId ?? undefined,
+    reservationCode: reservationId ? createPublicReservationReference(reservationId, 'walk_in') : createWalkInCode(walkInSnapshot.slot.id),
+    source: 'walk_in',
+    entryPassToken: entryPassToken ?? null,
+    lotId: walkInSnapshot.lotId,
+    lotName: walkInSnapshot.lotName,
+    address: walkInSnapshot.address,
+    slotId: slotId ?? walkInSnapshot.slot.id,
+    slotLabel: walkInSnapshot.slot.number,
+    slot: walkInSnapshot.slot,
+    arrivalWindowMinutes: holdMinutes,
+    plateNumber,
+    reservationFee: reservationFee ?? 0,
+    pricePerHour: walkInSnapshot.pricePerHour,
+    pricingConfig: walkInSnapshot.pricingConfig,
+    reservationStatus: reservationStatus ?? (reservationId ? 'confirmed' : 'local'),
+    expiresAt: expiresAt ?? null,
+    qrToken: null,
+    createdAt: createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -304,10 +441,6 @@ export async function issueWalkInEntryPass(request: WalkInEntryPassRequest) {
     return toLocalWalkInBooking({ ...request, holdMinutes });
   }
 
-  if (!isUuidLike(request.slot.id)) {
-    throw new Error('Live parking data is required for walk-in entry passes. Reload the lot map or switch to guest mode for local testing.');
-  }
-
   try {
     await ensureMobileAuthSession();
   } catch (error) {
@@ -315,7 +448,6 @@ export async function issueWalkInEntryPass(request: WalkInEntryPassRequest) {
   }
 
   let { data, error } = await supabase.rpc('issue_walk_in_entry_pass', {
-    p_slot_id: request.slot.id,
     p_plate_number: request.plateNumber,
     p_hold_minutes: holdMinutes,
   });
@@ -334,22 +466,23 @@ export async function issueWalkInEntryPass(request: WalkInEntryPassRequest) {
     throw new Error('Supabase did not return a walk-in entry pass row.');
   }
 
-  return toBookingFromReservation({
-    lot: request.lot,
-    slot: request.slot,
-    request: {
-      lot: request.lot,
-      slot: request.slot,
-      arrivalWindowMinutes: reservation.arrival_window_minutes ?? holdMinutes,
-      plateNumber: request.plateNumber,
-    },
+  return toWalkInBooking({
+    preferredLot: request.lot ?? null,
+    plateNumber: request.plateNumber,
+    holdMinutes: reservation.arrival_window_minutes ?? holdMinutes,
     reservationId: reservation.reservation_id,
     expiresAt: reservation.expires_at,
     reservationStatus: reservation.reservation_status,
     parkingRate: reservation.parking_rate,
     reservationFee: reservation.reservation_fee,
-    pricingConfig: reservation.pricing_config ?? request.lot.pricingConfig,
-    source: 'walk_in',
+    pricingConfig: reservation.pricing_config ?? request.lot?.pricingConfig ?? DEFAULT_PARKING_PRICING,
+    createdAt: reservation.reserved_at,
+    slotId: reservation.slot_id ?? undefined,
+    slotLabel: reservation.slot_label ?? undefined,
+    lotId: reservation.location_id,
+    lotName: reservation.location_name,
+    address: reservation.location_address,
+    entryPassToken: reservation.entry_token ?? null,
   });
 }
 
@@ -374,9 +507,15 @@ export async function getParkingReservationById(reservationId: string) {
       reservation_fee,
       parking_rate,
       pricing_config,
-      parking_slots!inner (
+      parking_slots (
         slot_label,
-        status
+        status,
+        location_id,
+        locations (
+          id,
+          name,
+          address
+        )
       )
     `)
     .eq('id', reservationId)
@@ -395,7 +534,7 @@ export async function getParkingReservationById(reservationId: string) {
         expires_at,
         plate_number,
         reservation_fee,
-        parking_slots!inner (
+        parking_slots (
           slot_label,
           status
         )
@@ -415,12 +554,13 @@ export async function getParkingReservationById(reservationId: string) {
   }
 
   const parkingSlot = Array.isArray(data.parking_slots) ? data.parking_slots[0] : data.parking_slots;
+  const location = Array.isArray(parkingSlot?.locations) ? parkingSlot?.locations[0] : parkingSlot?.locations;
 
   return {
     reservation_id: data.id,
-    slot_id: data.slot_id,
-    slot_label: parkingSlot?.slot_label ?? 'Assigned slot',
-    slot_status: parkingSlot?.status ?? 'available',
+    slot_id: data.slot_id ?? null,
+    slot_label: parkingSlot?.slot_label ?? null,
+    slot_status: parkingSlot?.status ?? null,
     reservation_status: data.status,
     source: 'source' in data ? data.source ?? null : null,
     reserved_at: data.reserved_at,
@@ -430,6 +570,9 @@ export async function getParkingReservationById(reservationId: string) {
     reservation_fee: 'reservation_fee' in data && data.reservation_fee !== null && data.reservation_fee !== undefined ? Number(data.reservation_fee) : null,
     parking_rate: 'parking_rate' in data && data.parking_rate !== null && data.parking_rate !== undefined ? Number(data.parking_rate) : null,
     pricing_config: 'pricing_config' in data ? normalizeParkingPricingConfig(data.pricing_config ?? null) : null,
+    location_id: parkingSlot?.location_id ?? null,
+    location_name: location?.name ?? null,
+    location_address: location?.address ?? null,
   } as ReservationResult;
 }
 
@@ -454,13 +597,23 @@ export async function getParkingSessionByReservationId(reservationId: string) {
       billed_minutes,
       billed_amount,
       status,
-        reservations!inner (
-          plate_number,
-          reservation_fee,
-          source,
-          pricing_config,
-          status,
-        parking_slots!inner (
+      parking_slots (
+        slot_label,
+        status,
+        location_id,
+        locations (
+          id,
+          name,
+          address
+        )
+      ),
+      reservations!inner (
+        plate_number,
+        reservation_fee,
+        source,
+        pricing_config,
+        status,
+        parking_slots (
           slot_label,
           status
         )
@@ -483,11 +636,15 @@ export async function getParkingSessionByReservationId(reservationId: string) {
         billed_minutes,
         billed_amount,
         status,
+        parking_slots (
+          slot_label,
+          status
+        ),
         reservations!inner (
           plate_number,
           reservation_fee,
           status,
-          parking_slots!inner (
+          parking_slots (
             slot_label,
             status
           )
@@ -508,7 +665,9 @@ export async function getParkingSessionByReservationId(reservationId: string) {
   }
 
   const reservation = Array.isArray(data.reservations) ? data.reservations[0] : data.reservations;
-  const parkingSlot = Array.isArray(reservation?.parking_slots) ? reservation?.parking_slots[0] : reservation?.parking_slots;
+  const parkingSlot = Array.isArray(data.parking_slots) ? data.parking_slots[0] : data.parking_slots;
+  const reservationParkingSlot = Array.isArray(reservation?.parking_slots) ? reservation?.parking_slots[0] : reservation?.parking_slots;
+  const location = Array.isArray(parkingSlot?.locations) ? parkingSlot?.locations[0] : parkingSlot?.locations;
 
   const { data: paymentRows } = await supabase
     .from('payments')
@@ -523,8 +682,8 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     session_id: data.id,
     reservation_id: data.reservation_id,
     slot_id: data.slot_id,
-    slot_label: parkingSlot?.slot_label ?? 'Assigned slot',
-    slot_status: parkingSlot?.status ?? 'occupied',
+    slot_label: parkingSlot?.slot_label ?? reservationParkingSlot?.slot_label ?? 'Assigned slot',
+    slot_status: parkingSlot?.status ?? reservationParkingSlot?.status ?? 'occupied',
     reservation_status: reservation?.status ?? 'confirmed',
     source: 'source' in (reservation ?? {}) ? reservation?.source ?? null : null,
     session_status: data.status,
@@ -540,6 +699,9 @@ export async function getParkingSessionByReservationId(reservationId: string) {
     billed_amount: data.billed_amount !== null && data.billed_amount !== undefined ? Number(data.billed_amount) : null,
     payment_status: payment?.status ?? (data.status === 'completed' ? 'paid' : null),
     pricing_config: normalizeParkingPricingConfig(reservation?.pricing_config ?? null),
+    location_id: parkingSlot?.location_id ?? location?.id ?? null,
+    location_name: location?.name ?? null,
+    location_address: location?.address ?? null,
   } as ParkingSessionResult;
 }
 
@@ -687,13 +849,13 @@ export function mapReservationToBooking(
 ): Booking {
   return {
     reservationId: reservation.reservation_id,
-    reservationCode: reservation.reservation_id,
+    reservationCode: createPublicReservationReference(reservation.reservation_id, reservation.source === 'walk_in' ? 'walk_in' : 'reservation'),
     source: reservation.source === 'walk_in' ? 'walk_in' : 'reservation',
     lotId: lot.id,
     lotName: lot.name,
     address: lot.address,
-    slotId: reservation.slot_id,
-    slotLabel: reservation.slot_label,
+    slotId: reservation.slot_id ?? undefined,
+    slotLabel: reservation.slot_label ?? undefined,
     slot,
     arrivalWindowMinutes: reservation.arrival_window_minutes ?? 0,
     plateNumber: reservation.plate_number ?? '',
@@ -707,12 +869,48 @@ export function mapReservationToBooking(
   };
 }
 
+export function mapWalkInReservationToBooking(
+  reservation: ReservationResult,
+  preferredLot?: ParkingLot | null,
+): Booking {
+  return toWalkInBooking({
+    preferredLot,
+    plateNumber: reservation.plate_number ?? '',
+    holdMinutes: reservation.arrival_window_minutes ?? 10,
+    reservationId: reservation.reservation_id,
+    expiresAt: reservation.expires_at,
+    reservationStatus: reservation.reservation_status,
+    parkingRate: reservation.parking_rate,
+    reservationFee: reservation.reservation_fee,
+    pricingConfig: reservation.pricing_config ?? preferredLot?.pricingConfig ?? DEFAULT_PARKING_PRICING,
+    createdAt: reservation.reserved_at,
+    slotId: reservation.slot_id ?? undefined,
+    slotLabel: reservation.slot_label ?? undefined,
+    lotId: reservation.location_id,
+    lotName: reservation.location_name,
+    address: reservation.location_address,
+    entryPassToken: reservation.walk_in_entry_token ?? null,
+  });
+}
+
 export function mapSessionToParkingSession(
   session: ParkingSessionResult,
   booking: Booking,
 ): ParkingSession {
   return {
     ...booking,
+    lotId: session.location_id ?? booking.lotId,
+    lotName: session.location_name ?? booking.lotName,
+    address: session.location_address ?? booking.address,
+    slotId: session.slot_id,
+    slotLabel: session.slot_label ?? booking.slotLabel,
+    slot: {
+      ...booking.slot,
+      id: session.slot_id,
+      number: session.slot_label ?? booking.slot.number,
+      status: (session.slot_status as ParkingSlot['status'] | null | undefined) ?? booking.slot.status,
+      isAvailable: false,
+    },
     sessionId: session.session_id,
     sessionStatus: session.session_status,
     startTime: session.started_at,

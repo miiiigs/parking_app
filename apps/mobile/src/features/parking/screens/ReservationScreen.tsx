@@ -122,6 +122,15 @@ export default function ReservationScreen() {
     return [...cardOptions, ...walletOptions, ...fallbackOptions];
   }, [cards, wallets]);
 
+  useEffect(() => {
+    if (mode === 'walkin' && lot) {
+      router.replace({
+        pathname: '/walkin-confirm',
+        params: { lotId: lot.id },
+      });
+    }
+  }, [lot, mode, router]);
+
   const clearSelectedSlot = () => {
     setErrorMessage(null);
     setSelectedSlot(null);
@@ -288,7 +297,6 @@ export default function ReservationScreen() {
                 pathname: '/walkin-confirm',
                 params: {
                   lotId: lot.id,
-                  ...(selectedSlot ? { slotId: selectedSlot.id } : {}),
                 },
               });
             }}
@@ -562,7 +570,7 @@ export default function ReservationScreen() {
                 <View style={styles.walkInInfoCopy}>
                   <Text style={styles.walkInInfoTitle}>Metered billing</Text>
                   <Text style={styles.walkInInfoText}>
-                    Continue to confirm payment method and vehicle details, then generate your entrance QR.
+                    Continue to confirm your vehicle details, then show your universal walk-in QR.
                   </Text>
                 </View>
               </View>
@@ -595,7 +603,6 @@ export default function ReservationScreen() {
                     pathname: '/walkin-confirm',
                     params: {
                       lotId: lot.id,
-                      slotId: selectedSlot.id,
                     },
                   })
                 }

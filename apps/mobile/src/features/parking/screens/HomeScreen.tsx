@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -17,17 +16,12 @@ import {
   AlertTriangle,
   CarFront,
   ChevronRight,
-  CreditCard,
-  Info,
   MapPin,
   Menu,
   Search,
-  Settings,
   SlidersHorizontal,
-  User,
   X,
   Zap,
-  type LucideIcon,
 } from 'lucide-react-native';
 
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
@@ -41,13 +35,6 @@ import type { ParkingLot } from '../types';
 import { formatParkingPricingSummary } from '@parking/shared';
 
 type BuildingType = 'All' | 'Mall' | 'Commercial' | 'Office';
-
-type DrawerItem = {
-  icon: LucideIcon;
-  label: string;
-  sublabel: string;
-  onPress: () => void;
-};
 
 const BUILDING_TYPES: BuildingType[] = ['All', 'Mall', 'Commercial', 'Office'];
 
@@ -63,7 +50,6 @@ export default function HomeScreen() {
   const [query, setQuery] = useState('');
   const [activeType, setActiveType] = useState<BuildingType>('All');
   const [showFilters, setShowFilters] = useState(false);
-  const [showDrawer, setShowDrawer] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [pendingLot, setPendingLot] = useState<ParkingLot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,21 +74,43 @@ export default function HomeScreen() {
   const isSyncing = isRestoring || isLoading || isRefreshing;
   const dataStatusLabel = isSyncing ? 'Syncing' : status === 'live' ? 'Live' : status === 'stale' ? 'Offline cache' : 'Demo';
   const lastSyncLabel = lastSyncedAt ? formatLastSyncLabel(lastSyncedAt) : null;
+  const displayName = useMemo(() => {
+    if (isGuest) {
+      return 'Guest';
+    }
+
+    const metadataName = auth.user?.user_metadata?.display_name ?? auth.user?.user_metadata?.full_name;
+    if (typeof metadataName === 'string' && metadataName.trim()) {
+      return metadataName.trim().split(' ')[0] ?? 'Driver';
+    }
+
+    if (auth.user?.email) {
+      return auth.user.email.split('@')[0];
+    }
+
+    return 'Driver';
+  }, [auth.user?.email, auth.user?.user_metadata?.display_name, auth.user?.user_metadata?.full_name, isGuest]);
+  const greetingLabel = getGreeting();
+  const dateLabel = new Date().toLocaleDateString('en-PH', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
 
   const quickAction = session
     ? {
         title: 'Active session',
-        copy: `Slot ${session.slot.number} at ${session.lotName}`,
+        copy: session.source === 'walk_in' ? `Active walk-in session at ${session.lotName}` : `Slot ${session.slot.number} at ${session.lotName}`,
         onPress: () => router.push('/session'),
       }
     : booking
       ? {
           title: booking.source === 'walk_in' ? 'Walk-in entry pass' : 'Reservation saved',
           copy: booking.source === 'walk_in'
-            ? `Resume the walk-in pass for slot ${booking.slot.number}`
+            ? 'Resume your universal walk-in QR'
             : `Open the entry pass for slot ${booking.slot.number}`,
           onPress: () => booking.source === 'walk_in'
-            ? router.push({ pathname: '/walkin-qr', params: { lotId: booking.lotId, slotId: booking.slot.id } })
+            ? router.push('/walkin-qr')
             : router.push('/arrival'),
         }
       : completedSession
@@ -114,48 +122,10 @@ export default function HomeScreen() {
         : featuredLot
           ? {
               title: 'Walk-In Parking',
-              copy: 'Already at the facility? Pay & park instantly',
+              copy: 'Already at the facility? Show one QR at any supported lot',
               onPress: () => router.push({ pathname: '/walkin-confirm', params: { lotId: featuredLot.id } }),
             }
           : null;
-
-  const drawerItems: DrawerItem[] = [
-    {
-      icon: User,
-      label: 'My Profile',
-      sublabel: 'Edit name, photo',
-      onPress: () => showComingSoon('My Profile'),
-    },
-    {
-      icon: CreditCard,
-      label: 'Payment Methods',
-      sublabel: 'Cards, GCash, Maya',
-      onPress: () => showComingSoon('Payment Methods'),
-    },
-    {
-      icon: Settings,
-      label: 'Settings',
-      sublabel: 'Notifications, privacy',
-      onPress: () => showComingSoon('Settings'),
-    },
-    {
-      icon: AlertTriangle,
-      label: 'Report an Issue',
-      sublabel: 'Help & support',
-      onPress: () => showComingSoon('Report an Issue'),
-    },
-    {
-      icon: Info,
-      label: 'About ParkingPH',
-      sublabel: 'Version, terms, contact',
-      onPress: () => showComingSoon('About ParkingPH'),
-    },
-  ];
-
-  function showComingSoon(label: string) {
-    setShowDrawer(false);
-    Alert.alert(label, 'This destination is in the latest design but is not implemented in the mobile app yet.');
-  }
 
   function handleLotPress(lot: ParkingLot) {
     if (requiresAuth) {
@@ -190,7 +160,7 @@ export default function HomeScreen() {
             <Text style={styles.loadingTitle}>Loading parking data</Text>
             <Text style={styles.loadingCopy}>Syncing live parking availability, pricing, and layout.</Text>
           </View>
-          <BottomNav activeTab="search" />
+          <BottomNav activeTab="home" />
         </View>
       </SafeAreaView>
     );
@@ -219,12 +189,19 @@ export default function HomeScreen() {
               <View style={styles.headerTopRow}>
                 <View style={styles.headerBrandRow}>
                   <AuthLogo />
-                  {isGuest ? <GuestBadge label="Guest" /> : null}
                 </View>
 
-                <Pressable onPress={() => router.push('/menu')} style={styles.headerIconButton} hitSlop={8}>
-                  <Menu color="#1E293B" size={22} strokeWidth={2.2} />
-                </Pressable>
+                <View style={styles.headerActions}>
+                  {isGuest ? <GuestBadge label="Guest" /> : null}
+                  <Pressable onPress={() => router.push('/profile')} style={styles.headerIconButton} hitSlop={8}>
+                    <Menu color="#1E293B" size={22} strokeWidth={2.2} />
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.greetingBlock}>
+                <Text style={styles.greetingTitle}>{`${greetingLabel}, ${displayName}`}</Text>
+                <Text style={styles.greetingDate}>{dateLabel}</Text>
               </View>
 
               <View style={styles.searchRow}>
@@ -300,14 +277,17 @@ export default function HomeScreen() {
             ) : null}
 
             <View style={styles.resultsHeader}>
-              <Text style={styles.resultsCopy}>
-                <Text style={styles.resultsCount}>{filteredLots.length}</Text> parking {filteredLots.length === 1 ? 'lot' : 'lots'} found
-              </Text>
+              <View>
+                <Text style={styles.sectionTitle}>Nearby Parking</Text>
+                <Text style={styles.resultsCopy}>
+                  <Text style={styles.resultsCount}>{filteredLots.length}</Text> {filteredLots.length === 1 ? 'lot' : 'lots'} near you
+                </Text>
+              </View>
               <View style={styles.resultsMetaRow}>
-                <View style={styles.nearYouRow}>
-                  <MapPin color="#0F766E" size={12} strokeWidth={2.3} />
-                  <Text style={styles.nearYouText}>Near You</Text>
-                </View>
+                <Pressable onPress={() => router.push('/explore')} style={styles.seeAllButton}>
+                  <Text style={styles.seeAllText}>See all</Text>
+                  <ChevronRight color="#0F766E" size={13} strokeWidth={2.2} />
+                </Pressable>
                 <View
                   style={[
                     styles.dataModeBadge,
@@ -354,34 +334,8 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <BottomNav activeTab="search" />
+        <BottomNav activeTab="home" />
       </View>
-
-      <Modal animationType="fade" transparent visible={showDrawer} onRequestClose={() => setShowDrawer(false)}>
-        <Pressable style={styles.drawerBackdrop} onPress={() => setShowDrawer(false)}>
-          <Pressable style={styles.drawerSheet} onPress={(event) => event.stopPropagation()}>
-            <View style={styles.drawerHandleWrap}>
-              <View style={styles.drawerHandle} />
-            </View>
-            <View style={styles.drawerContent}>
-              <Text style={styles.drawerEyebrow}>QUICK ACCESS</Text>
-              <View style={styles.drawerItemList}>
-                {drawerItems.map((item) => (
-                  <Pressable key={item.label} onPress={item.onPress} style={styles.drawerItem}>
-                    <View style={styles.drawerItemIconWrap}>
-                      <item.icon color="#0F766E" size={18} strokeWidth={2.2} />
-                    </View>
-                    <View style={styles.drawerItemCopy}>
-                      <Text style={styles.drawerItemTitle}>{item.label}</Text>
-                      <Text style={styles.drawerItemSubtitle}>{item.sublabel}</Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <Modal animationType="slide" transparent visible={showGuestModal} onRequestClose={() => setShowGuestModal(false)}>
         <View style={styles.modalBackdrop}>
@@ -434,6 +388,20 @@ function formatLastSyncLabel(value: number) {
   }
 
   return `${Math.floor(elapsedSeconds / 3600)} hr ago`;
+}
+
+function getGreeting() {
+  const hours = new Date().getHours();
+
+  if (hours < 12) {
+    return 'Good morning';
+  }
+
+  if (hours < 18) {
+    return 'Good afternoon';
+  }
+
+  return 'Good evening';
 }
 
 function HomeLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void }) {
@@ -524,11 +492,11 @@ function getAvailabilityColor(available: number, total: number) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAF9',
+    backgroundColor: '#F4F6F9',
   },
   loadingPage: {
     flex: 1,
-    backgroundColor: '#FAFAF9',
+    backgroundColor: '#F4F6F9',
   },
   loadingHeader: {
     paddingHorizontal: 20,
@@ -589,17 +557,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerBrandRow: {
+    alignItems: 'flex-start',
+  },
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   guestBadge: {
-    borderRadius: 6,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#FED7AA',
     backgroundColor: '#FFF7ED',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
   guestBadgeText: {
     color: '#F97316',
@@ -610,6 +581,21 @@ const styles = StyleSheet.create({
   },
   headerIconButton: {
     padding: 4,
+  },
+  greetingBlock: {
+    gap: 4,
+  },
+  greetingTitle: {
+    color: '#0F172A',
+    fontSize: 20,
+    lineHeight: 25,
+    fontFamily: 'Poppins_700Bold',
+  },
+  greetingDate: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: 'Poppins_400Regular',
   },
   searchRow: {
     flexDirection: 'row',
@@ -723,20 +709,28 @@ const styles = StyleSheet.create({
   },
   resultsHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
     paddingHorizontal: 0,
+    paddingTop: 4,
+  },
+  sectionTitle: {
+    color: '#0F172A',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
   },
   resultsCopy: {
-    color: '#64748B',
-    fontSize: 14,
-    lineHeight: 19,
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_400Regular',
     flex: 1,
+    marginTop: 2,
   },
   resultsCount: {
-    color: '#1E293B',
+    color: '#0F172A',
     fontFamily: 'Poppins_700Bold',
   },
   resultsMetaRow: {
@@ -744,15 +738,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  nearYouRow: {
+  seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  nearYouText: {
+  seeAllText: {
     color: '#0F766E',
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'Poppins_500Medium',
   },
   dataModeBadge: {
@@ -979,80 +973,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     fontFamily: 'Poppins_400Regular',
-  },
-  drawerBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  drawerSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    overflow: 'hidden',
-  },
-  drawerHandleWrap: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  drawerHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E2E8F0',
-  },
-  drawerContent: {
-    paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 24,
-  },
-  drawerEyebrow: {
-    color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: 0.6,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  drawerItemList: {
-    gap: 8,
-  },
-  drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  drawerItemIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#F0FDFA',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  drawerItemCopy: {
-    flex: 1,
-  },
-  drawerItemTitle: {
-    color: '#1E293B',
-    fontSize: 14,
-    lineHeight: 18,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  drawerItemSubtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: 'Poppins_400Regular',
-    marginTop: 1,
   },
   modalBackdrop: {
     flex: 1,

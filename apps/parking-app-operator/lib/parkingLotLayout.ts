@@ -211,7 +211,7 @@ async function fetchLiveSlotsForLocation(
     display_order: number;
   }>(
     await fetch(
-      `${url}/rest/v1/parking_slots?select=id,slot_label,status,display_order&location_id=eq.${locationId}&order=display_order.asc`,
+      `${url}/rest/v1/parking_slots?select=id,slot_label,status,display_order&location_id=eq.${locationId}&slot_kind=eq.standard&order=display_order.asc`,
       { headers, cache: 'no-store' },
     ),
   );
@@ -396,7 +396,7 @@ export async function fetchOperatorLotBuilderState(selectedLocationId?: string |
   }
 
   const slotResponse = await fetch(
-    `${config.url}/rest/v1/parking_slots?select=id,slot_label,status,display_order&location_id=eq.${location.id}&order=display_order.asc`,
+    `${config.url}/rest/v1/parking_slots?select=id,slot_label,status,display_order&location_id=eq.${location.id}&slot_kind=eq.standard&order=display_order.asc`,
     { headers, cache: 'no-store' },
   );
   const slotRows = (await slotResponse.json().catch(() => [])) as Array<{

@@ -28,6 +28,37 @@ The previous debugger log was accepted and cleared by review.
 
 ## Active Debug Session
 
+### 2026-08-02 - Hybrid walk-in flow no longer requires payment or slot selection
+
+- `Issue summary`:
+  The mobile walk-in flow still forced payment-method selection and slot selection before showing a QR, while the requested hybrid model requires a generic walk-in QR that any supported operator can confirm without consuming reservation-managed slots.
+- `Why debugger was called`:
+  The current walk-in implementation was structurally incompatible with the intended operational flow, so the repo needed a root-cause contract change rather than a UI-only patch.
+- `Scope inspected`:
+  `apps/mobile/src/features/parking/screens/WalkInConfirmScreen.tsx`, `apps/mobile/src/features/parking/screens/WalkInQrScreen.tsx`, `apps/mobile/src/features/parking/store/useParkingFlowStore.ts`, `apps/mobile/src/lib/reservations.ts`, `apps/mobile/src/lib/parkingData.ts`, `apps/mobile/app/validate.tsx`, `apps/mobile/tests/walkInContract.test.mjs`, `apps/parking-app-operator/lib/parkingLotLayout.ts`, `supabase/schema.sql`, `supabase/issue_walk_in_entry_pass.sql`, `supabase/confirm_parking_entry.sql`, `supabase/cancel_parking_reservation.sql`, and `supabase/expire_stale_walk_in_entry_passes.sql`.
+- `Observed root cause`:
+  Walk-in passes were modeled as reserved-slot holds from the moment of issuance. That meant the QR contract, workflow restore logic, expiry cleanup, and operator confirmation path all assumed a concrete `slot_id`, so the app could not support a true location-agnostic walk-in pass without changing the backend contract.
+- `What was changed`:
+  Reworked walk-in issuance so the mobile app requests a generic walk-in pass without payment-method or slot selection.
+  Updated operator confirmation to attach confirmed walk-ins to a hidden `walk_in_hub` slot per location, keeping reservation-managed slots out of the hybrid walk-in path.
+  Allowed reservations to carry a nullable `slot_id` before operator confirmation and hardened cancellation plus stale-expiry cleanup for slotless walk-in passes.
+  Filtered `walk_in_hub` slots out of mobile/operator map inventory, updated mobile workflow restore/session mapping for generic walk-in passes, removed the walk-in QR progress bar, and refreshed the walk-in contract tests.
+- `Validation run`:
+  `npm.cmd --workspace apps/mobile run typecheck`
+  `npm.cmd --workspace apps/mobile run test`
+  `npm.cmd --workspace apps/parking-app-operator run test`
+  `npm.cmd --workspace apps/parking-app-operator run build`
+- `Manual actions still required`:
+  Apply the updated Supabase SQL files before expecting the live app to follow the new hybrid walk-in behavior.
+  Rehearse one real device walk-in entry using an operator account after the SQL is applied, because the end-to-end confirmation path now depends on the new `walk_in_hub` slot contract.
+- `Residual risk or follow-up`:
+  Existing staging or local databases that still use the old walk-in RPC signature and non-null reservation-slot assumptions will mismatch the app until the SQL is applied.
+  The hidden hub-slot model intentionally keeps walk-ins out of reservation inventory, but any future reporting that assumes every active session maps to a standard slot should be reviewed before expanding dashboard analytics.
+- `Suggested planner note`:
+  Treat this as a backend-contract and mobile-workflow change, not just a UI adjustment. Future planning should account for rollout sequencing: SQL first, then mobile/operator smoke validation on a real environment.
+- `Resolution status`:
+  `Patched, manual validation required`
+
 ### 2026-06-25 - Admin hardening SQL rerun fails on existing trigger
 
 - `Issue summary`:

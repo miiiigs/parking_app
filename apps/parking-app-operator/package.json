@@ -11,6 +11,7 @@
     "test": "node --test --experimental-strip-types tests/routeLocationEnforcement.test.js tests/routeContractCoverage.test.js tests/routeRequestValidation.test.mjs tests/locationContext.test.mjs tests/reconciliationPlan.test.mjs tests/reservationStatus.test.mjs tests/slotLabelNormalization.test.mjs tests/slotSyncPlan.test.mjs tests/adminToolScoping.test.mjs tests/dashboardMetricShaping.test.mjs tests/operatorPermissions.test.mjs tests/customerOversight.test.mjs"
   },
   "dependencies": {
+    "@parking/shared": "1.0.0",
     "@supabase/ssr": "^0.5.2",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",

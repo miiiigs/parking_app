@@ -94,9 +94,10 @@ export default function ParkingActionsPage() {
   const scanLockRef = useRef(false);
 
   const canOperateParkingActions = hasOperatorCapability(user?.role, 'edit-slot-status');
+  const reservations = data?.reservations ?? [];
   const activeReservations = useMemo(
-    () => (data?.reservations ?? []).filter((reservation) => reservation.status === 'active').slice(0, 8),
-    [data?.reservations],
+    () => reservations.filter((reservation) => reservation.status === 'active' && reservation.source === 'reservation').slice(0, 8),
+    [reservations],
   );
 
   useEffect(() => {
@@ -104,13 +105,28 @@ export default function ParkingActionsPage() {
   }, []);
 
   useEffect(() => {
-    const seededEntryPass = searchParams.get('entryPass');
-    if (!seededEntryPass) {
+    const seededReservationId = searchParams.get('reservationId');
+    const seededSource = searchParams.get('source');
+    if (!seededReservationId) {
       return;
     }
 
-    setEntryPass((current) => current || seededEntryPass);
-  }, [searchParams]);
+    const matchedReservation = reservations.find((reservation) => (
+      reservation.id === seededReservationId
+      && (!seededSource || reservation.source === seededSource)
+    ));
+    if (!matchedReservation) {
+      return;
+    }
+
+    const slotQrToken = data?.parkingMap.slots.find((slot) => slot.id === matchedReservation.slotId)?.qrToken ?? null;
+    const nextEntryPass = buildOperatorEntryPass(matchedReservation, slotQrToken);
+    if (!nextEntryPass) {
+      return;
+    }
+
+    setEntryPass((current) => current || nextEntryPass);
+  }, [data?.parkingMap.slots, reservations, searchParams]);
 
   useEffect(() => {
     return () => {
@@ -169,14 +185,15 @@ export default function ParkingActionsPage() {
       const confirmation = payload?.confirmation ?? null;
       const idempotentReplay = Boolean(confirmation?.idempotent_replay);
       const graceEndsAt = formatTimestamp(confirmation?.parking_grace_ends_at);
-      const sessionId = typeof confirmation?.id === 'string' ? confirmation.id : null;
+      const sessionId = typeof confirmation?.session_id === 'string' ? confirmation.session_id : null;
+      const assignedLocation = activeLocation?.name ?? 'the active operator location';
 
       setFeedback({
         tone: idempotentReplay ? 'warning' : 'success',
         title: idempotentReplay ? 'Entry already confirmed' : 'Entry confirmed',
         message: idempotentReplay
           ? `The QR was already used for an active session${sessionId ? ` (${sessionId})` : ''}. Replay was handled safely.`
-          : `The reservation is now backed by an active session${graceEndsAt ? ` with parking grace until ${graceEndsAt}` : ''}.`,
+          : `The QR is now assigned to ${assignedLocation} and backed by an active session${graceEndsAt ? ` with parking grace until ${graceEndsAt}` : ''}.`,
       });
       recordOperatorActionSuccess();
       await refresh({ silent: true, force: true });
@@ -313,7 +330,7 @@ export default function ParkingActionsPage() {
                 <div>
                   <CardTitle className="text-lg text-foreground">Entry Scan</CardTitle>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    Scan or paste a reservation or walk-in entry QR to confirm lot entry for the active location.
+                    Scan or paste any valid reservation or walk-in entry QR to confirm entry and assign it to the active operator location.
                   </div>
                 </div>
                 <Badge variant="outline" className="border-border text-xs">
@@ -350,7 +367,7 @@ export default function ParkingActionsPage() {
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
                   {scanSupported
-                    ? 'Use the device camera to read the customer entry QR, then the operator flow will verify it automatically.'
+                    ? 'Use the device camera to read any valid customer entry QR. Once verified, the entry is attached to the active operator location automatically.'
                     : 'This browser does not expose in-app QR detection, so operators should use the manual QR payload field below.'}
                 </div>
                 <div className="mt-4 overflow-hidden rounded-lg border border-border bg-black/60">
@@ -442,7 +459,13 @@ export default function ParkingActionsPage() {
                       variant="outline"
                       size="sm"
                       className="max-w-full justify-start border-border"
-                      onClick={() => setEntryPass(buildOperatorEntryPass(reservation))}
+                      onClick={() => {
+                        const slotQrToken = data?.parkingMap.slots.find((slot) => slot.id === reservation.slotId)?.qrToken ?? null;
+                        const nextEntryPass = buildOperatorEntryPass(reservation, slotQrToken);
+                        if (nextEntryPass) {
+                          setEntryPass(nextEntryPass);
+                        }
+                      }}
                     >
                       <span className="truncate">
                         {reservation.reservationId} · {reservation.slotNumber}

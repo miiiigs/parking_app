@@ -9,7 +9,7 @@ import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { formatDateTime, formatDuration } from '../../../utils/format';
-import { AppScreenHeader } from '../../auth/components/AuthPrimitives';
+import { FlowScreenHeader } from '../../auth/components/AuthPrimitives';
 import { formatParkingPricingSummary } from '@parking/shared';
 
 function formatCurrency(amount: number) {
@@ -91,25 +91,17 @@ export default function ReceiptScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.inner, { paddingHorizontal: horizontalPadding }]}>
           <View style={[styles.maxWidth, { maxWidth: contentWidth }]}>
-            <View
-              style={[
-                styles.header,
-                {
-                  marginHorizontal: -horizontalPadding,
-                },
-              ]}
-            >
-              <AppScreenHeader
-                title="Official Receipt"
+            <View style={styles.content}>
+              <FlowScreenHeader
+                title="Receipt"
+                onBack={() => router.back()}
                 rightAccessory={
                   <Pressable onPress={() => void saveReceipt()} disabled={isWorking} style={styles.printButton}>
                     <Printer color="#0F766E" size={18} strokeWidth={2.2} />
                   </Pressable>
                 }
               />
-            </View>
 
-            <View style={styles.content}>
               <View ref={receiptRef} collapsable={false} style={styles.receiptCard}>
                 <View style={styles.receiptHero}>
                   <View style={styles.logoBubble}>
@@ -223,7 +215,6 @@ const styles = StyleSheet.create({
   maxWidth: {
     width: '100%',
   },
-  header: {},
   printButton: {
     width: 36,
     height: 36,

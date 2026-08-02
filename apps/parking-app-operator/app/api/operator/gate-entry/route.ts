@@ -6,15 +6,38 @@ import { hasOperatorCapability } from '@/lib/operatorPermissions';
 import { createOperatorRouteContext, jsonWithRequestContext, logOperatorRouteError, logOperatorRouteSuccess } from '@/lib/operatorRequestContext';
 import { formatRouteValidationIssues, operatorGateEntryRouteRequestSchema } from '@/lib/operatorRouteSchemas';
 import { getOperatorSupabaseConfig } from '@/lib/supabase';
+import { parseEntryPass } from '@parking/shared';
 
-const ENTRY_PASS_PREFIXES = ['reservation-entry|', 'walkin-entry-pass|'];
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function getConfirmationErrorStatus(message: string) {
+  if (message.includes('Legacy walk-in entry pass')) {
+    return 400;
+  }
 
-function resolveReservationId(entryPass: string) {
-  const prefix = ENTRY_PASS_PREFIXES.find((candidate) => entryPass.startsWith(candidate));
-  const value = prefix ? entryPass.slice(prefix.length).trim() : entryPass.trim();
+  if (message.includes('expired')) {
+    return 410;
+  }
 
-  return UUID_PATTERN.test(value) ? value : null;
+  if (message.includes('already used')) {
+    return 409;
+  }
+
+  if (message.includes('invalid') || message.includes('does not match') || message.includes('no longer accepted')) {
+    return 403;
+  }
+
+  if (message.includes('not found')) {
+    return 404;
+  }
+
+  if (message.includes('Could not find the function public.confirm_parking_entry')) {
+    return 503;
+  }
+
+  if (message.includes('active operator location')) {
+    return 409;
+  }
+
+  return 422;
 }
 
 export async function POST(request: Request) {
@@ -37,10 +60,11 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
-  const reservationId = resolveReservationId(parsedBody.data.entryPass);
-  if (!reservationId) {
+  const parsedEntryPass = parseEntryPass(parsedBody.data.entryPass);
+  if (!parsedEntryPass) {
     return jsonWithRequestContext(routeContext, { error: 'Malformed reservation entry pass.' }, { status: 400 });
   }
+  const reservationId = parsedEntryPass.reservationId;
 
   const config = getOperatorSupabaseConfig();
   if (!config?.url || !config.serviceRoleKey) {
@@ -66,6 +90,43 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
+    const reservationLookupResponse = await fetch(
+      `${config.url}/rest/v1/reservations?select=id,source,slot_id,parking_slots(qr_token)&id=eq.${encodeURIComponent(reservationId)}&limit=1`,
+      {
+        headers: getServiceHeaders(config.serviceRoleKey),
+        cache: 'no-store',
+      },
+    );
+    const reservationLookupPayload = await reservationLookupResponse.json().catch(() => []);
+    if (!reservationLookupResponse.ok) {
+      return jsonWithRequestContext(routeContext, { error: 'Unable to validate the entry pass right now.' }, { status: 503 });
+    }
+
+    const reservationRecord = Array.isArray(reservationLookupPayload) ? reservationLookupPayload[0] ?? null : null;
+    if (!reservationRecord) {
+      return jsonWithRequestContext(routeContext, { error: 'Entry pass not found.' }, { status: 404 });
+    }
+
+    const reservationSource = reservationRecord.source === 'walk_in' ? 'walk_in' : 'reservation';
+    if (reservationSource !== parsedEntryPass.kind) {
+      return jsonWithRequestContext(routeContext, { error: 'Entry pass type does not match the reservation source.' }, { status: 403 });
+    }
+
+    const reservationSlot = Array.isArray(reservationRecord.parking_slots)
+      ? reservationRecord.parking_slots[0] ?? null
+      : reservationRecord.parking_slots ?? null;
+    const expectedSlotQrToken = typeof reservationSlot?.qr_token === 'string' ? reservationSlot.qr_token : null;
+    if (parsedEntryPass.kind === 'reservation' && parsedEntryPass.slotQrToken && expectedSlotQrToken !== parsedEntryPass.slotQrToken) {
+      return jsonWithRequestContext(routeContext, { error: 'Entry pass validation failed for this reserved slot.' }, { status: 403 });
+    }
+    if (parsedEntryPass.kind === 'walk_in') {
+      if (!parsedEntryPass.entryToken) {
+        return jsonWithRequestContext(routeContext, {
+          error: 'Legacy walk-in entry pass detected. Ask the customer to reopen the latest walk-in QR before scanning again.',
+        }, { status: 400 });
+      }
+    }
+
     const rpcResponse = await fetch(`${config.url}/rest/v1/rpc/confirm_parking_entry`, {
       method: 'POST',
       headers: {
@@ -75,6 +136,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         p_reservation_id: reservationId,
         p_location_id: activeLocation.id,
+        p_entry_token: parsedEntryPass.kind === 'walk_in' ? parsedEntryPass.entryToken : null,
       }),
       cache: 'no-store',
     });
@@ -82,14 +144,15 @@ export async function POST(request: Request) {
     const payload = await rpcResponse.json().catch(() => null);
     if (!rpcResponse.ok) {
       const message = payload?.message ?? payload?.error ?? 'Unable to confirm parking entry.';
-      const status = message.includes('active operator location') ? 409 : message.includes('not found') ? 404 : 422;
-      return jsonWithRequestContext(routeContext, { error: message }, { status });
+      return jsonWithRequestContext(routeContext, { error: message }, { status: getConfirmationErrorStatus(message) });
     }
 
     const confirmation = Array.isArray(payload) ? payload[0] ?? null : payload;
     logOperatorRouteSuccess(routeContext, 'Confirmed parking entry', {
       reservationId,
       locationId: activeLocation.id,
+      entryPassKind: parsedEntryPass.kind,
+      legacyEntryPass: parsedEntryPass.isLegacy,
       idempotentReplay: Boolean(confirmation?.idempotent_replay),
     });
 

@@ -7,6 +7,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { AuthActionButton } from '../../auth/components/AuthPrimitives';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { formatParkingPricingSummary } from '@parking/shared';
+import { buildReservationEntryPass } from '@parking/shared';
 import { formatTime } from '../../../utils/format';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 
@@ -87,7 +88,14 @@ export default function ArrivalScreen() {
       return 'parking-entry-unavailable';
     }
 
-    return `reservation-entry|${reservation.reservationId ?? reservation.reservationCode}`;
+    if (reservation.reservationId) {
+      return buildReservationEntryPass({
+        reservationId: reservation.reservationId,
+        slotQrToken: reservation.qrToken ?? null,
+      });
+    }
+
+    return `reservation-entry|${reservation.reservationCode}`;
   }, [reservation]);
 
   if (!reservation) {

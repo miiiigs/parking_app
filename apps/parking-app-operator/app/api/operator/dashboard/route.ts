@@ -425,6 +425,10 @@ export async function GET(request: Request) {
               id: liveId,
               slotNumber: liveLabel,
               status: mapOperatorSlotStatus(status),
+              qrToken:
+                live && 'qr_token' in live
+                  ? live.qr_token
+                  : null,
               x: Math.round(slot.x ?? 0),
               y: Math.round(slot.y ?? 0),
               width: Math.round(slot.width ?? 92),

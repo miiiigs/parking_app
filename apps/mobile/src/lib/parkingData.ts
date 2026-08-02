@@ -45,6 +45,7 @@ type LiveSlotRow = {
   status: ParkingSlotStatus;
   display_order: number;
   qr_token: string;
+  slot_kind?: 'standard' | 'walk_in_hub' | null;
 };
 
 type LiveLayoutRow = {
@@ -81,6 +82,14 @@ function isMissingPricingColumnError(message: string | undefined) {
     'first_period_hours',
     'succeeding_hourly_rate',
   ].some((column) => message.includes(column));
+}
+
+function isMissingSlotKindColumnError(message: string | undefined) {
+  const normalized = message?.toLowerCase() ?? '';
+  return (
+    normalized.includes('slot_kind')
+    && normalized.includes('does not exist')
+  );
 }
 
 function buildLocationPricingConfig(location: LiveLocationRow): ParkingPricingConfig {
@@ -242,17 +251,32 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
 
   const liveLocations = locations;
   const locationIds = liveLocations.map((location) => location.id);
-  const [{ data: slotRows, error: slotError }, { data: layoutRows, error: layoutError }] = await Promise.all([
-    supabase
+  let slotRows: LiveSlotRow[] | null = null;
+  let slotError: { message?: string } | null = null;
+  const { data: initialSlotRows, error: initialSlotError } = await supabase
+    .from('parking_slots')
+    .select('id, location_id, slot_label, status, display_order, qr_token, slot_kind')
+    .in('location_id', locationIds)
+    .order('display_order', { ascending: true });
+
+  slotRows = (initialSlotRows as LiveSlotRow[] | null) ?? null;
+  slotError = initialSlotError;
+
+  if (slotError && isMissingSlotKindColumnError(slotError.message)) {
+    const fallbackSlotResponse = await supabase
       .from('parking_slots')
       .select('id, location_id, slot_label, status, display_order, qr_token')
       .in('location_id', locationIds)
-      .order('display_order', { ascending: true }),
-    supabase
-      .from('parking_lot_layouts')
-      .select('location_id, layout')
-      .in('location_id', locationIds),
-  ]);
+      .order('display_order', { ascending: true });
+
+    slotRows = (fallbackSlotResponse.data as LiveSlotRow[] | null) ?? null;
+    slotError = fallbackSlotResponse.error;
+  }
+
+  const { data: layoutRows, error: layoutError } = await supabase
+    .from('parking_lot_layouts')
+    .select('location_id, layout')
+    .in('location_id', locationIds);
 
   if (slotError) {
     throw new Error(slotError.message ?? 'Unable to load parking slots.');
@@ -263,7 +287,9 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
   }
 
   const slotsByLocation = new Map<string, LiveSlotRow[]>();
-  ((slotRows ?? []) as Array<LiveSlotRow & { location_id: string }>).forEach((slot) => {
+  ((slotRows ?? []) as Array<LiveSlotRow & { location_id: string }>)
+    .filter((slot) => (slot.slot_kind ?? 'standard') === 'standard')
+    .forEach((slot) => {
     const current = slotsByLocation.get(slot.location_id);
     if (current) {
       current.push(slot);
@@ -271,7 +297,7 @@ export async function loadParkingLots(): Promise<ParkingDataLoadResult> {
     }
 
     slotsByLocation.set(slot.location_id, [slot]);
-  });
+    });
 
   const layoutsByLocation = new Map(
     ((layoutRows ?? []) as LiveLayoutRow[]).map((layout) => [layout.location_id, layout] as const),

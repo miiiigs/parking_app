@@ -32,6 +32,12 @@ type AppScreenHeaderProps = {
   rightAccessory?: ReactNode;
 };
 
+type FlowScreenHeaderProps = {
+  title?: string;
+  onBack?: () => void;
+  rightAccessory?: ReactNode;
+};
+
 type AuthPhoneFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
@@ -116,6 +122,30 @@ export function AppScreenHeader({ title, onBack, rightAccessory }: AppScreenHead
       <View style={styles.headerTitleWrap}>
         <Text numberOfLines={1} style={styles.headerTitle}>{title}</Text>
         {rightAccessory ? <View style={styles.headerAccessoryWrap}>{rightAccessory}</View> : null}
+      </View>
+    </View>
+  );
+}
+
+export function FlowScreenHeader({ title, onBack, rightAccessory }: FlowScreenHeaderProps) {
+  return (
+    <View style={styles.flowHeader}>
+      <View style={styles.flowHeaderEdge}>
+        {onBack ? (
+          <Pressable onPress={onBack} hitSlop={8} style={styles.flowHeaderBackButton}>
+            <ChevronLeft color="#1E293B" size={20} strokeWidth={2.2} />
+          </Pressable>
+        ) : (
+          <View style={styles.flowHeaderSpacer} />
+        )}
+      </View>
+
+      <View style={styles.flowHeaderCenter}>
+        {title ? <Text numberOfLines={1} style={styles.flowHeaderTitle}>{title}</Text> : null}
+      </View>
+
+      <View style={styles.flowHeaderEdge}>
+        {rightAccessory ? rightAccessory : <View style={styles.flowHeaderSpacer} />}
       </View>
     </View>
   );
@@ -282,6 +312,44 @@ const styles = StyleSheet.create({
   },
   headerAccessoryWrap: {
     alignItems: 'flex-end',
+  },
+  flowHeader: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  flowHeaderEdge: {
+    width: 40,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  flowHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 0,
+  },
+  flowHeaderBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flowHeaderSpacer: {
+    width: 40,
+    height: 40,
+  },
+  flowHeaderTitle: {
+    color: '#1E293B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'center',
   },
   buttonBase: {
     height: 52,
