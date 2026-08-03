@@ -303,7 +303,7 @@ export default function ReservationScreen() {
             style={[styles.modeTab, isCompact ? styles.modeTabCompact : null, mode === 'walkin' ? styles.modeTabActive : null]}
           >
             <Zap color={mode === 'walkin' ? '#0F766E' : '#64748B'} size={12} strokeWidth={2.3} />
-            <Text style={[styles.modeTabText, isCompact ? styles.modeTabTextCompact : null, mode === 'walkin' ? styles.modeTabTextActive : null]}>Walk-In Parking</Text>
+            <Text style={[styles.modeTabText, isCompact ? styles.modeTabTextCompact : null, mode === 'walkin' ? styles.modeTabTextActive : null]}>Park Now</Text>
           </Pressable>
         </View>
       </View>
@@ -414,7 +414,7 @@ export default function ReservationScreen() {
                     {mode === 'walkin' ? (
                       <View style={styles.walkInBadge}>
                         <Zap color="#0F766E" size={10} strokeWidth={2.3} />
-                        <Text style={styles.walkInBadgeText}>Walk-In</Text>
+                        <Text style={styles.walkInBadgeText}>Park Now</Text>
                       </View>
                     ) : null}
                   </View>
@@ -570,7 +570,7 @@ export default function ReservationScreen() {
                 <View style={styles.walkInInfoCopy}>
                   <Text style={styles.walkInInfoTitle}>Metered billing</Text>
                   <Text style={styles.walkInInfoText}>
-                    Continue to confirm your vehicle details, then show your universal walk-in QR.
+                    Continue to confirm your vehicle details, then show your Park Now QR.
                   </Text>
                 </View>
               </View>
@@ -585,7 +585,7 @@ export default function ReservationScreen() {
                   onPress={() => router.push({ pathname: '/auth', params: { returnTo: `/reservation/${lot.id}` } })}
                 />
                 <Text style={styles.guestNotice}>
-                  Guest mode can browse availability, but {mode === 'walkin' ? 'walk-in entry' : 'slot reservation'} needs a signed-in account.
+                  Guest mode can browse availability, but {mode === 'walkin' ? 'Park Now entry' : 'slot reservation'} needs a signed-in account.
                 </Text>
               </>
             ) : mode === 'reserve' ? (
@@ -597,7 +597,7 @@ export default function ReservationScreen() {
               />
             ) : (
               <AuthActionButton
-                label="Continue to Walk-In"
+                label="Continue to Park Now"
                 onPress={() =>
                   router.push({
                     pathname: '/walkin-confirm',

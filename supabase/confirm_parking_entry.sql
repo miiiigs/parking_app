@@ -3,6 +3,31 @@ alter table parking_sessions
   add column if not exists parking_grace_ends_at timestamptz,
   add column if not exists metered_started_at timestamptz;
 
+alter table parking_slots
+  add column if not exists slot_kind text;
+
+update parking_slots
+set slot_kind = 'standard'
+where slot_kind is null;
+
+alter table parking_slots
+  alter column slot_kind set default 'standard',
+  alter column slot_kind set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'parking_slots_slot_kind_check'
+  ) then
+    alter table parking_slots
+      add constraint parking_slots_slot_kind_check
+      check (slot_kind in ('standard', 'walk_in_hub'));
+  end if;
+end;
+$$;
+
 create table if not exists walk_in_entry_pass_tokens (
   id uuid primary key default gen_random_uuid(),
   reservation_id uuid not null unique references reservations(id) on delete cascade,
@@ -77,12 +102,12 @@ begin
       raise exception 'Legacy walk-in entry pass is no longer accepted';
     end if;
 
-    v_entry_token_hash := encode(digest(trim(p_entry_token), 'sha256'), 'hex');
+    v_entry_token_hash := encode(extensions.digest(trim(p_entry_token), 'sha256'), 'hex');
 
     select *
       into v_walk_in_token
       from walk_in_entry_pass_tokens
-      where reservation_id = p_reservation_id
+      where walk_in_entry_pass_tokens.reservation_id = p_reservation_id
       for update;
 
     if not found then
@@ -113,7 +138,7 @@ begin
         update walk_in_entry_pass_tokens
         set consumed_at = v_confirmed_at,
             consumed_by_location_id = p_location_id
-        where reservation_id = p_reservation_id;
+        where walk_in_entry_pass_tokens.reservation_id = p_reservation_id;
       elsif v_walk_in_token.consumed_by_location_id is distinct from p_location_id then
         raise exception 'Walk-in entry pass was already used at another location';
       end if;
@@ -171,7 +196,7 @@ begin
     update walk_in_entry_pass_tokens
     set consumed_at = v_confirmed_at,
         consumed_by_location_id = p_location_id
-    where reservation_id = p_reservation_id;
+    where walk_in_entry_pass_tokens.reservation_id = p_reservation_id;
 
     select *
       into v_walk_in_hub_slot

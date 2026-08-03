@@ -18,6 +18,8 @@ before update on walk_in_entry_pass_tokens
 for each row execute function set_updated_at();
 
 alter table walk_in_entry_pass_tokens enable row level security;
+alter table reservations
+  alter column slot_id drop not null;
 
 drop function if exists issue_walk_in_entry_pass(uuid, text, integer);
 drop function if exists issue_walk_in_entry_pass(text, integer);
@@ -53,8 +55,8 @@ declare
   v_expires_at timestamptz := now() + make_interval(mins => v_hold_minutes);
   v_existing_reservation reservations%rowtype;
   v_existing_slot parking_slots%rowtype;
-  v_entry_token text := encode(gen_random_bytes(18), 'hex');
-  v_entry_token_hash text := encode(digest(v_entry_token, 'sha256'), 'hex');
+  v_entry_token text := encode(extensions.gen_random_bytes(18), 'hex');
+  v_entry_token_hash text := encode(extensions.digest(v_entry_token, 'sha256'), 'hex');
   v_pricing_config jsonb := jsonb_build_object(
     'mode', 'fixed_rate',
     'flatRateAmount', 50,
@@ -117,7 +119,7 @@ begin
       null,
       null
     )
-    on conflict (reservation_id) do update
+    on conflict on constraint walk_in_entry_pass_tokens_reservation_id_key do update
       set token_hash = excluded.token_hash,
           expires_at = excluded.expires_at,
           consumed_at = null,

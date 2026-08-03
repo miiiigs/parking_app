@@ -24,10 +24,10 @@ import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { useMobileParkingData } from '../../../providers/MobileParkingDataProvider';
 import { useMobileVehicles } from '../../../providers/MobileVehicleProvider';
 import { formatParkingPricingSummary } from '@parking/shared';
-import { AuthLogo } from '../../auth/components/AuthPrimitives';
 import { useParkingFlowStore } from '../store/useParkingFlowStore';
 import { calculateBill } from '../lib/flow';
 import { formatTimer, formatTime } from '../../../utils/format';
+import { colors, radius, spacing } from '../../../theme/tokens';
 
 function formatCurrency(amount: number) {
   return `PHP ${amount.toFixed(2)}`;
@@ -136,7 +136,7 @@ export default function SessionScreen() {
             ]}
           >
             <View style={styles.headerRow}>
-              <AuthLogo height={28} />
+              <Text style={styles.emptyHeaderEyebrow}>PARKING</Text>
               <Text numberOfLines={1} style={styles.emptyHeaderTitle}>Active Session</Text>
             </View>
           </View>
@@ -147,7 +147,7 @@ export default function SessionScreen() {
             </View>
             <Text style={styles.emptyTitle}>No Active Session</Text>
             <Text style={styles.emptyCopy}>
-              You don&apos;t have a parking session in progress. Reserve a slot or use Walk-In Parking to get started.
+              You don&apos;t have a parking session in progress. Reserve a slot or use Park Now to get started.
             </Text>
 
             <View style={styles.emptyActionGroup}>
@@ -166,7 +166,7 @@ export default function SessionScreen() {
                 style={styles.secondaryAction}
               >
                 <Car color="#0F766E" size={17} strokeWidth={2.2} />
-                <Text style={styles.secondaryActionText}>Walk-In Parking</Text>
+                <Text style={styles.secondaryActionText}>Park Now</Text>
               </Pressable>
             </View>
           </View>
@@ -193,7 +193,6 @@ export default function SessionScreen() {
                 ]}
               >
                 <View style={[styles.headerRow, isCompact ? styles.headerRowCompact : null]}>
-                  <AuthLogo height={28} />
                   <View style={styles.headerTitleWrap}>
                     <View style={styles.activeBadgeRow}>
                       <View style={styles.activeDot} />
@@ -241,7 +240,7 @@ export default function SessionScreen() {
                 </View>
                 <Text style={styles.infoPrimaryText}>{session.lotName}</Text>
                   <Text style={styles.infoSecondaryText}>
-                    {session.address} - {session.source === 'walk_in' ? 'Walk-In Access' : `Slot ${session.slot.number}`}
+                    {session.address} - {session.source === 'walk_in' ? 'Park Now Access' : `Slot ${session.slot.number}`}
                   </Text>
                 </View>
 
@@ -329,7 +328,7 @@ function FeeRow({ label, amount }: { label: string; amount: string }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAF9',
+    backgroundColor: colors.canvas,
   },
   page: {
     flex: 1,
@@ -345,77 +344,78 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.canvasMuted,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingTop: 20,
-    paddingBottom: 16,
+    borderBottomColor: colors.border,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 4,
   },
   headerRowCompact: {
     alignItems: 'flex-start',
   },
   headerTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   activeBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   activeDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#34D399',
+    backgroundColor: colors.accent,
   },
   activeBadgeText: {
-    color: '#34D399',
-    fontSize: 13,
+    color: colors.accent,
+    fontSize: 11,
     lineHeight: 17,
-    fontFamily: 'Poppins_500Medium',
+    fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.5,
   },
   headerTitle: {
-    color: '#1E293B',
+    color: colors.text,
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: 'Poppins_600SemiBold',
+    textAlign: 'left',
+  },
+  headerTitleCompact: {
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  emptyHeaderEyebrow: {
+    color: colors.mutedSoft,
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: 'Poppins_700Bold',
+    letterSpacing: 0.6,
+  },
+  emptyHeaderTitle: {
+    color: colors.text,
     fontSize: 24,
     lineHeight: 30,
     fontFamily: 'Poppins_600SemiBold',
-    textAlign: 'right',
-  },
-  headerTitleCompact: {
-    fontSize: 20,
-    lineHeight: 26,
-  },
-  emptyHeaderTitle: {
-    color: '#1E293B',
-    fontSize: 18,
-    lineHeight: 23,
-    fontFamily: 'Poppins_600SemiBold',
-    flex: 1,
-    textAlign: 'right',
   },
   content: {
     gap: 16,
     paddingTop: 20,
   },
   timerCard: {
-    borderRadius: 22,
-    backgroundColor: '#0F766E',
+    borderRadius: radius.xl,
+    backgroundColor: colors.primaryDark,
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 22,
-    shadowColor: '#0F766E',
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
     elevation: 4,
   },
   timerEyebrow: {
@@ -474,10 +474,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
   },
   infoCard: {
-    borderRadius: 18,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
     padding: 16,
   },
   infoHeaderRow: {
@@ -535,10 +535,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   summaryCard: {
-    borderRadius: 18,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
     padding: 16,
   },
   summaryTitle: {
@@ -603,14 +603,14 @@ const styles = StyleSheet.create({
   },
   endButton: {
     height: 52,
-    borderRadius: 14,
-    backgroundColor: '#EF4444',
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#EF4444',
-    shadowOpacity: 0.26,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.12,
     shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     elevation: 4,
   },
   endButtonText: {
@@ -674,17 +674,17 @@ const styles = StyleSheet.create({
   },
   secondaryAction: {
     height: 52,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#0F766E',
-    backgroundColor: '#FFFFFF',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceRaised,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   secondaryActionText: {
-    color: '#0F766E',
+    color: colors.text,
     fontSize: 15,
     lineHeight: 19,
     fontFamily: 'Poppins_500Medium',
@@ -692,12 +692,12 @@ const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(16,19,26,0.42)',
   },
   modalSheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    backgroundColor: colors.surfaceRaised,
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 30,
@@ -717,15 +717,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalNotice: {
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#FED7AA',
-    backgroundColor: '#FFF7ED',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
     padding: 14,
     marginBottom: 18,
   },
   modalNoticeText: {
-    color: '#9A3412',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 21,
     fontFamily: 'Poppins_400Regular',
@@ -735,8 +735,8 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButton: {
     height: 50,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -748,8 +748,8 @@ const styles = StyleSheet.create({
   },
   modalSecondaryButton: {
     height: 50,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },

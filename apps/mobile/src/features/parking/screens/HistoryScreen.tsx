@@ -43,7 +43,7 @@ export default function HistoryScreen() {
   if (booking) {
     cards.push({
       title: booking.lotName,
-      subtitle: booking.source === 'walk_in' ? 'Universal walk-in entry pass ready' : `Reservation for slot ${booking.slot.number}`,
+      subtitle: booking.source === 'walk_in' ? 'Park Now entry QR ready' : `Reservation for slot ${booking.slot.number}`,
       meta: booking.expiresAt ? `Valid until ${formatDateTime(booking.expiresAt)}` : `Created ${formatDateTime(booking.createdAt)}`,
       kind: 'pending',
       onPress: () => router.push(booking.source === 'walk_in' ? '/walkin-qr' : '/arrival'),

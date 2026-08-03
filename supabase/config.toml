@@ -1,0 +1,2 @@
+[functions.paymongo-return]
+verify_jwt = false

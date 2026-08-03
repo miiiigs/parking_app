@@ -437,8 +437,12 @@ export async function issueWalkInEntryPass(request: WalkInEntryPassRequest) {
   const useLocalFlow = await shouldUseLocalFlow();
   const holdMinutes = request.holdMinutes ?? 10;
 
-  if (!supabase || useLocalFlow) {
-    return toLocalWalkInBooking({ ...request, holdMinutes });
+  if (!supabase) {
+    throw new Error('Supabase is not configured for secure walk-in entry passes. Set the mobile Supabase environment first.');
+  }
+
+  if (useLocalFlow) {
+    throw new Error('Secure walk-in entry passes are unavailable in guest mode. Sign in to request a scannable walk-in QR.');
   }
 
   try {
@@ -453,7 +457,7 @@ export async function issueWalkInEntryPass(request: WalkInEntryPassRequest) {
   });
 
   if (error && isMissingIssueWalkInEntryPassSignature(error.message)) {
-    return toLocalWalkInBooking({ ...request, holdMinutes });
+    throw new Error('Secure walk-in entry passes are not deployed yet. Run supabase/issue_walk_in_entry_pass.sql, then request a fresh walk-in QR.');
   }
 
   if (error || !data) {

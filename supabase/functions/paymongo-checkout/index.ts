@@ -32,6 +32,8 @@ type PaymentRecord = {
   amount: number | string;
 };
 
+type ReservationContext = Awaited<ReturnType<typeof loadReservationContext>>;
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -154,12 +156,6 @@ async function loadReservationContext(adminClient: ReturnType<typeof createClien
     throw new Error(paymentError.message);
   }
 
-  const latestPayment = Array.isArray(latestPaymentRows) ? (latestPaymentRows[0] as PaymentRecord | undefined) ?? null : null;
-
-  if (!latestPayment) {
-    throw new Error('Payment record not found.');
-  }
-
   const { data: slotRow, error: slotError } = await adminClient
     .from('parking_slots')
     .select('slot_label,locations(name,address)')
@@ -173,6 +169,49 @@ async function loadReservationContext(adminClient: ReturnType<typeof createClien
   const locationPayload = Array.isArray(slotRow?.locations) ? slotRow.locations[0] : slotRow?.locations;
   const location = isRecord(locationPayload) ? locationPayload : null;
 
+  let latestPayment = Array.isArray(latestPaymentRows) ? (latestPaymentRows[0] as PaymentRecord | undefined) ?? null : null;
+
+  if (!latestPayment && session.status === 'completed') {
+    const rebuiltAmount = roundToCurrency((Number(session.billed_amount ?? 0) + Number(reservation.reservation_fee ?? 0)));
+    const fallbackAmount = rebuiltAmount > 0 ? rebuiltAmount : 1;
+
+    const { error: insertedPaymentError } = await adminClient
+      .from('payments')
+      .insert({
+        session_id: session.id,
+        reservation_id: reservationId,
+        provider: 'paymongo',
+        status: 'pending',
+        reference: 'backfilled_pending_payment',
+        amount: fallbackAmount,
+      });
+
+    if (insertedPaymentError) {
+      throw new Error(insertedPaymentError.message);
+    }
+
+    const { data: reloadedPaymentRows, error: reloadedPaymentError } = await adminClient
+      .from('payments')
+      .select('id,status,reference,amount')
+      .eq('reservation_id', reservationId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (reloadedPaymentError) {
+      throw new Error(reloadedPaymentError.message);
+    }
+
+    latestPayment = Array.isArray(reloadedPaymentRows) ? (reloadedPaymentRows[0] as PaymentRecord | undefined) ?? null : null;
+  }
+
+  if (!latestPayment) {
+    if (session.status !== 'completed') {
+      throw new Error('The backend parking session is still active. Go back to the session screen and tap End Session again before paying.');
+    }
+
+    throw new Error('Payment record not found. Reload the app and try the payment again so we can recreate the pending payment row.');
+  }
+
   return {
     reservation,
     session,
@@ -181,6 +220,10 @@ async function loadReservationContext(adminClient: ReturnType<typeof createClien
     locationName: typeof location?.name === 'string' ? location.name : 'ParkingPH',
     locationAddress: typeof location?.address === 'string' ? location.address : '',
   };
+}
+
+function roundToCurrency(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function normalizeIntentOutcome(paymentIntent: Record<string, unknown>) {

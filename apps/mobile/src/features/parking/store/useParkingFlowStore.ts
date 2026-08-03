@@ -374,8 +374,9 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
         }
 
         let completedSession: CompletedSession;
+        const hasLiveReservation = Boolean(session.reservationId);
 
-        if (session.reservationCode.startsWith('WIN-')) {
+        if (!hasLiveReservation) {
           const endTime = new Date().toISOString();
           completedSession = {
             ...session,
@@ -397,23 +398,11 @@ export const useParkingFlowStore = create<ParkingFlowState>()(
             paymentStatus: 'pending',
           });
 
-          if (endRecords && endRecords.length > 0) {
-            completedSession = mapCompletedSession(endRecords[0], session);
-          } else {
-            const endTime = new Date().toISOString();
-            completedSession = {
-              ...session,
-              endTime,
-              durationSeconds,
-              totalBill: calculateBill(durationSeconds, session.pricingConfig),
-              receiptNumber: createReceiptNumber(),
-              transactionId: createTransactionId(),
-              exitCode: createExitCode(session.slot.id),
-              exitGraceEndsAt: new Date(
-                new Date(endTime).getTime() + session.pricingConfig.exitGraceMinutes * 60 * 1000,
-              ).toISOString(),
-            };
+          if (!endRecords || endRecords.length === 0) {
+            throw new Error('The backend did not confirm the completed parking session. Please try End Session again.');
           }
+
+          completedSession = mapCompletedSession(endRecords[0], session);
         }
 
         await sendSessionCompletedNotification({

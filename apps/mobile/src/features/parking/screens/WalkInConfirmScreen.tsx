@@ -31,7 +31,7 @@ export default function WalkInConfirmScreen() {
   if (!preferredLot && isLoading) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Loading walk-in parking...</Text>
+        <Text style={styles.loadingTitle}>Loading Park Now...</Text>
         <Text style={styles.loadingCopy}>Syncing the supported parking locations.</Text>
       </View>
     );
@@ -40,7 +40,7 @@ export default function WalkInConfirmScreen() {
   if (!preferredLot && !isLoading) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>{error ? 'Unable to load walk-in parking.' : 'No parking lots available.'}</Text>
+        <Text style={styles.loadingTitle}>{error ? 'Unable to load Park Now.' : 'No parking lots available.'}</Text>
         {error ? <Text style={styles.loadingCopy}>{error}</Text> : null}
         <AuthActionButton label="Retry" onPress={() => void refresh()} style={styles.loadingButton} />
         <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
@@ -69,7 +69,7 @@ export default function WalkInConfirmScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.contentFrame, { maxWidth: contentWidth }]}>
-          <FlowScreenHeader title="Walk-In Parking" onBack={() => router.replace('/home')} />
+          <FlowScreenHeader title="Park Now" onBack={() => router.replace('/home')} />
 
           <ParkingDataStatusCard
             status={status}
@@ -84,9 +84,9 @@ export default function WalkInConfirmScreen() {
               <Zap color="#FFFFFF" size={20} strokeWidth={2.4} />
             </View>
             <View style={styles.heroCopyBlock}>
-              <Text style={styles.heroTitle}>Start a walk-in entry</Text>
+              <Text style={styles.heroTitle}>Start parking now</Text>
               <Text style={styles.heroCopy}>
-                Confirm the vehicle you are bringing. We will issue one walk-in QR for gate or operator validation.
+                Confirm the vehicle you are bringing. We will issue one secure entry QR for gate or operator validation.
               </Text>
             </View>
           </View>
@@ -122,7 +122,7 @@ export default function WalkInConfirmScreen() {
             {!selectedVehicle ? (
               <View style={styles.noticeCardWarning}>
                 <Text style={styles.noticeCopyWarning}>
-                  Add or choose a saved vehicle before showing your walk-in QR.
+                  Add or choose a saved vehicle before showing your Park Now QR.
                 </Text>
               </View>
             ) : null}
@@ -132,7 +132,7 @@ export default function WalkInConfirmScreen() {
 
       <View style={[styles.footer, { paddingHorizontal: horizontalPadding, paddingTop: isCompact ? 14 : 18 }]}>
         <AuthActionButton
-          label="Confirm Vehicle"
+          label="Continue to Entry QR"
           onPress={() =>
             router.push({
               pathname: '/walkin-qr',

@@ -106,7 +106,7 @@ export default function ArrivalScreen() {
   const cancellationCharge = reservationFee / 2;
   const releaseAmount = reservationFee - cancellationCharge;
   const pricingSummary = formatParkingPricingSummary(reservation.pricingConfig);
-  const qrSize = isCompact ? 148 : 164;
+  const qrSize = isCompact ? 212 : 236;
   const reservationStartTime = formatTime(reservation.createdAt);
   const reservationExpiryTime = reservation.expiresAt
     ? formatTime(reservation.expiresAt)
@@ -180,10 +180,7 @@ export default function ArrivalScreen() {
             <View style={styles.qrFrame}>
               <QRCode value={entryQrValue} size={qrSize} color="#1E293B" backgroundColor="#FFFFFF" />
             </View>
-            <View style={styles.qrCodeBadge}>
-              <Text style={styles.qrCodeBadgeText}>{reservation.reservationCode}</Text>
-            </View>
-            <Text style={styles.qrCaption}>Present this QR at the gate or to the operator so they can confirm your entry.</Text>
+            <Text style={styles.qrCaption}>Present only this QR at the gate or to the operator so they can confirm your entry.</Text>
           </View>
 
           <View style={styles.detailCard}>
@@ -335,7 +332,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingVertical: 22,
     shadowColor: '#0F172A',
     shadowOpacity: 0.05,
     shadowRadius: 12,
@@ -347,22 +344,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
-    padding: 12,
-  },
-  qrCodeBadge: {
-    marginTop: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  qrCodeBadgeText: {
-    color: '#0F766E',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'Poppins_700Bold',
+    padding: 14,
   },
   qrCaption: {
     color: '#64748B',
@@ -370,7 +352,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: 'Poppins_400Regular',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 14,
   },
   detailCard: {
     borderRadius: 20,

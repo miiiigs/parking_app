@@ -30,6 +30,12 @@ test('gate confirmation is service-only, location-scoped, locked, and idempotent
   assert.equal(confirmationSource.includes('Entry pass has expired'), true);
   assert.equal(confirmationSource.includes('parking_grace_ends_at'), true);
   assert.equal(confirmationSource.includes('idempotent_replay'), true);
+  assert.equal(confirmationSource.includes("extensions.digest(trim(p_entry_token), 'sha256')"), true);
+  assert.equal(confirmationSource.includes('walk_in_entry_pass_tokens.reservation_id = p_reservation_id'), true);
+  assert.equal(confirmationSource.includes('alter table parking_slots'), true);
+  assert.equal(confirmationSource.includes('add column if not exists slot_kind text'), true);
+  assert.equal(confirmationSource.includes("set slot_kind = 'standard'"), true);
+  assert.equal(confirmationSource.includes("check (slot_kind in ('standard', 'walk_in_hub'))"), true);
   assert.equal(confirmationSource.includes("v_reservation.status <> 'confirmed' or v_existing_session.status <> 'active'"), true);
   assert.equal(
     confirmationSource.indexOf("v_existing_session.status <> 'active'") < confirmationSource.indexOf('return query select'),
@@ -37,7 +43,7 @@ test('gate confirmation is service-only, location-scoped, locked, and idempotent
   );
   assert.equal(confirmationSource.includes('Entry pass is in a terminal state'), true);
   assert.equal(confirmationSource.includes("'parking_entry_confirmed'"), true);
-  assert.equal(confirmationSource.includes('grant execute on function confirm_parking_entry(uuid, uuid) to service_role'), true);
+  assert.equal(confirmationSource.includes('grant execute on function confirm_parking_entry(uuid, uuid, text) to service_role'), true);
   assert.equal(confirmationSource.includes('from public, anon, authenticated'), true);
   assert.equal(startSource.includes('grant execute on function start_parking_session(uuid, text) to service_role'), true);
   assert.equal(startSource.includes('to anon, authenticated'), false);

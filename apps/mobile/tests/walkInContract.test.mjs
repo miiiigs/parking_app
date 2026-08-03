@@ -16,8 +16,12 @@ test('walk-in entry pass rpc derives identity and source on the server', () => {
   assert.equal(source.includes('auth.uid()'), true);
   assert.equal(source.includes("'walk_in'"), true);
   assert.equal(source.includes('p_user_id'), false);
-  assert.equal(source.includes('You already have an active walk-in entry pass'), true);
+  assert.equal(source.includes('on conflict on constraint walk_in_entry_pass_tokens_reservation_id_key do update'), true);
   assert.equal(source.includes("'scope', 'multi_location'"), true);
+  assert.equal(source.includes('alter table reservations'), true);
+  assert.equal(source.includes('alter column slot_id drop not null'), true);
+  assert.equal(source.includes('extensions.gen_random_bytes(18)'), true);
+  assert.equal(source.includes("extensions.digest(v_entry_token, 'sha256')"), true);
   assert.equal(source.includes('grant execute on function issue_walk_in_entry_pass(text, integer)'), true);
 });
 
@@ -36,13 +40,15 @@ test('walk-in entry pass flow no longer routes through slot-qr validation', () =
 
   assert.equal(screenSource.includes("router.push('/validate')"), false);
   assert.equal(screenSource.includes('Session starts automatically when the timer reaches 00:00.'), false);
-  assert.equal(screenSource.includes('Check Gate Confirmation'), true);
+  assert.equal(screenSource.includes('Universal walk-in access'), true);
   assert.equal(screenSource.includes('scan the QR posted at your parked slot'), false);
   assert.equal(screenSource.includes('Any supported parking lot'), true);
+  assert.equal(screenSource.includes('WALK_IN_ISSUE_TIMEOUT_MS'), true);
+  assert.equal(screenSource.includes('issueTimedOut'), true);
+  assert.equal(screenSource.includes('walkin-debug v3'), false);
   assert.equal(storeSource.includes('startWalkInSession: async'), false);
   assert.equal(storeSource.includes('refreshSession: async'), true);
   assert.equal(storeSource.includes('clearExpiredEntryPass: async'), true);
-  assert.equal(screenSource.includes('await clearExpiredEntryPass()'), true);
 });
 
 test('walk-in expiry cleanup is locked, idempotent, inventory-safe, and audit-backed', () => {

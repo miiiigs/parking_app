@@ -9,6 +9,7 @@
     "dev:mobile": "npm --workspace apps/mobile run start",
     "dev:operator": "npm --workspace apps/parking-app-operator run dev",
     "build:operator": "npm --workspace apps/parking-app-operator run build",
+    "audit:supabase-rpcs": "node ./scripts/audit-supabase-rpcs.mjs",
     "test:mobile": "npm --workspace apps/mobile run test",
     "test:operator": "npm --workspace apps/parking-app-operator run test",
     "test": "npm run test:mobile",

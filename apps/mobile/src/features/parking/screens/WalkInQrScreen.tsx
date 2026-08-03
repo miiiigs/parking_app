@@ -13,6 +13,26 @@ import { useWalkInPreferencesStore } from '../store/useWalkInPreferencesStore';
 import { useResponsiveMetrics } from '../../../hooks/useResponsive';
 import { buildWalkInEntryPass } from '@parking/shared';
 
+const WALK_IN_ISSUE_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export default function WalkInQrScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ lotId?: string }>();
@@ -27,9 +47,12 @@ export default function WalkInQrScreen() {
   const activeWalkInBooking = booking?.source === 'walk_in' ? booking : null;
   const [secondsRemaining, setSecondsRemaining] = useState(600);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [issueTimedOut, setIssueTimedOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [issueAttempt, setIssueAttempt] = useState(0);
   const isPollingRef = useRef(false);
+  const lastIssuedAttemptRef = useRef<number | null>(null);
+  const issueInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!vehicle) {
@@ -38,26 +61,48 @@ export default function WalkInQrScreen() {
   }, [router, vehicle]);
 
   useEffect(() => {
-    if (!vehicle || (activeWalkInBooking && activeWalkInBooking.entryPassToken) || isIssuing) {
+    if (!vehicle || (activeWalkInBooking && activeWalkInBooking.entryPassToken) || issueInFlightRef.current) {
+      return;
+    }
+
+    if (lastIssuedAttemptRef.current === issueAttempt) {
       return;
     }
 
     let active = true;
+    lastIssuedAttemptRef.current = issueAttempt;
+    issueInFlightRef.current = true;
+    const timeoutId = setTimeout(() => {
+      if (!active) {
+        return;
+      }
+
+      setIssueTimedOut(true);
+      setErrorMessage((current) => current ?? 'Issuing the secure Park Now pass took too long. Pull to refresh parking data or tap Retry.');
+      setIsIssuing(false);
+    }, WALK_IN_ISSUE_TIMEOUT_MS);
 
     (async () => {
       try {
         setIsIssuing(true);
+        setIssueTimedOut(false);
         setErrorMessage(null);
-        await issueWalkInEntryPass({
-          lot: preferredLot ?? undefined,
-          plateNumber: vehicle.plate,
-          holdMinutes: 10,
-        });
+        await withTimeout(
+          issueWalkInEntryPass({
+            lot: preferredLot ?? undefined,
+            plateNumber: vehicle.plate,
+            holdMinutes: 10,
+          }),
+          WALK_IN_ISSUE_TIMEOUT_MS,
+          'Issuing the secure Park Now pass took too long. Pull to refresh parking data or tap Retry.',
+        );
       } catch (error) {
         if (active) {
-          setErrorMessage(error instanceof Error ? error.message : 'Unable to issue the walk-in entry pass right now.');
+          setErrorMessage(error instanceof Error ? error.message : 'Unable to issue the Park Now entry pass right now.');
         }
       } finally {
+        clearTimeout(timeoutId);
+        issueInFlightRef.current = false;
         if (active) {
           setIsIssuing(false);
         }
@@ -66,8 +111,9 @@ export default function WalkInQrScreen() {
 
     return () => {
       active = false;
+      clearTimeout(timeoutId);
     };
-  }, [activeWalkInBooking, isIssuing, issueAttempt, issueWalkInEntryPass, preferredLot, vehicle]);
+  }, [activeWalkInBooking, issueAttempt, issueWalkInEntryPass, preferredLot, vehicle]);
 
   useEffect(() => {
     const expiresAt = activeWalkInBooking?.expiresAt;
@@ -135,17 +181,17 @@ export default function WalkInQrScreen() {
   if (isLoading && !preferredLot) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Preparing walk-in QR...</Text>
+        <Text style={styles.loadingTitle}>Preparing Park Now QR...</Text>
         <Text style={styles.loadingCopy}>Loading the supported parking locations.</Text>
       </View>
     );
   }
 
-  if (!activeWalkInBooking && (isLoading || isIssuing) && vehicle) {
+  if (!activeWalkInBooking && isIssuing && vehicle && !errorMessage && !issueTimedOut) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Preparing walk-in QR...</Text>
-        <Text style={styles.loadingCopy}>Issuing your backend walk-in access pass.</Text>
+        <Text style={styles.loadingTitle}>Preparing Park Now QR...</Text>
+        <Text style={styles.loadingCopy}>Issuing your secure Park Now access pass.</Text>
       </View>
     );
   }
@@ -153,7 +199,7 @@ export default function WalkInQrScreen() {
   if (!activeWalkInBooking && vehicle) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>Walk-in QR not available.</Text>
+        <Text style={styles.loadingTitle}>Park Now QR not available.</Text>
         {errorMessage ? <Text style={styles.loadingCopy}>{errorMessage}</Text> : null}
         <AuthActionButton label="Retry" onPress={() => setIssueAttempt((value) => value + 1)} style={styles.loadingButton} />
         <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
@@ -164,7 +210,7 @@ export default function WalkInQrScreen() {
   if (!activeWalkInBooking || !vehicle) {
     return (
       <View style={styles.loadingRoot}>
-        <Text style={styles.loadingTitle}>{dataError ? 'Unable to load the walk-in QR.' : 'Walk-in QR not available.'}</Text>
+        <Text style={styles.loadingTitle}>{dataError ? 'Unable to load the Park Now QR.' : 'Park Now QR not available.'}</Text>
         {dataError ? <Text style={styles.loadingCopy}>{dataError}</Text> : null}
         <AuthActionButton label="Retry" onPress={() => void refresh()} style={styles.loadingButton} />
         <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
@@ -175,14 +221,37 @@ export default function WalkInQrScreen() {
   const issuedAt = new Date(activeWalkInBooking.createdAt ?? new Date().toISOString());
   const timeLabel = issuedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
   const dateLabel = issuedAt.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
-  const qrValue = activeWalkInBooking.reservationId
+  const qrValue = activeWalkInBooking.reservationId && activeWalkInBooking.entryPassToken
     ? buildWalkInEntryPass({
         reservationId: activeWalkInBooking.reservationId,
-        entryToken: activeWalkInBooking.entryPassToken ?? null,
+        entryToken: activeWalkInBooking.entryPassToken,
       })
-    : activeWalkInBooking.reservationCode;
+    : null;
   const isExpired = secondsRemaining <= 0;
   const qrSize = isCompact ? 220 : 256;
+
+  if (!qrValue) {
+    return (
+      <View style={styles.loadingRoot}>
+        <Text style={styles.loadingTitle}>Secure Park Now QR not ready yet.</Text>
+        <Text style={styles.loadingCopy}>
+          {errorMessage
+            ? errorMessage
+            : 'This device is still holding an older Park Now pass format. Request a fresh entrance pass before scanning.'}
+        </Text>
+        <AuthActionButton
+          label={isIssuing ? 'Refreshing entrance pass...' : 'Retry'}
+          onPress={() => {
+            setIssueTimedOut(false);
+            setErrorMessage(null);
+            setIssueAttempt((value) => value + 1);
+          }}
+          style={styles.loadingButton}
+        />
+        <AuthActionButton label="Back to home" variant="secondary" onPress={() => router.replace('/home')} style={styles.loadingButton} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -206,7 +275,7 @@ export default function WalkInQrScreen() {
               <Zap color="#FFFFFF" size={22} strokeWidth={2.4} />
             </View>
             <View style={styles.heroCopyBlock}>
-              <Text style={styles.heroTitle}>Universal walk-in access</Text>
+              <Text style={styles.heroTitle}>Park Now access</Text>
               <Text style={styles.heroCopy}>Present this QR at any supported parking lot. The operator will identify your vehicle and confirm entry at the actual location.</Text>
             </View>
           </View>
@@ -214,7 +283,7 @@ export default function WalkInQrScreen() {
           <View style={styles.qrCard}>
             <View style={styles.qrHeader}>
               <View>
-                <Text style={styles.qrHeaderTitle}>Walk-In Entrance QR</Text>
+                <Text style={styles.qrHeaderTitle}>Park Now Entry QR</Text>
                 <Text style={styles.qrHeaderSubtitle}>{dateLabel} - {timeLabel}</Text>
               </View>
               <View style={[styles.qrStatusBadge, isExpired ? styles.qrStatusBadgeExpired : styles.qrStatusBadgeActive]}>
@@ -242,7 +311,7 @@ export default function WalkInQrScreen() {
             <MapPin color="#1D4ED8" size={14} strokeWidth={2.2} />
             <Text style={styles.noticeCopyInfo}>
               {isExpired
-                ? 'This walk-in pass expired before entry was confirmed.'
+                ? 'This Park Now pass expired before entry was confirmed.'
                 : 'The final rate follows the operator location that confirms your entry.'}
             </Text>
           </View>

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Clock3, Compass, Home, LayoutList, User } from 'lucide-react-native';
+import { CarFront, Compass, Home, LayoutList, User } from 'lucide-react-native';
 
 import { useParkingFlowStore } from '../../features/parking/store/useParkingFlowStore';
 
@@ -11,11 +11,11 @@ type BottomNavProps = {
 };
 
 const tabs = [
-  { key: 'home', label: 'Home', icon: Home, route: '/home' },
-  { key: 'explore', label: 'Explore', icon: Compass, route: '/explore' },
-  { key: 'session', label: 'Active', icon: Clock3, route: '/session' },
-  { key: 'history', label: 'History', icon: LayoutList, route: '/history' },
-  { key: 'profile', label: 'Profile', icon: User, route: '/profile' },
+  { key: 'home', label: 'Home', icon: Home, route: '/home', standout: false },
+  { key: 'explore', label: 'Explore', icon: Compass, route: '/explore', standout: false },
+  { key: 'session', label: 'Park', icon: CarFront, route: '/session', standout: true },
+  { key: 'history', label: 'History', icon: LayoutList, route: '/history', standout: false },
+  { key: 'profile', label: 'Profile', icon: User, route: '/profile', standout: false },
 ] as const;
 
 export function BottomNav({ activeTab }: BottomNavProps) {
@@ -30,20 +30,47 @@ export function BottomNav({ activeTab }: BottomNavProps) {
         {tabs.map((tab) => {
           const active = tab.key === activeTab;
           const Icon = tab.icon;
-          const showBadge = tab.key === 'session' && hasActiveWorkflow && !active;
+          const showBadge = tab.key === 'session' && hasActiveWorkflow && !active && !tab.standout;
+          const standout = tab.standout === true;
 
           return (
             <Pressable
               key={tab.key}
               onPress={() => router.replace(tab.route)}
-              style={styles.tabButton}
+              style={[styles.tabButton, standout ? styles.tabButtonStandout : null]}
             >
               {active ? <View style={styles.activeIndicator} /> : null}
-              <View style={styles.iconWrap}>
-                <Icon color={active ? '#0F766E' : '#94A3B8'} size={20} strokeWidth={active ? 2.2 : 1.8} />
+              <View
+                style={[
+                  styles.iconWrap,
+                  standout ? styles.iconWrapStandout : null,
+                  standout && active ? styles.iconWrapStandoutActive : null,
+                ]}
+              >
+                <Icon
+                  color={
+                    standout
+                      ? active
+                        ? '#FFFFFF'
+                        : '#0F766E'
+                      : active
+                        ? '#0F766E'
+                        : '#94A3B8'
+                  }
+                  size={standout ? 24 : 22}
+                  strokeWidth={active || standout ? 2.2 : 1.9}
+                />
                 {showBadge ? <View style={styles.notificationDot} /> : null}
               </View>
-              <Text style={[styles.tabLabel, active ? styles.tabLabelActive : null]}>{tab.label}</Text>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  standout ? styles.tabLabelStandout : null,
+                  active ? styles.tabLabelActive : null,
+                ]}
+              >
+                {tab.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -63,20 +90,23 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    paddingTop: 10,
-    paddingBottom: 8,
+    gap: 4,
+    paddingTop: 12,
+    paddingBottom: 11,
+  },
+  tabButtonStandout: {
+    paddingTop: 8,
+    paddingBottom: 9,
   },
   activeIndicator: {
     position: 'absolute',
     top: 0,
     left: '50%',
-    marginLeft: -10,
-    width: 20,
-    height: 2.5,
+    marginLeft: -12,
+    width: 24,
+    height: 3,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
     backgroundColor: '#0F766E',
@@ -84,11 +114,27 @@ const styles = StyleSheet.create({
   iconWrap: {
     position: 'relative',
   },
+  iconWrapStandout: {
+    minWidth: 42,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8FBF2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  iconWrapStandoutActive: {
+    backgroundColor: '#0F766E',
+  },
   tabLabel: {
     color: '#94A3B8',
-    fontSize: 9.5,
-    lineHeight: 11,
+    fontSize: 10.5,
+    lineHeight: 12,
     fontFamily: 'Poppins_400Regular',
+  },
+  tabLabelStandout: {
+    color: '#64748B',
+    fontFamily: 'Poppins_600SemiBold',
   },
   tabLabelActive: {
     color: '#0F766E',

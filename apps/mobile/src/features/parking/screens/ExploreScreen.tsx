@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
   AlertTriangle,
-  CarFront,
   ChevronRight,
   MapPin,
   Search,
@@ -215,7 +214,8 @@ export default function ExploreScreen() {
 
 function ExploreLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void }) {
   const availabilityColor = getAvailabilityColor(lot.availableSlots, lot.totalSlots);
-  const availabilityBackground = getAvailabilityBackground(lot.availableSlots, lot.totalSlots);
+  const pricingSummary = formatParkingPricingSummary(lot.pricingConfig);
+  const buildingType = classifyBuildingType(lot);
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
@@ -226,32 +226,15 @@ function ExploreLotCard({ lot, onPress }: { lot: ParkingLot; onPress: () => void
             <MapPin color="#94A3B8" size={10} strokeWidth={2.2} />
             <Text style={styles.addressText}>{lot.address}</Text>
           </View>
-        </View>
-        <View style={styles.distanceBadge}>
-          <Text style={styles.distanceBadgeText}>{formatDistance(lot.distanceKm)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.metrics}>
-        <View style={[styles.metricCard, { backgroundColor: availabilityBackground }]}>
-          <View style={styles.metricLabelRow}>
-            <CarFront color="#64748B" size={10} strokeWidth={2.2} />
-            <Text style={styles.metricLabel}>Available</Text>
-          </View>
-          <Text style={[styles.metricValue, { color: availabilityColor }]}>
-            {lot.availableSlots}
-            <Text style={styles.metricValueSuffix}>/{lot.totalSlots}</Text>
+          <Text style={styles.cardMetaText}>
+            {buildingType} • {pricingSummary} • {formatDistance(lot.distanceKm)}
           </Text>
         </View>
 
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>Pricing</Text>
-          <Text style={styles.metricDetail}>{formatParkingPricingSummary(lot.pricingConfig)}</Text>
-        </View>
-
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>Type</Text>
-          <Text style={styles.metricDetail}>{classifyBuildingType(lot)}</Text>
+        <View style={styles.exploreAvailabilityBlock}>
+          <Text style={styles.exploreAvailabilityLabel}>Available</Text>
+          <Text style={[styles.exploreAvailabilityValue, { color: availabilityColor }]}>{lot.availableSlots}</Text>
+          <Text style={styles.exploreAvailabilityMeta}>reserve lots</Text>
         </View>
       </View>
 
@@ -289,20 +272,6 @@ function getAvailabilityColor(available: number, total: number) {
   }
 
   return '#DC2626';
-}
-
-function getAvailabilityBackground(available: number, total: number) {
-  const ratio = total > 0 ? available / total : 0;
-
-  if (ratio > 0.5) {
-    return '#F0FDF4';
-  }
-
-  if (ratio > 0.2) {
-    return '#FFFBEB';
-  }
-
-  return '#FEF2F2';
 }
 
 const styles = StyleSheet.create({
@@ -444,7 +413,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 12,
     marginBottom: 12,
   },
   cardCopy: {
@@ -469,57 +438,36 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_400Regular',
     flex: 1,
   },
-  distanceBadge: {
-    borderRadius: 20,
-    backgroundColor: '#F0FDFA',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  distanceBadgeText: {
-    color: '#0F766E',
-    fontSize: 11,
-    lineHeight: 14,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  metrics: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  metricCard: {
-    flex: 1,
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  metricLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 2,
-  },
-  metricLabel: {
-    color: '#64748B',
-    fontSize: 9,
-    lineHeight: 12,
-    fontFamily: 'Poppins_400Regular',
-  },
-  metricValue: {
-    fontSize: 16,
-    lineHeight: 20,
-    fontFamily: 'Poppins_700Bold',
-  },
-  metricValueSuffix: {
+  cardMetaText: {
     color: '#94A3B8',
-    fontSize: 9,
-    lineHeight: 12,
-    fontFamily: 'Poppins_400Regular',
-  },
-  metricDetail: {
-    color: '#0F172A',
     fontSize: 12,
     lineHeight: 16,
+    fontFamily: 'Poppins_400Regular',
+    marginTop: 6,
+  },
+  exploreAvailabilityBlock: {
+    minWidth: 72,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  exploreAvailabilityLabel: {
+    color: '#94A3B8',
+    fontSize: 10,
+    lineHeight: 14,
     fontFamily: 'Poppins_600SemiBold',
+    letterSpacing: 0.4,
+  },
+  exploreAvailabilityValue: {
+    fontSize: 24,
+    lineHeight: 28,
+    fontFamily: 'Poppins_700Bold',
+  },
+  exploreAvailabilityMeta: {
+    color: '#94A3B8',
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: 'Poppins_400Regular',
   },
   cardFooter: {
     flexDirection: 'row',

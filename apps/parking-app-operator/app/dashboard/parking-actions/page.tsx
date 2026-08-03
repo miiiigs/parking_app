@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Camera, CircleOff, Loader2, QrCode, ScanLine } from 'lucide-react';
 
@@ -152,6 +153,14 @@ function isBarcodeDetectorSupported() {
   return Boolean((window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector);
 }
 
+function isCameraScanSupported() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  return Boolean(navigator.mediaDevices?.getUserMedia);
+}
+
 export default function ParkingActionsPage() {
   const searchParams = useSearchParams();
   const { user, activeLocation } = useAuth();
@@ -167,6 +176,7 @@ export default function ParkingActionsPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scanLockRef = useRef(false);
 
   const canOperateParkingActions = hasOperatorCapability(user?.role, 'edit-slot-status');
@@ -177,7 +187,7 @@ export default function ParkingActionsPage() {
   );
 
   useEffect(() => {
-    setScanSupported(isBarcodeDetectorSupported());
+    setScanSupported(isCameraScanSupported());
   }, []);
 
   useEffect(() => {
@@ -294,12 +304,7 @@ export default function ParkingActionsPage() {
   }
 
   async function startCameraScan() {
-    if (!isBarcodeDetectorSupported()) {
-      setScanMessage('Camera QR scanning is not available in this browser yet. Use manual entry instead.');
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!isCameraScanSupported()) {
       setScanMessage('Camera access is unavailable in this environment. Use manual entry instead.');
       return;
     }
@@ -327,11 +332,19 @@ export default function ParkingActionsPage() {
       await video.play();
 
       const Detector = (window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
-      if (!Detector) {
-        throw new Error('Camera QR scanning is not available in this browser yet.');
+      const detector = Detector ? new Detector({ formats: ['qr_code'] }) : null;
+      const canvas = canvasRef.current ?? document.createElement('canvas');
+      canvasRef.current = canvas;
+      const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
+      if (!canvasContext) {
+        throw new Error('This browser camera preview started, but QR decoding could not be initialized.');
       }
 
-      const detector = new Detector({ formats: ['qr_code'] });
+      setScanMessage(
+        detector
+          ? 'Camera scan is ready. Point the QR at the frame.'
+          : 'Camera scan is running in compatibility mode for this browser. Point the QR at the frame.',
+      );
       setCameraLoading(false);
 
       const scanFrame = async () => {
@@ -343,7 +356,31 @@ export default function ParkingActionsPage() {
         }
 
         try {
-          const results = await detector.detect(videoRef.current);
+          if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 2 || video.videoHeight < 2) {
+            animationFrameRef.current = window.requestAnimationFrame(() => {
+              void scanFrame();
+            });
+            return;
+          }
+
+          let results: BarcodeResult[] = [];
+          if (detector) {
+            results = await detector.detect(videoRef.current);
+          } else {
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+            }
+
+            canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+            const decoded = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'attemptBoth',
+            });
+
+            results = decoded?.data ? [{ rawValue: decoded.data }] : [];
+          }
+
           const match = results.find((item) => typeof item.rawValue === 'string' && item.rawValue.trim().length > 0);
 
           if (match?.rawValue) {
@@ -449,10 +486,10 @@ export default function ParkingActionsPage() {
                   <ScanLine className="h-4 w-4" />
                   Camera scan
                 </div>
-                <div className="mt-2 text-sm text-muted-foreground">
+              <div className="mt-2 text-sm text-muted-foreground">
                   {scanSupported
                     ? 'Use the device camera to read any valid customer entry QR. Once verified, the entry is attached to the active operator location automatically.'
-                    : 'This browser does not expose in-app QR detection, so operators should use the manual QR payload field below.'}
+                    : 'This browser cannot open camera scanning here, so operators should use the manual QR payload field below.'}
                 </div>
                 <div className="relative mt-4 overflow-hidden rounded-lg border border-border bg-black/60">
                   <video
